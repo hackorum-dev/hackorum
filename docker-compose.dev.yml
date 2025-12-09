@@ -1,0 +1,77 @@
+services:
+  db:
+    image: postgres:18
+    env_file:
+      - .env.development
+    volumes:
+      - db-data:/var/lib/postgresql
+    ports:
+      - "15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hackorum} -d ${POSTGRES_DB:-hackorum_development}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .env.development
+    environment:
+      RAILS_ENV: development
+      NODE_ENV: development
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-hackorum}:${POSTGRES_PASSWORD:-hackorum}@db:5432/${POSTGRES_DB:-hackorum_development}}
+      PGHOST: db
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER:-hackorum}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-hackorum}
+      PGDATABASE: ${POSTGRES_DB:-hackorum_development}
+    volumes:
+      - .:/app
+      - bundle:/usr/local/bundle
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["./bin/docker-entrypoint"]
+    command: ["./bin/dev", "-b", "0.0.0.0", "-p", "3000"]
+
+  imap_worker:
+    profiles: ["imap"]
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .env.development
+    command: ["bundle", "exec", "ruby", "script/imap_idle.rb"]
+    environment:
+      RAILS_ENV: development
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-hackorum}:${POSTGRES_PASSWORD:-hackorum}@db:5432/${POSTGRES_DB:-hackorum_development}}
+      PGHOST: db
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER:-hackorum}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-hackorum}
+      PGDATABASE: ${POSTGRES_DB:-hackorum_development}
+    volumes:
+      - .:/app
+      - bundle:/usr/local/bundle
+    depends_on:
+      db:
+        condition: service_healthy
+
+  psql:
+    profiles: ["tools"]
+    image: postgres:18
+    entrypoint: ["psql", "postgresql://${POSTGRES_USER:-hackorum}:${POSTGRES_PASSWORD:-hackorum}@db:5432/${POSTGRES_DB:-hackorum_development}"]
+    env_file:
+      - .env.development
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:
+  bundle:
