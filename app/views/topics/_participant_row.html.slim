@@ -1,0 +1,25 @@
+- alias_record = participant[:alias]
+- return unless alias_record
+- avatar_size = local_assigns[:avatar_size] || 40
+- message_count = participant[:message_count]
+- last_at = participant[:last_at]
+- tooltip_parts = []
+- tooltip_parts << "#{message_count} messages" if message_count
+- tooltip_parts << "last #{smart_time_display(last_at)}" if last_at
+- tooltip = local_assigns[:tooltip] || (tooltip_parts.any? ? tooltip_parts.join(", ") : alias_record.name)
+- avatar_classes = ["participant-avatar"]
+- avatar_classes << "is-core-team" if alias_record.core_team?
+- avatar_classes << "is-committer" if !alias_record.core_team? && alias_record.committer?
+- avatar_classes << "is-major-contributor" if !alias_record.core_team? && !alias_record.committer? && alias_record.major_contributor?
+- avatar_classes << "is-significant-contributor" if !alias_record.core_team? && !alias_record.committer? && !alias_record.major_contributor? && alias_record.significant_contributor?
+- avatar_classes << "is-past-contributor" if alias_record.contributor&.past_contributor?
+- row_classes = ["participant-row"]
+- row_classes << "is-core-team" if alias_record.core_team?
+- row_classes << "is-committer" if alias_record.committer?
+- row_classes << "is-major-contributor" if alias_record.major_contributor?
+- row_classes << "is-significant-contributor" if alias_record.significant_contributor?
+- row_classes << "is-past-contributor" if alias_record.contributor&.past_contributor?
+.participant-row class=row_classes.join(" ") title=tooltip
+  = image_tag alias_record.gravatar_url(size: avatar_size), class: avatar_classes.join(" "), alt: alias_record.name, title: tooltip
+  .participant-details
+    .participant-name = alias_record.name

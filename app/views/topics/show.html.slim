@@ -8,25 +8,7 @@
         .participants-list
           - max_participants = 12
           - @participants.first(max_participants).each do |participant|
-            - alias_record = participant[:alias]
-            - badge_text = alias_record.contributor_badge
-            - avatar_classes = ["participant-avatar"]
-            - avatar_classes << "is-core-team" if alias_record.core_team?
-            - avatar_classes << "is-committer" if !alias_record.core_team? && alias_record.committer?
-            - avatar_classes << "is-major-contributor" if !alias_record.core_team? && !alias_record.committer? && alias_record.major_contributor?
-            - avatar_classes << "is-significant-contributor" if !alias_record.core_team? && !alias_record.committer? && !alias_record.major_contributor? && alias_record.significant_contributor?
-            - avatar_classes << "is-past-contributor" if alias_record.contributor&.past_contributor?
-            - row_classes = ["participant-row"]
-            - row_classes << "is-core-team" if alias_record.core_team?
-            - row_classes << "is-committer" if alias_record.committer?
-            - row_classes << "is-major-contributor" if alias_record.major_contributor?
-            - row_classes << "is-significant-contributor" if alias_record.significant_contributor?
-            - row_classes << "is-past-contributor" if alias_record.contributor&.past_contributor?
-            - tooltip = "#{participant[:message_count]} messages, last #{smart_time_display(participant[:last_at])}"
-            .participant-row class=row_classes.join(" ") title=tooltip
-              = image_tag alias_record.gravatar_url(size: 40), class: avatar_classes.join(" "), alt: alias_record.name, title: tooltip
-              .participant-details
-                .participant-name = alias_record.name
+            = render partial: "participant_row", locals: { participant: participant, avatar_size: 40 }
           - if @participants.size > max_participants
             .participant-more "+ #{(@participants.size - max_participants)} more"
       - else

@@ -66,6 +66,30 @@ class Topic < ApplicationRecord
     end
   end
 
+  def contributor_participants
+    @contributor_participants ||= begin
+      contributor_alias_ids = Contributor.joins(:aliases).pluck('aliases.id').uniq
+      return [] if contributor_alias_ids.empty?
+
+      stats = messages.where(sender_id: contributor_alias_ids)
+                      .group(:sender_id)
+                      .select('sender_id, COUNT(*) AS message_count, MAX(created_at) AS last_at')
+
+      alias_map = Alias.includes(:contributors).where(id: stats.map(&:sender_id)).index_by(&:id)
+
+      stats.map do |row|
+        alias_record = alias_map[row.sender_id]
+        next unless alias_record
+
+        {
+          alias: alias_record,
+          message_count: row.read_attribute(:message_count).to_i,
+          last_at: row.read_attribute(:last_at)
+        }
+      end.compact.sort_by { |p| [-p[:message_count], p[:alias].name] }
+    end
+  end
+
   def highest_contributor_activity
     return "core_team" if has_core_team_activity?
     return "committer" if has_committer_activity?

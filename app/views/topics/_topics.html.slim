@@ -2,8 +2,16 @@
   tr.topic-row data-topic-id=topic.id data-last-message-id=topic.messages.maximum(:id)
     td.topic-title data-label="Topic"
       - if topic.has_contributor_activity?
-        div class ="topic-icon activity-#{ topic.highest_contributor_activity }"
+        - contributor_participants = topic.contributor_participants
+        - contributor_count = contributor_participants.size
+        div class ="topic-icon activity-#{ topic.highest_contributor_activity }" data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
           i.fa-solid.fa-users-rays
+          - if contributor_count.positive?
+            span.topic-icon-badge = contributor_count
+          - if contributor_participants.any?
+            .topic-icon-hover data-hover-popover-target="popover" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+              - contributor_participants.each do |participant|
+                = render partial: "participant_row", locals: { participant: participant, avatar_size: 32 }
       - if topic.attachments.exists?
         .topic-icon
           i.fa-solid.fa-paperclip

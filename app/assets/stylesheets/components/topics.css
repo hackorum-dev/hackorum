@@ -73,6 +73,26 @@
   padding: 3px;
   margin: 5px 0px;
   margin-right: 10px;
+  position: relative;
+}
+
+.topic-icon-badge {
+  position: absolute;
+  bottom: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 2px 4px;
+  border-radius: 999px;
+  background: var(--color-bg-icon);
+  color: #000;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .activity-core_team {
@@ -87,6 +107,31 @@
   &:hover {
     background: var(--color-bg-hover);
   }
+}
+
+.topic-icon-hover {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  background: var(--color-bg-hoverbox);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-3);
+  box-shadow: var(--shadow-lg);
+  min-width: 260px;
+}
+
+.topic-icon.is-open .topic-icon-hover {
+  display: block;
+}
+
+.topic-icon-hover .participant-row {
+  margin-bottom: var(--spacing-2);
+}
+
+.topic-icon-hover .participant-row:last-child {
+  margin-bottom: 0;
 }
 
 .topic-meta {
