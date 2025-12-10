@@ -89,6 +89,12 @@
   }
 }
 
+.topic-meta {
+  & span {
+    padding-right: var(--spacing-2);
+  }
+}
+
 .topic-link {
   color: var(--color-text-link);
   text-decoration: none;
