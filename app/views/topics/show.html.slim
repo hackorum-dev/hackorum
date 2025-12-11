@@ -95,9 +95,11 @@
       span.message-count #{@messages.size} messages
 
 - if user_signed_in?
-  - thread_notes = @notes_by_message&.[](:thread) || []
   .thread-notes-container
-    = render "notes/note_stack", topic: @topic, message: nil, notes: thread_notes
+    .note-actions-inline
+      = render "notes/add_button", topic: @topic, message: nil
+    - thread_notes = @notes_by_message&.[](:thread) || []
+    = render "notes/note_stack", topic: @topic, message: nil, notes: thread_notes, open_form: false
 
 .messages-container class=(["messages-container", @view_mode, (@sort_order == :desc ? "desc" : "asc")].compact.join(" "))
   - if user_signed_in?

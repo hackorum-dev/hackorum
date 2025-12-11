@@ -1,0 +1,9 @@
+- note_dom_id = message ? "notes-message-#{message.id}" : "thread-notes"
+- button_classes = ["note-add-link"]
+
+= button_tag "Add note",
+  type: "button",
+  class: button_classes.join(" "),
+  data: { controller: "note-loader",
+          action: "click->note-loader#load",
+          note_loader_url_value: new_note_path(topic_id: topic.id, message_id: message&.id, format: :turbo_stream) }

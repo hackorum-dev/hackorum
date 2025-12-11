@@ -29,6 +29,9 @@
       - if message.attachments.any?
         .attachment-indicator
           span.attachment-count #{message.attachments.size} attachment(s)
+      - if user_signed_in?
+        .note-actions-inline
+          = render "notes/add_button", topic: @topic, message: message
 
   .message-content class=read_classes.join(" ") data=read_data
     - if message.subject != @topic.title && message.subject.present?
@@ -51,7 +54,5 @@
       details
         summary Import Notes
         pre.import-log = message.import_log
-
   - notes_for_message = @notes_by_message&.[](message.id) || []
-  - if user_signed_in?
-    = render "notes/note_stack", topic: @topic, message: message, notes: notes_for_message
+  = render "notes/note_stack", topic: @topic, message: message, notes: notes_for_message, open_form: false

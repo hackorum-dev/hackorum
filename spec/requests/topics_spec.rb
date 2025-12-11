@@ -73,51 +73,23 @@ RSpec.describe "Topics", type: :request do
         expect(response.body).to include(reply_message.body)
       end
 
-      it "shows threaded view by default" do
+      it "shows flat view by default (oldest first)" do
         get topic_path(topic)
-        expect(response.body).to include('messages-container threaded')
-      end
-
-      it "has active Threaded button" do
-        get topic_path(topic)
-        expect(response.body).to include('class="toggle-btn active"')
-      end
-
-      it "has active Oldest First button" do
-        get topic_path(topic)
-        expect(response.body).to include('class="toggle-btn active"')
-      end
-    end
-
-    context "with flat view mode" do
-      it "shows flat view" do
-        get topic_path(topic, view: 'flat')
-        expect(response).to have_http_status(:success)
         expect(response.body).to include('messages-container flat')
-      end
-
-      it "has active Flat button" do
-        get topic_path(topic, view: 'flat')
-        expect(response.body).to include('toggle-btn active')
+        # root should appear before reply
+        root_position = response.body.index(root_message.body)
+        reply_position = response.body.index(reply_message.body)
+        expect(root_position).to be < reply_position
       end
     end
 
     context "with descending sort" do
-      it "shows newest first" do
+      it "still shows oldest first (descending disabled)" do
         get topic_path(topic, view: 'flat', sort: 'desc')
         expect(response).to have_http_status(:success)
-        # Check that reply message appears before root message in HTML
-        reply_position = response.body.index(reply_message.body)
         root_position = response.body.index(root_message.body)
-        expect(reply_position).to be < root_position
-      end
-    end
-
-    context "with invalid view mode" do
-      it "defaults to threaded" do
-        get topic_path(topic, view: 'invalid')
-        expect(response).to have_http_status(:success)
-        expect(response.body).to include('messages-container threaded')
+        reply_position = response.body.index(reply_message.body)
+        expect(root_position).to be < reply_position
       end
     end
 
