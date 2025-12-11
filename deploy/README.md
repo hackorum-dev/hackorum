@@ -20,10 +20,16 @@ This is a minimal, single-host setup for running Hackorum on a VPS (e.g., Hetzne
    # edit deploy/.env (SECRET_KEY_BASE, IMAP creds, etc.)
    ```
 
-2) Update Caddyfile domain:
+2) Copy and tune Postgres config:
+   ```bash
+   cp deploy/postgres/postgresql.conf.example deploy/postgres/postgresql.conf
+   # edit deploy/postgres/postgresql.conf to match host resources
+   ```
+
+3) Update Caddyfile domain:
    - Edit `deploy/Caddyfile` and replace `hackorum.example.com` and contact email.
 
-3) Build and start:
+4) Build and start:
    ```bash
    cd deploy
    docker compose up -d --build
@@ -35,7 +41,7 @@ This is a minimal, single-host setup for running Hackorum on a VPS (e.g., Hetzne
    - `caddy`: TLS + reverse proxy on :80/:443
    - `autoheal`: restarts containers whose healthchecks fail
 
-4) Verify:
+5) Verify:
    - Browse to your domain; or `curl -f http://localhost:3000/up` from the host (`docker compose exec web ...` inside the network).
 
 ## Environment variables (deploy/.env)

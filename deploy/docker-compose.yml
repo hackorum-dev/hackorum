@@ -12,13 +12,11 @@ services:
       - pgdata:/var/lib/postgresql
       - pgwal:/var/lib/postgresql/wal-archive
       - pgbackups:/backups
+      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro # copy from postgresql.conf.example
     command:
       [
         "postgres",
-        "-c", "wal_level=replica",
-        "-c", "archive_mode=on",
-        "-c", "archive_timeout=60",
-        "-c", "archive_command=test ! -f /var/lib/postgresql/wal-archive/%f \\&\\& cp %p /var/lib/postgresql/wal-archive/%f"
+        "-c", "config_file=/etc/postgresql/postgresql.conf"
       ]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-hackorum}"]
