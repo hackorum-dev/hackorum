@@ -192,7 +192,7 @@
 }
 
 .topic-row.topic-read {
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
 }
 
 .topic-icon-hover {
@@ -240,6 +240,15 @@
 
   &:hover {
     color: var(--color-text-link-hover);
+    text-decoration: underline;
+  }
+}
+
+.topic-row.topic-read .topic-link {
+  color: var(--color-text-muted);
+
+  &:hover {
+    color: var(--color-text-muted);
     text-decoration: underline;
   }
 }
