@@ -1,0 +1,29 @@
+- state = state || {}
+- note_count = note_count.to_i
+- participation = participation || {}
+- team_readers = team_readers || []
+
+tr id=dom_id(topic) class="topic-row topic-#{state[:status] || 'new'}" data-topic-id=topic.id data-last-message-id=topic.messages.maximum(:id)
+  = render partial: "topics/status_cell", locals: { topic: topic, state: state, note_count: note_count, team_readers: team_readers }
+  td.topic-activity data-label="Activity"
+    - last_message = topic.messages.order(:created_at).last
+    - replies_count = [topic.messages.count - 1, 0].max
+    .activity-info.compact
+      .activity-replies = pluralize(replies_count, "reply")
+      .activity-time title=absolute_time_display(last_message.created_at) = smart_time_display(last_message.created_at)
+  td.topic-participants data-label="Participants"
+    - participants = topic.participant_aliases(limit: 5)
+    - participant_count = topic.participant_count
+    = render partial: "avatar_list", locals: { participants: participants, total_participants: participant_count }
+    - if topic.has_contributor_activity?
+      - contributor_participants = topic.contributor_participants
+      - contributor_count = contributor_participants.size
+      div class ="topic-icon activity-#{ topic.highest_contributor_activity }" data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+        i.fa-solid.fa-users-rays
+        - if contributor_count.positive?
+          span.topic-icon-badge = contributor_count
+        - if contributor_participants.any?
+          .topic-icon-hover data-hover-popover-target="popover" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+            - contributor_participants.each do |participant|
+              = render partial: "participant_row", locals: { participant: participant, avatar_size: 32 }
+    = render partial: "topics/participation_icon", locals: { topic: topic, participation: participation }

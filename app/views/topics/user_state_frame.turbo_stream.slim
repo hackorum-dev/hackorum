@@ -4,8 +4,5 @@
   - participation = @participation_flags&.dig(topic.id) || {}
   - team_readers = state[:team_readers] || []
 
-  = turbo_stream.replace dom_id(topic, "status_cell") do
-    = render partial: "topics/status_cell", locals: { topic: topic, state: state, note_count: note_count, team_readers: team_readers }
-
-  = turbo_stream.replace dom_id(topic, "participation") do
-    = render partial: "topics/participation_icon", locals: { topic: topic, participation: participation }
+  = turbo_stream.replace dom_id(topic) do
+    = render partial: "topics/topic_row_user", locals: { topic: topic, state: state, note_count: note_count, participation: participation, team_readers: team_readers }
