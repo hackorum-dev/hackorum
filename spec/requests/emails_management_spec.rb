@@ -23,6 +23,10 @@ RSpec.describe 'Emails management', type: :request do
     end
 
     raw = extract_raw_token_from_mailer
+
+    # Simulate user clicking verification link while logged out (no session).
+    delete session_path
+
     get verification_path(token: raw)
     expect(response).to redirect_to(settings_path)
 
@@ -43,6 +47,55 @@ RSpec.describe 'Emails management', type: :request do
       post emails_path, params: { email: 'taken@example.com' }
     }.not_to change { UserToken.count }
     expect(response).to redirect_to(settings_path)
+  end
+
+  it 'attaches all matching aliases when the email exists multiple times' do
+    user = create(:user, password: 'secret', password_confirmation: 'secret')
+    create(:alias, user: user, email: 'me-multi@example.com', primary_alias: true)
+    Alias.by_email('me-multi@example.com').update_all(verified_at: Time.current)
+
+    # Legacy duplicates for the same email (different names)
+    create(:alias, email: 'multi@example.com', name: 'Old One')
+    create(:alias, email: 'multi@example.com', name: 'Older One')
+
+    sign_in(email: 'me-multi@example.com')
+
+    perform_enqueued_jobs do
+      post emails_path, params: { email: 'multi@example.com' }
+      expect(response).to redirect_to(settings_path)
+    end
+
+    raw = extract_raw_token_from_mailer
+    get verification_path(token: raw)
+    expect(response).to redirect_to(settings_path)
+
+    aliases = Alias.by_email('multi@example.com')
+    expect(aliases.count).to eq(2)
+    expect(aliases.pluck(:user_id).uniq).to eq([user.id])
+    expect(aliases.where(verified_at: nil)).to be_empty
+  end
+
+  it 'rejects verification when logged in as a different user than the token user' do
+    token_user = create(:user, password: 'secret', password_confirmation: 'secret')
+    create(:alias, user: token_user, email: 'token-user@example.com', primary_alias: true)
+    Alias.by_email('token-user@example.com').update_all(verified_at: Time.current)
+
+    other_user = create(:user, password: 'secret', password_confirmation: 'secret')
+    create(:alias, user: other_user, email: 'other@example.com', primary_alias: true)
+    Alias.by_email('other@example.com').update_all(verified_at: Time.current)
+
+    # Simulate an existing verification token for token_user.
+    token, raw = UserToken.issue!(purpose: 'add_alias', user: token_user, email: 'token-user@example.com', ttl: 1.hour)
+
+    sign_in(email: 'other@example.com')
+
+    get verification_path(token: raw)
+
+    expect(response).to redirect_to(settings_path)
+    expect(flash[:alert]).to match(/different user/)
+    expect(Alias.by_email('token-user@example.com').pluck(:user_id).uniq).to eq([token_user.id])
+  ensure
+    token&.destroy
   end
 
   def extract_raw_token_from_mailer

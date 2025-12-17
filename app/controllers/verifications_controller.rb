@@ -67,17 +67,23 @@ class VerificationsController < ApplicationController
   end
 
   def handle_add_alias(token)
-    require_authentication
+    user = token.user
+    return redirect_to root_path, alert: 'Invalid token user' unless user
+
+    if user_signed_in? && current_user.id != user.id
+      return redirect_to settings_path, alert: 'This verification link belongs to a different user.'
+    end
+
     email = token.email
-    if Alias.by_email(email).where.not(user_id: [nil, current_user.id]).exists?
+    if Alias.by_email(email).where.not(user_id: [nil, user.id]).exists?
       return redirect_to settings_path, alert: 'Email is linked to another account. Delete that account first to release it.'
     end
 
     aliases = Alias.by_email(email)
     if aliases.exists?
-      aliases.update_all(user_id: current_user.id, verified_at: Time.current)
+      aliases.update_all(user_id: user.id, verified_at: Time.current)
     else
-      Alias.create!(user: current_user, name: email, email: email, verified_at: Time.current)
+      Alias.create!(user: user, name: email, email: email, verified_at: Time.current)
     end
 
     redirect_to settings_path, notice: 'Email added and verified.'
