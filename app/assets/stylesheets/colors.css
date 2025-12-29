@@ -29,7 +29,7 @@
   --color-secondary2-5: #3b82f6;
 
   --color-gray-25: #f8fafc;
-  --color-gray-50: #f8fafc;
+  --color-gray-50: var(--color-gray-25);
   --color-gray-100: #e2e8f0;
   --color-gray-300: #cbd5e1;
   --color-gray-500: #64748b;
@@ -38,29 +38,29 @@
   --color-gray-800: #1e293b;
   --color-gray-900: #0f172a;
 
-  --color-text-primary: #0f172a;
+  --color-text-primary: var(--color-gray-900);
   --color-text-secondary: #1f2937;
   --color-text-muted: #6b7280;
   --color-text-link: var(--color-primary-700);
   --color-text-link-hover: var(--color-primary-900);
-  --color-text-contrast: #f8fafc;
-  --color-text-button: #0f172a;
+  --color-text-contrast: var(--color-gray-50);
+  --color-text-button: var(--color-gray-900);
   --color-text-nav: var(--color-text-primary);
 
   --color-bg-page: var(--color-primary-1);
-  --color-bg-input: #f8fafc;
+  --color-bg-input: var(--color-gray-50);
   --color-bg-container: #ffffff;
-  --color-bg-card: #ffffff;
+  --color-bg-card: var(--color-bg-container);
   --color-bg-hover: var(--color-primary-2);
   --color-bg-sidebar: #f3f4ff;
   --color-bg-sidebar-header: var(--color-primary-2);
   --color-bg-table-header: var(--color-primary-2);
-  --color-bg-nav: #0f172a;
+  --color-bg-nav: var(--color-gray-900);
   --color-bg-button: var(--color-primary-2);
   --color-bg-button-hover: var(--color-primary-3);
   --color-bg-icon: var(--color-secondary1-2);
   --color-bg-icon-status: var(--color-secondary2-2);
-  --color-bg-hoverbox: #eef2ff;
+  --color-bg-hoverbox: var(--color-primary-50);
   --color-bg-contributor: var(--color-secondary1-2);
   --color-bg-committer: var(--color-secondary2-2);
   --color-bg-activity-team: var(--color-secondary2-2);
@@ -128,27 +128,27 @@
   --color-gray-800: #e5e7eb;
   --color-gray-900: #f8fafc;
 
-  --color-text-primary: #e2e8f0;
-  --color-text-secondary: #cbd5e1;
-  --color-text-muted: #94a3b8;
-  --color-text-link: #c7d2fe;
-  --color-text-link-hover: #e0e7ff;
-  --color-text-contrast: #f8fafc;
-  --color-text-button: #e2e8f0;
+  --color-text-primary: var(--color-gray-700);
+  --color-text-secondary: var(--color-gray-600);
+  --color-text-muted: var(--color-gray-500);
+  --color-text-link: var(--color-primary-700);
+  --color-text-link-hover: var(--color-primary-900);
+  --color-text-contrast: var(--color-gray-900);
+  --color-text-button: var(--color-gray-700);
   --color-text-nav: var(--color-text-contrast);
 
   --color-bg-page: var(--color-primary-1);
-  --color-bg-input: #111827;
+  --color-bg-input: var(--color-gray-100);
   --color-bg-container: var(--color-primary-2);
-  --color-bg-card: #111827;
-  --color-bg-hover: #1f2937;
+  --color-bg-card: var(--color-gray-100);
+  --color-bg-hover: var(--color-gray-300);
   --color-bg-sidebar: var(--color-primary-2);
-  --color-bg-sidebar-header: #111827;
-  --color-bg-table-header: #111827;
-  --color-bg-nav: #0b1220;
-  --color-bg-button: #223055;
+  --color-bg-sidebar-header: var(--color-gray-100);
+  --color-bg-table-header: var(--color-gray-100);
+  --color-bg-nav: var(--color-gray-25);
+  --color-bg-button: var(--color-primary-5);
   --color-bg-button-hover: #2e3b66;
-  --color-bg-icon: #1f2937;
+  --color-bg-icon: var(--color-gray-300);
   --color-bg-icon-status: #2b375c;
   --color-bg-hoverbox: #1a2337;
   --color-bg-contributor: #1f2545;
@@ -156,7 +156,7 @@
   --color-bg-activity-team: #18253d;
   --color-bg-activity-user: #142235;
 
-  --color-border: #1f2937;
+  --color-border: var(--color-gray-300);
   --color-border-focus: #818cf8;
   --color-border-contributor: #2b375c;
   --color-border-new: #3a5f93;
