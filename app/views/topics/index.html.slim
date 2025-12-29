@@ -1,5 +1,3 @@
-- content_for :title, "PostgreSQL Hackers Archive"
-
 - cache_block = lambda do
   #new-topics-banner data-controller="new-topics-banner" data-new-topics-banner-url-value=new_topics_count_topics_path(viewing_since: @viewing_since.iso8601, filter: params[:filter], team_id: params[:team_id]) data-new-topics-banner-interval-ms-value="180000"
     = render partial: "new_topics_banner", locals: { count: @new_topics_count, viewing_since: @viewing_since }
