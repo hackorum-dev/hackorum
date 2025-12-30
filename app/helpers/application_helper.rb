@@ -36,6 +36,24 @@ module ApplicationHelper
     "message-id-#{CGI.escape(message.message_id)}"
   end
 
+  def commitfest_ci_label(summary)
+    case summary[:ci_status]
+    when "not_processed"
+      "Not processed"
+    when "needs_rebase"
+      "Needs rebase"
+    when "score"
+      "CI score: #{summary[:ci_score].to_i}/10"
+    end
+  end
+
+  def commitfest_icon_class(summary)
+    return "fa-circle-check" if summary[:committed]
+    return "fa-magnifying-glass" if summary[:status] == "Needs review"
+
+    "fa-code-branch"
+  end
+
   def read_visibility_seconds
     5
   end

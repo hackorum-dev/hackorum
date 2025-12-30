@@ -11,7 +11,10 @@ td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") 
         span.topic-icon-badge.topic-icon-badge-sup = unread_count
   = render partial: "topics/note_icon", locals: { topic: topic, count: note_count.to_i }
   = render partial: "topics/team_readers_icon", locals: { topic: topic, readers: team_readers }
-  - if topic.attachments.exists?
+  - commitfest_summary = @commitfest_summaries&.dig(topic.id)
+  - if commitfest_summary
+    = render partial: "topics/commitfest_icon", locals: { summary: commitfest_summary }
+  - elsif topic.attachments.exists?
     .topic-icon
       i.fa-solid.fa-paperclip
   = link_to topic.title, topic_path(topic), class: "topic-link"

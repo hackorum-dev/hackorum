@@ -237,6 +237,61 @@
   margin-bottom: 0;
 }
 
+.commitfest-icon {
+  background: var(--color-bg-icon);
+  color: var(--color-text-secondary);
+}
+
+.commitfest-icon.commitfest-committed {
+  color: var(--color-success);
+}
+
+.commitfest-hover {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.commitfest-hover-title {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  font-weight: var(--font-weight-semibold);
+}
+
+.commitfest-hover-title a {
+  color: var(--color-text-link);
+  text-decoration: none;
+}
+
+.commitfest-hover-title a:hover {
+  text-decoration: underline;
+}
+
+.commitfest-hover-status {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.commitfest-hover-row {
+  display: flex;
+  gap: var(--spacing-2);
+  align-items: baseline;
+}
+
+.commitfest-hover-label {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.commitfest-hover-value {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+}
+
 .topic-meta {
   & span {
     padding-right: var(--spacing-2);

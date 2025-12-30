@@ -1,0 +1,33 @@
+- committed = summary[:committed]
+- icon_class = commitfest_icon_class(summary)
+- ci_label = commitfest_ci_label(summary)
+- reviewers = summary[:reviewers] || []
+- tags = summary[:tags] || []
+
+div class="topic-icon commitfest-icon#{committed ? ' commitfest-committed' : ''}" data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+  i.fa-solid class=icon_class
+  .topic-icon-hover data-hover-popover-target="popover" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+    .commitfest-hover
+      .commitfest-hover-title
+        = link_to summary[:commitfest_name], "https://commitfest.postgresql.org/#{summary[:commitfest_external_id]}/", target: "_blank", rel: "noopener"
+        span.commitfest-hover-status = summary[:status].presence || "Unknown"
+      .commitfest-hover-row
+        span.commitfest-hover-label Patch
+        span.commitfest-hover-value
+          = link_to "##{summary[:patch_external_id]}", "https://commitfest.postgresql.org/patch/#{summary[:patch_external_id]}/", target: "_blank", rel: "noopener"
+      - if tags.any?
+        .commitfest-hover-row
+          span.commitfest-hover-label Tags
+          span.commitfest-hover-value = tags.join(", ")
+      - if ci_label.present?
+        .commitfest-hover-row
+          span.commitfest-hover-label CI
+          span.commitfest-hover-value = ci_label
+      - if reviewers.any?
+        .commitfest-hover-row
+          span.commitfest-hover-label Reviewers
+          span.commitfest-hover-value = reviewers.join(", ")
+      - if committed && summary[:committer].present?
+        .commitfest-hover-row
+          span.commitfest-hover-label Committer
+          span.commitfest-hover-value = summary[:committer]

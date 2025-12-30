@@ -192,17 +192,7 @@ class EmailIngestor
   end
 
   def clean_reference(ref)
-    return '' if ref.nil?
-
-    ref_str = ref.to_s
-
-    if ref_str.include?('<')
-      matches = ref_str.scan(/<([^>]+)>/)
-      ref_str = matches.last&.first || ref_str
-    end
-
-    # Allow RFC 5322 msg-id atext plus dot and @, strip anything else.
-    ref_str.gsub(/[^A-Za-z0-9.!#$%&'*+\/=?^_`{|}~@-]/, '')
+    MessageIdNormalizer.normalize(ref)
   end
 
   def update_default_alias_for_person(alias_record)

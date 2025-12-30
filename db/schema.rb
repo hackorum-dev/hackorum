@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_29_102000) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_29_164500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -60,6 +60,89 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_29_102000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["message_id"], name: "index_attachments_on_message_id"
+  end
+
+  create_table "commitfest_patch_commitfests", force: :cascade do |t|
+    t.bigint "commitfest_id", null: false
+    t.bigint "commitfest_patch_id", null: false
+    t.string "status", null: false
+    t.string "ci_status"
+    t.integer "ci_score"
+    t.datetime "last_synced_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["commitfest_id", "commitfest_patch_id"], name: "index_cf_patch_commitfests_unique", unique: true
+    t.index ["commitfest_id"], name: "index_commitfest_patch_commitfests_on_commitfest_id"
+    t.index ["commitfest_patch_id"], name: "index_commitfest_patch_commitfests_on_commitfest_patch_id"
+  end
+
+  create_table "commitfest_patch_messages", force: :cascade do |t|
+    t.bigint "commitfest_patch_id", null: false
+    t.string "message_id", null: false
+    t.bigint "message_record_id"
+    t.datetime "last_synced_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["commitfest_patch_id", "message_id"], name: "index_cf_patch_messages_unique", unique: true
+    t.index ["commitfest_patch_id"], name: "index_commitfest_patch_messages_on_commitfest_patch_id"
+    t.index ["message_record_id"], name: "index_commitfest_patch_messages_on_message_record_id"
+  end
+
+  create_table "commitfest_patch_tags", force: :cascade do |t|
+    t.bigint "commitfest_patch_id", null: false
+    t.bigint "commitfest_tag_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["commitfest_patch_id", "commitfest_tag_id"], name: "index_cf_patch_tags_unique", unique: true
+    t.index ["commitfest_patch_id"], name: "index_commitfest_patch_tags_on_commitfest_patch_id"
+    t.index ["commitfest_tag_id"], name: "index_commitfest_patch_tags_on_commitfest_tag_id"
+  end
+
+  create_table "commitfest_patch_topics", force: :cascade do |t|
+    t.bigint "commitfest_patch_id", null: false
+    t.bigint "topic_id", null: false
+    t.datetime "last_synced_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["commitfest_patch_id", "topic_id"], name: "index_cf_patch_topics_unique", unique: true
+    t.index ["commitfest_patch_id"], name: "index_commitfest_patch_topics_on_commitfest_patch_id"
+    t.index ["topic_id"], name: "index_commitfest_patch_topics_on_topic_id"
+  end
+
+  create_table "commitfest_patches", force: :cascade do |t|
+    t.integer "external_id", null: false
+    t.string "title", null: false
+    t.string "topic"
+    t.string "target_version"
+    t.string "wikilink"
+    t.string "gitlink"
+    t.text "reviewers"
+    t.string "committer"
+    t.datetime "last_synced_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["external_id"], name: "index_commitfest_patches_on_external_id", unique: true
+  end
+
+  create_table "commitfest_tags", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "color"
+    t.string "description"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_commitfest_tags_on_name", unique: true
+  end
+
+  create_table "commitfests", force: :cascade do |t|
+    t.integer "external_id", null: false
+    t.string "name", null: false
+    t.string "status", null: false
+    t.date "start_date", null: false
+    t.date "end_date", null: false
+    t.datetime "last_synced_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["external_id"], name: "index_commitfests_on_external_id", unique: true
   end
 
   create_table "contributor_memberships", force: :cascade do |t|
@@ -302,6 +385,14 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_29_102000) do
   add_foreign_key "aliases", "people"
   add_foreign_key "aliases", "users"
   add_foreign_key "attachments", "messages"
+  add_foreign_key "commitfest_patch_commitfests", "commitfest_patches"
+  add_foreign_key "commitfest_patch_commitfests", "commitfests"
+  add_foreign_key "commitfest_patch_messages", "commitfest_patches"
+  add_foreign_key "commitfest_patch_messages", "messages", column: "message_record_id"
+  add_foreign_key "commitfest_patch_tags", "commitfest_patches"
+  add_foreign_key "commitfest_patch_tags", "commitfest_tags"
+  add_foreign_key "commitfest_patch_topics", "commitfest_patches"
+  add_foreign_key "commitfest_patch_topics", "topics"
   add_foreign_key "contributor_memberships", "people"
   add_foreign_key "identities", "users"
   add_foreign_key "mentions", "aliases"

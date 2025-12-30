@@ -2,6 +2,40 @@
 
 - content_for :sidebar do
   .sidebar
+    - if @commitfest_sidebar_entries.present?
+      details.sidebar-section open=true
+        summary.sidebar-heading Commitfests
+        .sidebar-section
+          .commitfest-list
+            - @commitfest_sidebar_entries.each do |entry|
+              .commitfest-entry
+                .commitfest-entry-header
+                  = link_to entry[:commitfest_name], "https://commitfest.postgresql.org/#{entry[:commitfest_external_id]}/", target: "_blank", rel: "noopener", class: "commitfest-link"
+                  span.commitfest-status = entry[:status].presence || "Unknown"
+                - if entry[:patch_title].present?
+                  .commitfest-patch
+                    = link_to entry[:patch_title], "https://commitfest.postgresql.org/patch/#{entry[:patch_external_id]}/", target: "_blank", rel: "noopener", class: "commitfest-patch-link"
+                - if entry[:tags].present?
+                  .commitfest-tags
+                    - entry[:tags].each do |tag|
+                      span.commitfest-tag = tag
+
+    - if @commitfest_reviewers.present?
+      details.sidebar-section open=true
+        summary.sidebar-heading Reviewers
+        .sidebar-section
+          ul.commitfest-reviewers
+            - @commitfest_reviewers.each do |reviewer|
+              li = reviewer
+
+    - if @commitfest_committers.present?
+      details.sidebar-section open=true
+        summary.sidebar-heading Committer
+        .sidebar-section
+          ul.commitfest-committers
+            - @commitfest_committers.each do |committer|
+              li = committer
+
     details.sidebar-section open=true
       summary.sidebar-heading Participants
       .sidebar-section

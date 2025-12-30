@@ -107,3 +107,66 @@
 .sidebar .attachment-names {
   color: var(--color-text-secondary);
 }
+
+.sidebar .commitfest-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.sidebar .commitfest-entry-header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  align-items: baseline;
+}
+
+.sidebar .commitfest-link,
+.sidebar .commitfest-patch-link {
+  color: var(--color-text-link);
+  text-decoration: none;
+  font-weight: var(--font-weight-semibold);
+}
+
+.sidebar .commitfest-link:hover,
+.sidebar .commitfest-patch-link:hover {
+  text-decoration: underline;
+}
+
+.sidebar .commitfest-status {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.sidebar .commitfest-patch {
+  margin-top: var(--spacing-1);
+  color: var(--color-text-secondary);
+}
+
+.sidebar .commitfest-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-2);
+}
+
+.sidebar .commitfest-tag {
+  background: var(--color-gray-100);
+  padding: 2px 8px;
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.sidebar .commitfest-reviewers,
+.sidebar .commitfest-committers {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.sidebar .commitfest-reviewers li + li,
+.sidebar .commitfest-committers li + li {
+  margin-top: var(--spacing-1);
+}

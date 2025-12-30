@@ -493,6 +493,7 @@ DEPENDENCIES
   kaminari
   letter_opener
   letter_opener_web
+  nokogiri
   omniauth
   omniauth-google-oauth2
   omniauth-rails_csrf_protection
@@ -517,4 +518,4 @@ DEPENDENCIES
   web-console
 
 BUNDLED WITH
-   2.6.9
+  4.0.3

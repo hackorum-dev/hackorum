@@ -7,6 +7,7 @@ class TopicsController < ApplicationController
     base_query = apply_filters(Topic.includes(:creator))
 
     apply_cursor_pagination(base_query)
+    preload_commitfest_summaries
     @new_topics_count = 0
     @page_cache_key = topics_page_cache_key
 
@@ -42,6 +43,7 @@ class TopicsController < ApplicationController
 
     build_participants_sidebar_data(messages_scope)
     build_thread_outline(messages_scope)
+    load_commitfest_sidebar
     load_notes if user_signed_in?
   end
 
@@ -101,6 +103,7 @@ class TopicsController < ApplicationController
       @new_topics_count = 0
     end
 
+    preload_commitfest_summaries
     preload_participation_flags if user_signed_in?
 
     respond_to do |format|
@@ -157,6 +160,7 @@ class TopicsController < ApplicationController
     preload_topic_states
     preload_note_counts
     preload_participation_flags
+    preload_commitfest_summaries
 
     respond_to do |format|
       format.turbo_stream
@@ -698,6 +702,37 @@ class TopicsController < ApplicationController
     @topics = hydrate_topics_from_entries(sliced[:entries])
     @topics = [] unless @topics
     @new_topics_count = 0
+  end
+
+  def preload_commitfest_summaries
+    topic_ids = @topics.map(&:id)
+    @commitfest_summaries = Topic.commitfest_summaries(topic_ids)
+  end
+
+  def load_commitfest_sidebar
+    entries = CommitfestPatchCommitfest
+      .joins(commitfest_patch: :commitfest_patch_topics)
+      .includes(:commitfest, commitfest_patch: :commitfest_tags)
+      .where(commitfest_patch_topics: { topic_id: @topic.id })
+      .order("commitfests.end_date DESC, commitfests.start_date DESC")
+
+    @commitfest_sidebar_entries = entries.map do |entry|
+      patch = entry.commitfest_patch
+      {
+        commitfest_name: entry.commitfest.name,
+        commitfest_external_id: entry.commitfest.external_id,
+        patch_external_id: patch.external_id,
+        patch_title: patch.title,
+        status: entry.status,
+        tags: patch.commitfest_tags.map(&:name)
+      }
+    end
+
+    reviewers = entries.flat_map { |entry| Topic.parse_csv_list(entry.commitfest_patch.reviewers) }
+    @commitfest_reviewers = reviewers.uniq
+
+    committers = entries.map { |entry| entry.commitfest_patch.committer.to_s.strip }.reject(&:blank?).uniq
+    @commitfest_committers = committers
   end
 
   def slice_cached_entries(entries, cursor_param)
