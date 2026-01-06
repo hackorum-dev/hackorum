@@ -465,13 +465,20 @@
 }
 
 .mark-aware-button {
-  padding: var(--spacing-2) var(--spacing-4);
+  padding: var(--spacing-3) var(--spacing-4);
   border: var(--border-width) solid var(--color-border);
   background: var(--color-bg-card);
-  border-radius: var(--border-radius-sm);
+  border-radius: 999px;
   cursor: pointer;
   font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-primary-300);
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+  }
 
   &.secondary {
     background: var(--color-bg-hover);

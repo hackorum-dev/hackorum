@@ -72,7 +72,7 @@
   text-decoration: none;
   font-weight: var(--font-weight-medium);
   padding: var(--spacing-2) var(--spacing-4);
-  border-radius: var(--border-radius-md);
+  border-radius: 999px;
   transition: all var(--transition-fast);
   border: var(--border-width) solid transparent;
   display: inline-flex;
@@ -113,6 +113,7 @@
   color: var(--color-text-secondary);
   cursor: pointer;
   box-shadow: var(--shadow-sm);
+  border-radius: 999px;
 
   &:hover {
     background: var(--color-bg-hover);
