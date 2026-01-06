@@ -1,12 +1,17 @@
-h1 Set a new password
+.session-page
+  .session-card
+    h1.session-title Set a new password
 
-= form_with url: password_path, method: :patch, data: { turbo: false } do
-  = hidden_field_tag :token, @raw
-  .field
-    = label_tag :password
-    = password_field_tag :password
-  .field
-    = label_tag :password_confirmation
-    = password_field_tag :password_confirmation
-  .actions
-    = submit_tag 'Update password'
+    = form_with url: password_path, method: :patch, data: { turbo: false }, class: 'session-form' do
+      = hidden_field_tag :token, @raw
+      .session-field
+        = label_tag :password, 'Password', class: 'visually-hidden'
+        = password_field_tag :password, nil, placeholder: 'Password', autocomplete: 'new-password', class: 'session-input'
+      .session-field
+        = label_tag :password_confirmation, 'Confirm password', class: 'visually-hidden'
+        = password_field_tag :password_confirmation, nil, placeholder: 'Confirm password', autocomplete: 'new-password', class: 'session-input'
+      .session-actions
+        = submit_tag 'Update password', class: 'session-submit'
+
+    .session-links
+      = link_to 'Back to Log In', new_session_path, class: 'session-link'

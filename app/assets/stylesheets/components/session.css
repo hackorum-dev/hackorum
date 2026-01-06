@@ -23,6 +23,13 @@
   color: var(--color-text-primary);
 }
 
+.session-text {
+  margin: 0 0 var(--spacing-6);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+}
+
 .session-oauth {
   margin-bottom: var(--spacing-6);
 }
@@ -134,6 +141,13 @@
   align-items: center;
   gap: var(--spacing-2);
   font-size: var(--font-size-sm);
+}
+
+.session-hint {
+  display: block;
+  margin-top: var(--spacing-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
 }
 
 .session-link {

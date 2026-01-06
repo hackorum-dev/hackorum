@@ -1,8 +1,13 @@
-h1 Reset password
+.session-page
+  .session-card
+    h1.session-title Reset password
 
-= form_with url: password_path, method: :post, data: { turbo: false } do
-  .field
-    = label_tag :email
-    = email_field_tag :email
-  .actions
-    = submit_tag 'Send reset link'
+    = form_with url: password_path, method: :post, data: { turbo: false }, class: 'session-form' do
+      .session-field
+        = label_tag :email, 'Email', class: 'visually-hidden'
+        = email_field_tag :email, nil, placeholder: 'Email', autocomplete: 'email', class: 'session-input'
+      .session-actions
+        = submit_tag 'Send reset link', class: 'session-submit'
+
+    .session-links
+      = link_to 'Back to Log In', new_session_path, class: 'session-link'
