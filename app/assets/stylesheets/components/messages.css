@@ -125,6 +125,10 @@
     display: inline-flex;
     align-items: center;
   }
+
+  & a + a {
+    margin-left: var(--spacing-2);
+  }
 }
 
 .message-content {
