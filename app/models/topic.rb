@@ -122,14 +122,7 @@ class Topic < ApplicationRecord
           FROM commitfest_patch_tags cpt
           JOIN commitfest_tags ct ON ct.id = cpt.commitfest_tag_id
           WHERE cpt.commitfest_patch_id = cp.id
-        ) AS tag_names,
-        (
-          SELECT bool_or(pcc2.status = 'Committed')
-          FROM commitfest_patch_topics cpt2
-          JOIN commitfest_patches cp2 ON cp2.id = cpt2.commitfest_patch_id
-          JOIN commitfest_patch_commitfests pcc2 ON pcc2.commitfest_patch_id = cp2.id
-          WHERE cpt2.topic_id = cptop.topic_id
-        ) AS committed_any
+        ) AS tag_names
       FROM commitfest_patch_topics cptop
       JOIN commitfest_patches cp ON cp.id = cptop.commitfest_patch_id
       JOIN commitfest_patch_commitfests pcc ON pcc.commitfest_patch_id = cp.id
@@ -152,7 +145,7 @@ class Topic < ApplicationRecord
         committer: row["committer"].to_s.strip.presence,
         patch_external_id: row["patch_external_id"].to_i,
         tags: tags,
-        committed: ActiveModel::Type::Boolean.new.cast(row["committed_any"])
+        committed: row["status"].to_s == "Committed"
       }
     end
   end
