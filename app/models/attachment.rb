@@ -3,8 +3,7 @@ class Attachment < ApplicationRecord
   has_many :patch_files, dependent: :destroy
   
   def patch?
-    content_type&.include?('text') && 
-    (file_name&.ends_with?('.patch') || file_name&.ends_with?('.diff') || patch_content?)
+    file_name&.ends_with?('.patch') || file_name&.ends_with?('.diff') || patch_content?
   end
   
   def decoded_body
