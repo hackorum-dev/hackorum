@@ -34,35 +34,35 @@ html data-theme="light"
       .global-warning
         span Please set a username in Settings.
     nav.main-navigation
-    .nav-container
-      .nav-brand
-        = link_to root_path, class: "brand-link" do
-          img.brand-icon src="/icon.png" alt="Hackorum" width="24" height="24"
-          span.brand-text Hackorum
-        span.tagline PostgreSQL Hackers Archive
-      .nav-links
-        = link_to "Topics", topics_path, class: "nav-link"
-        - search_link = content_for?(:search_sidebar) ? "#search" : topics_path(anchor: "search")
-        = link_to "Search", search_link, class: "nav-link"
-        = link_to "Statistics", stats_path, class: "nav-link"
-      .nav-right
-        button.nav-link.theme-toggle type="button" aria-label="Toggle theme" data-controller="theme" data-action="click->theme#toggle"
-          i.fas.fa-moon data-theme-target="icon"
-          span data-theme-target="label" Theme
-        .nav-auth
-          - if user_signed_in?
-            - if current_user&.person&.default_alias
-              span.nav-user = current_user.person.default_alias.name
-            - unread = activity_unread_count
-            = link_to activities_path, class: "nav-link nav-link-activity", title: "Activity" do
-              i.fa-regular.fa-bell
-              - if unread.positive?
-                span.nav-badge = unread
-            = link_to "Settings", settings_path, class: "nav-link"
-            = button_to "Sign out", session_path, method: :delete, class: "nav-link", form: { style: 'display:inline' }, data: { turbo: false }
-          - else
-            = link_to "Sign in", new_session_path, class: "nav-link"
-            = link_to "Register", new_registration_path, class: "nav-link"
+      .nav-container
+        .nav-brand
+          = link_to root_path, class: "brand-link" do
+            img.brand-icon src="/icon.png" alt="Hackorum" width="24" height="24"
+            span.brand-text Hackorum
+          span.tagline PostgreSQL Hackers Archive
+        .nav-links
+          = link_to "Topics", topics_path, class: "nav-link"
+          - search_link = content_for?(:search_sidebar) ? "#search" : topics_path(anchor: "search")
+          = link_to "Search", search_link, class: "nav-link"
+          = link_to "Statistics", stats_path, class: "nav-link"
+        .nav-right
+          button.nav-link.theme-toggle type="button" aria-label="Toggle theme" data-controller="theme" data-action="click->theme#toggle"
+            i.fas.fa-moon data-theme-target="icon"
+            span data-theme-target="label" Theme
+          .nav-auth
+            - if user_signed_in?
+              - if current_user&.person&.default_alias
+                span.nav-user = current_user.person.default_alias.name
+              - unread = activity_unread_count
+              = link_to activities_path, class: "nav-link nav-link-activity", title: "Activity" do
+                i.fa-regular.fa-bell
+                - if unread.positive?
+                  span.nav-badge = unread
+              = link_to "Settings", settings_path, class: "nav-link"
+              = button_to "Sign out", session_path, method: :delete, class: "nav-link", form: { style: 'display:inline' }, data: { turbo: false }
+            - else
+              = link_to "Sign in", new_session_path, class: "nav-link"
+              = link_to "Register", new_registration_path, class: "nav-link"
 
     - if content_for?(:sidebar)
       .page-layout.with-sidebar

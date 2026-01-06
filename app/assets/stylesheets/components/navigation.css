@@ -3,7 +3,7 @@
  */
 
 .main-navigation {
-  background-color: var(--color-bg-nav);
+  background-color: var(--color-bg-page);
   border-bottom: var(--border-width) solid var(--color-border);
   box-shadow: var(--shadow-sm);
   position: sticky;
