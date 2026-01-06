@@ -11,4 +11,5 @@ div class=classes.join(" ") id=dom_id(topic, "participation") data-controller="h
     .topic-icon-hover data-hover-popover-target="popover" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
       - aliases.each do |alias_record|
         - participant_stub = { alias: alias_record }
-        = render partial: "participant_row", locals: { participant: participant_stub, avatar_size: 32, tooltip: alias_record.name }
+        - role_label = alias_record.contributor_badge || "User"
+        = render partial: "participant_row", locals: { participant: participant_stub, avatar_size: 32, tooltip: "#{alias_record.name} (#{role_label})" }

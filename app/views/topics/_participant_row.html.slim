@@ -6,7 +6,9 @@
 - tooltip_parts = []
 - tooltip_parts << "#{message_count} messages" if message_count
 - tooltip_parts << "last #{smart_time_display(last_at)}" if last_at
-- tooltip = local_assigns[:tooltip] || (tooltip_parts.any? ? tooltip_parts.join(", ") : alias_record.name)
+- role_label = alias_record.contributor_badge || "User"
+- tooltip_parts << role_label
+- tooltip = local_assigns[:tooltip] || (tooltip_parts.any? ? tooltip_parts.join(", ") : "#{alias_record.name} (#{role_label})")
 - avatar_classes = ["participant-avatar"]
 - membership_icons = []
 - membership_types = alias_record.contributor_membership_types

@@ -5,7 +5,7 @@ td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") 
     - read_count = state[:read_count].to_i
     - total_count = topic.messages.count
     - unread_count = [total_count - read_count, 0].max
-    .topic-icon.topic-icon-reading
+    .topic-icon.topic-icon-reading title="Unread messages: #{unread_count}"
       i.fa-solid.fa-envelope
       - if unread_count.positive?
         span.topic-icon-badge.topic-icon-badge-sup = unread_count
@@ -15,6 +15,6 @@ td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") 
   - if commitfest_summary
     = render partial: "topics/commitfest_icon", locals: { summary: commitfest_summary }
   - elsif topic.attachments.exists?
-    .topic-icon
+    .topic-icon title="Attachments"
       i.fa-solid.fa-paperclip
   = link_to topic.title, topic_path(topic), class: "topic-link"

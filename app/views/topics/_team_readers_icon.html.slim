@@ -10,4 +10,5 @@ div class=classes.join(" ") id=dom_id(topic, "team_readers") data-controller="ho
         - alias_record = reader[:user]&.person&.default_alias || reader[:user]&.aliases&.first
         - next unless alias_record
         - participant_stub = { alias: alias_record }
-        = render partial: "participant_row", locals: { participant: participant_stub, avatar_size: 32, tooltip: "#{alias_record.name} (#{reader[:status]})" }
+        - role_label = alias_record.contributor_badge || "User"
+        = render partial: "participant_row", locals: { participant: participant_stub, avatar_size: 32, tooltip: "#{alias_record.name} (#{reader[:status]}, #{role_label})" }

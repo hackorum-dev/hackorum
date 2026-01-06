@@ -7,7 +7,8 @@
       - css_classes << "is-major-contributor" if !participant.core_team? && !participant.committer? && participant.major_contributor?
       - css_classes << "is-significant-contributor" if !participant.core_team? && !participant.committer? && !participant.major_contributor? && participant.significant_contributor?
       - css_classes << "is-past-contributor" if participant.past_contributor?
-      - badge_text = participant.contributor_badge ? "#{participant.name} (#{participant.contributor_badge})" : participant.name
+      - role_label = participant.contributor_badge || "User"
+      - badge_text = "#{participant.name} (#{role_label})"
       = link_to person_path(participant.email), class: "participant-avatar-link" do
         = image_tag participant.display_gravatar_url(size: 32), class: css_classes.join(" "), alt: participant.name, title: badge_text
     - if total_participants > participants.count

@@ -1,7 +1,8 @@
 - count = count.to_i
 - classes = ["topic-icon", "activity-note"]
 - classes << "is-hidden" unless count.positive?
-div class=classes.join(" ") id=dom_id(topic, "notes") data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+- tooltip_label = count.positive? ? "Notes: #{count}" : "Notes"
+div class=classes.join(" ") id=dom_id(topic, "notes") title=tooltip_label data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
   i.fa-solid.fa-note-sticky
   - if count.positive?
     span.topic-icon-badge = count
