@@ -2,6 +2,9 @@
   position: sticky;
   top: calc(var(--nav-height) + var(--spacing-5));
   align-self: start;
+  max-height: calc(100vh - var(--nav-height) - var(--spacing-5));
+  overflow-y: auto;
+  padding-right: var(--spacing-2);
 }
 
 .sidebar-section {
