@@ -26,11 +26,23 @@
   align-items: center;
   justify-content: center;
   transition: transform var(--transition-fast), background-color var(--transition-fast);
+  z-index: 1;
 }
 
 .sidebar-collapse-button:hover {
   background: var(--color-bg-hover);
   transform: scale(1.05);
+}
+
+@media (max-width: 720px) {
+  .layout-sidebar-resizer {
+    width: 18px;
+  }
+
+  .sidebar-collapse-button {
+    width: 48px;
+    height: 48px;
+  }
 }
 
 .sidebar-section {
