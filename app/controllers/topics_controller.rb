@@ -771,6 +771,7 @@ class TopicsController < ApplicationController
   def topics_page_cache_key
     return nil unless @topics&.first
     return nil if params[:filter].present? || params[:team_id].present?
+    return nil if params[:note_tag].present?
 
     latest_topic = @topics.first
     watermark = "#{latest_topic.last_activity.to_i}_#{latest_topic.id}"
@@ -791,8 +792,8 @@ class TopicsController < ApplicationController
   end
 
   def topics_turbo_stream_cache_fetch
-    Rails.cache.fetch(topics_turbo_stream_cache_key, expires_in: 10.minutes) do
-      yield
-    end
+    return yield if params[:filter].present? || params[:team_id].present? || params[:note_tag].present?
+
+    Rails.cache.fetch(topics_turbo_stream_cache_key, expires_in: 10.minutes) { yield }
   end
 end
