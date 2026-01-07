@@ -86,14 +86,14 @@
       p No emails yet.
 
   .settings-section
-    h2 Danger zone
-    p Deleting your account will remove your data. This cannot be undone.
-    = link_to "Delete account", new_account_deletion_path, class: "button-danger"
-
-  .settings-section
     h2 Teams
     = link_to "Manage teams", teams_path, class: "button-secondary"
 
   .settings-section
     h2 Import
     = link_to "Import existing read status", new_read_status_import_path, class: "button-secondary"
+
+  .settings-section
+    h2 Danger zone
+    p Deleting your account will remove your data. This cannot be undone.
+    = link_to "Delete account", new_account_deletion_path, class: "button-danger"
