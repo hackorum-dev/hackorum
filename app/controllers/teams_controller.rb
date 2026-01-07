@@ -3,6 +3,7 @@
 class TeamsController < ApplicationController
   before_action :require_authentication, except: [:show, :index]
   before_action :set_team, only: [:show, :destroy]
+  before_action :require_team_member!, only: [:show]
   before_action :require_team_admin!, only: [:destroy]
 
   def index
@@ -46,5 +47,14 @@ class TeamsController < ApplicationController
     unless user_signed_in? && @team.admin?(current_user)
       redirect_to @team, alert: "Admins only" and return
     end
+  end
+
+  def require_team_member!
+    unless user_signed_in?
+      redirect_to new_session_path, alert: "Please sign in"
+      return
+    end
+
+    render_404 unless @team.member?(current_user)
   end
 end

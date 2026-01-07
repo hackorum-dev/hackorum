@@ -6,6 +6,7 @@ class TeamMembersController < ApplicationController
 
   def create
     authorize_invite!
+    return if performed?
     username = params[:username].to_s.strip
     user = User.find_by(username: username)
     return redirect_to @team, alert: "User not found" unless user
@@ -24,6 +25,7 @@ class TeamMembersController < ApplicationController
       redirect_to teams_path, notice: "You left the team"
     else
       authorize_admin!
+      return if performed?
       if @team.last_admin?(membership)
         redirect_to @team, alert: "Cannot remove the last admin"
       else
@@ -40,12 +42,14 @@ class TeamMembersController < ApplicationController
   end
 
   def authorize_invite!
-    return if @team.admin?(current_user) || @team.member?(current_user)
-    redirect_to @team, alert: "Only team members can add users"
+    return if @team.admin?(current_user)
+    redirect_to @team, alert: "Admins only"
+    return
   end
 
   def authorize_admin!
     return if @team.admin?(current_user)
     redirect_to @team, alert: "Admins only"
+    return
   end
 end
