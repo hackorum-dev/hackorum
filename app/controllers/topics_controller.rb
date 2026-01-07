@@ -1,6 +1,7 @@
 class TopicsController < ApplicationController
   before_action :set_topic, only: [:show, :aware, :read_all]
   before_action :require_authentication, only: [:aware, :aware_bulk, :aware_all, :read_all]
+  before_action :require_team_membership, only: [:index, :new_topics_count]
 
   def index
     @search_query = nil
@@ -795,5 +796,19 @@ class TopicsController < ApplicationController
     return yield if params[:filter].present? || params[:team_id].present? || params[:note_tag].present?
 
     Rails.cache.fetch(topics_turbo_stream_cache_key, expires_in: 10.minutes) { yield }
+  end
+
+  def require_team_membership
+    team_id = params[:team_id].presence&.to_i
+    return unless team_id
+
+    unless user_signed_in?
+      redirect_to new_session_path, alert: "Please sign in"
+      return
+    end
+
+    team = Team.find_by(id: team_id)
+    render_404 and return unless team
+    render_404 unless team.member?(current_user)
   end
 end
