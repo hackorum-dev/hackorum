@@ -65,9 +65,12 @@ html data-theme="light"
               = link_to "Register", new_registration_path, class: "nav-link"
 
     - if content_for?(:sidebar)
-      .page-layout.with-sidebar
-        .layout-sidebar
+      .page-layout.with-sidebar data-controller="sidebar" data-sidebar-target="layout"
+        .layout-sidebar#layout-sidebar data-sidebar-target="sidebar"
           = yield :sidebar
+        .layout-sidebar-resizer data-sidebar-target="resizer" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" data-action="mousedown->sidebar#startResize touchstart->sidebar#startResize"
+          button.sidebar-collapse-button type="button" aria-label="Toggle sidebar" data-action="click->sidebar#toggle" data-sidebar-target="toggleButton"
+            span data-sidebar-target="toggleIcon" ◀
         main.container
           - flash.each do |type, message|
             .flash class=type

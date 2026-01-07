@@ -7,6 +7,32 @@
   padding-right: var(--spacing-2);
 }
 
+.layout-sidebar-resizer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-collapse-button {
+  border: none;
+  background: var(--color-bg-card);
+  color: var(--color-text-secondary);
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition-fast), background-color var(--transition-fast);
+}
+
+.sidebar-collapse-button:hover {
+  background: var(--color-bg-hover);
+  transform: scale(1.05);
+}
+
 .sidebar-section {
   margin-bottom: var(--spacing-8);
 }
