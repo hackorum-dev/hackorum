@@ -30,6 +30,25 @@
   line-height: var(--line-height-relaxed);
 }
 
+.session-subtitle {
+  margin: 0 0 var(--spacing-3);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+.session-features {
+  margin: 0 0 var(--spacing-6);
+  padding-left: var(--spacing-5);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+}
+
+.session-features li + li {
+  margin-top: var(--spacing-2);
+}
+
 .session-oauth {
   margin-bottom: var(--spacing-6);
 }

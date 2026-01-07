@@ -2,6 +2,14 @@
   .session-card
     h1.session-title Register
     p.session-text Enter your email. If it's in the archive, we'll verify and attach it. Otherwise, we'll create a new alias.
+    h2.session-subtitle Why register?
+    ul.session-features
+      li Track read progress and mark threads aware.
+      li Add private notes and tags to messages.
+      li @mention people or teams and share tags via notes.
+      li See team reading activity and unread counts.
+      li Follow contributors and get quick access to their recent threads.
+      li Connect all your email addresses to a single identity.
 
     .session-oauth
       = link_to '/auth/google_oauth2', class: 'session-oauth-button' do
