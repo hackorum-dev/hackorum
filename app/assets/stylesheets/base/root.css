@@ -6,9 +6,9 @@ body {
 }
 
 .container {
-  max-width: var(--max-width-container);
+  max-width: none;
   width: 100%;
-  margin: 0 auto;
+  margin: 0;
   padding: 0;
   background-color: var(--color-bg-container);
   min-width: 0;
@@ -16,16 +16,66 @@ body {
 }
 
 .page-layout.with-sidebar {
+  --sidebar-width: 360px;
+  --sidebar-resizer-width: 10px;
   display: grid;
-  grid-template-columns: 480px 1fr;
+  grid-template-columns: var(--sidebar-width) var(--sidebar-resizer-width) minmax(0, 1fr);
+  grid-template-areas: "sidebar resizer main";
   gap: 0;
   align-items: start;
+  overflow: visible;
 }
 
 .page-layout.with-sidebar .layout-sidebar {
   background: var(--color-bg-card);
-  border-right: var(--border-width) solid var(--color-border);
   min-height: calc(100vh - var(--nav-height));
   background-color: var(--color-bg-sidebar);
   align-self: stretch;
+  min-width: 0;
+  grid-area: sidebar;
+}
+
+.page-layout.with-sidebar .layout-sidebar-resizer {
+  cursor: col-resize;
+  background: var(--color-bg-page);
+  border-right: var(--border-width) solid var(--color-border);
+  min-height: calc(100vh - var(--nav-height));
+  position: sticky;
+  top: var(--nav-height);
+  touch-action: none;
+  width: var(--sidebar-resizer-width);
+  grid-area: resizer;
+}
+
+.page-layout.with-sidebar .layout-sidebar-resizer:hover,
+.page-layout.with-sidebar .layout-sidebar-resizer:active {
+  background: var(--color-bg-hover);
+}
+
+body.sidebar-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+body.sidebar-collapsed .page-layout.with-sidebar {
+  grid-template-columns: 0 var(--sidebar-resizer-width) minmax(0, 1fr);
+}
+
+body.sidebar-collapsed .layout-sidebar {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+body.sidebar-collapsed .layout-sidebar-resizer {
+  border-left: var(--border-width) solid var(--color-border);
+  justify-self: start;
+}
+
+body.sidebar-collapsed .page-layout.with-sidebar > main.container {
+  max-width: none;
+  width: 100%;
+}
+
+.page-layout.with-sidebar > main.container {
+  grid-area: main;
 }
