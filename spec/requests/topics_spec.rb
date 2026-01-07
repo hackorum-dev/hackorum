@@ -205,16 +205,14 @@ RSpec.describe "Topics", type: :request do
     context "without search query" do
       it "shows search form" do
         get search_topics_path
-        expect(response).to have_http_status(:success)
-        expect(response.body).to include("Search the PostgreSQL Hackers Archive")
+        expect(response).to redirect_to(topics_path(anchor: "search"))
       end
     end
 
     context "with empty search query" do
       it "shows search form" do
         get search_topics_path, params: { q: "   " }
-        expect(response).to have_http_status(:success)
-        expect(response.body).to include("Search the PostgreSQL Hackers Archive")
+        expect(response).to redirect_to(topics_path(anchor: "search"))
       end
     end
 
