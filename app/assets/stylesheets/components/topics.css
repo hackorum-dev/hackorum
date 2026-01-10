@@ -193,6 +193,20 @@
   }
 }
 
+.activity-star {
+  background-color: var(--color-bg-activity-team);
+  .topic-icon-badge {
+    background-color: var(--color-bg-activity-team);
+  }
+}
+
+.activity-star.is-starred {
+  background-color: var(--color-bg-activity-user);
+  .topic-icon-badge {
+    background-color: var(--color-bg-activity-user);
+  }
+}
+
 .is-hidden {
   display: none !important;
 }

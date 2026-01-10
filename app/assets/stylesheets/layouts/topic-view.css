@@ -282,3 +282,9 @@
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
 }
+
+.topic-title-with-star {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}

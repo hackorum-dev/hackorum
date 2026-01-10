@@ -3,6 +3,7 @@
   - note_count = @topic_note_counts&.dig(topic.id).to_i
   - participation = @participation_flags&.dig(topic.id) || {}
   - team_readers = state[:team_readers] || []
+  - star_data = @topic_star_data&.dig(topic.id) || {}
 
   = turbo_stream.replace dom_id(topic) do
-    = render partial: "topics/topic_row_user", locals: { topic: topic, state: state, note_count: note_count, participation: participation, team_readers: team_readers }
+    = render partial: "topics/topic_row_user", locals: { topic: topic, state: state, note_count: note_count, participation: participation, team_readers: team_readers, star_data: star_data }

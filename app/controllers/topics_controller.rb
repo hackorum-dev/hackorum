@@ -1,6 +1,6 @@
 class TopicsController < ApplicationController
-  before_action :set_topic, only: [:show, :aware, :read_all]
-  before_action :require_authentication, only: [:aware, :aware_bulk, :aware_all, :read_all]
+  before_action :set_topic, only: [:show, :aware, :read_all, :star, :unstar]
+  before_action :require_authentication, only: [:aware, :aware_bulk, :aware_all, :read_all, :star, :unstar]
   before_action :require_team_membership, only: [:index, :new_topics_count]
 
   def index
@@ -45,7 +45,10 @@ class TopicsController < ApplicationController
     build_participants_sidebar_data(messages_scope)
     build_thread_outline(messages_scope)
     load_commitfest_sidebar
-    load_notes if user_signed_in?
+    if user_signed_in?
+      load_notes
+      load_star_state
+    end
   end
 
   def aware
@@ -93,6 +96,30 @@ class TopicsController < ApplicationController
     end
   end
 
+  def star
+    TopicStar.create!(user: current_user, topic: @topic)
+    respond_to do |format|
+      format.turbo_stream { render :update_star_state }
+      format.json { render json: { starred: true } }
+      format.html { redirect_to topic_path(@topic) }
+    end
+  rescue ActiveRecord::RecordNotUnique
+    respond_to do |format|
+      format.turbo_stream { render :update_star_state }
+      format.json { render json: { starred: true } }
+      format.html { redirect_to topic_path(@topic) }
+    end
+  end
+
+  def unstar
+    TopicStar.where(user: current_user, topic: @topic).destroy_all
+    respond_to do |format|
+      format.turbo_stream { render :update_star_state }
+      format.json { render json: { starred: false } }
+      format.html { redirect_to topic_path(@topic) }
+    end
+  end
+
   def search
     @search_query = params[:q].to_s.strip
 
@@ -123,6 +150,7 @@ class TopicsController < ApplicationController
     preload_topic_states
     preload_note_counts
     preload_participation_flags
+    preload_star_counts
 
     payload = topic_ids.index_with do |tid|
       state = @topic_states[tid] || {}
@@ -139,6 +167,7 @@ class TopicsController < ApplicationController
         team: participation[:team],
         aliases_count: Array(participation[:aliases]).size
       }
+      star_data = @topic_star_data&.dig(tid) || { starred_by_me: false, team_starrers: [] }
       {
         status: state[:status],
         progress: state[:progress],
@@ -147,7 +176,8 @@ class TopicsController < ApplicationController
         aware_until: state[:aware_until],
         team_readers: readers,
         note_count: @topic_note_counts&.dig(tid).to_i,
-        participation: participation_payload
+        participation: participation_payload,
+        star: star_data
       }
     end
 
@@ -164,6 +194,7 @@ class TopicsController < ApplicationController
     preload_note_counts
     preload_participation_flags
     preload_commitfest_summaries
+    preload_star_counts
 
     respond_to do |format|
       format.turbo_stream
@@ -360,6 +391,44 @@ class TopicsController < ApplicationController
                               .count
   end
 
+  def preload_star_counts
+    topic_ids = @topics.map(&:id)
+    return if topic_ids.empty?
+    return unless user_signed_in?
+
+    my_stars = TopicStar.where(user: current_user, topic_id: topic_ids)
+                        .pluck(:topic_id)
+                        .to_set
+
+    team_ids = TeamMember.where(user_id: current_user.id).pluck(:team_id)
+    team_stars = {}
+
+    if team_ids.any?
+      teammate_ids = TeamMember.where(team_id: team_ids)
+                               .where.not(user_id: current_user.id)
+                               .pluck(:user_id)
+
+      if teammate_ids.any?
+        stars = TopicStar.where(user_id: teammate_ids, topic_id: topic_ids)
+                         .includes(user: { person: :default_alias })
+
+        stars.each do |star|
+          team_stars[star.topic_id] ||= []
+          alias_record = star.user.person&.default_alias || star.user.aliases&.first
+          team_stars[star.topic_id] << alias_record if alias_record
+        end
+      end
+    end
+
+    @topic_star_data = {}
+    @topics.each do |topic|
+      @topic_star_data[topic.id] = {
+        starred_by_me: my_stars.include?(topic.id),
+        team_starrers: team_stars[topic.id] || []
+      }
+    end
+  end
+
   def load_visible_tags
     @available_note_tags = NoteTag.joins(:note)
                                   .merge(Note.active.visible_to(current_user))
@@ -553,6 +622,18 @@ class TopicsController < ApplicationController
         member_alias_ids = Alias.where(person_id: member_person_ids).select(:id)
         base_query = base_query.where(id: Message.where(sender_id: member_alias_ids).select(:topic_id))
       end
+    when "starred_by_me"
+      if current_user_id
+        base_query = base_query.joins(:topic_stars)
+                               .where(topic_stars: { user_id: current_user_id })
+      end
+    when "starred_by_team"
+      if team_id && current_user_id
+        member_ids = TeamMember.where(team_id: team_id).select(:user_id)
+        base_query = base_query.joins(:topic_stars)
+                               .where(topic_stars: { user_id: member_ids })
+                               .distinct
+      end
     end
     base_query
   end
@@ -661,6 +742,10 @@ class TopicsController < ApplicationController
       key = note.message_id || :thread
       @notes_by_message[key] << note
     end
+  end
+
+  def load_star_state
+    @is_starred = TopicStar.exists?(user: current_user, topic: @topic)
   end
 
   def load_cached_search_results

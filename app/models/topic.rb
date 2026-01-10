@@ -5,7 +5,9 @@ class Topic < ApplicationRecord
   has_many :notes, dependent: :destroy
   has_many :commitfest_patch_topics, dependent: :destroy
   has_many :commitfest_patches, through: :commitfest_patch_topics
-  
+  has_many :topic_stars, dependent: :destroy
+  has_many :starring_users, through: :topic_stars, source: :user
+
   validates :title, presence: true
 
   def participant_count

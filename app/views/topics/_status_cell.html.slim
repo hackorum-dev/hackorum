@@ -1,5 +1,6 @@
 - status = state[:status] || "new"
 - status_class = "status-#{status}"
+- star_data = star_data || {}
 td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") data-label="Topic"
   - if status.to_s == "reading"
     - read_count = state[:read_count].to_i
@@ -9,6 +10,7 @@ td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") 
       i.fa-solid.fa-envelope
       - if unread_count.positive?
         span.topic-icon-badge.topic-icon-badge-sup = unread_count
+  = render partial: "topics/star_icon", locals: { topic: topic, star_data: star_data }
   = render partial: "topics/note_icon", locals: { topic: topic, count: note_count.to_i }
   = render partial: "topics/team_readers_icon", locals: { topic: topic, readers: team_readers }
   - commitfest_summary = @commitfest_summaries&.dig(topic.id)

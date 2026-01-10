@@ -1,0 +1,24 @@
+- star_data = star_data || {}
+- starred_by_me = star_data[:starred_by_me] || false
+- team_starrers = star_data[:team_starrers] || []
+- total_count = (starred_by_me ? 1 : 0) + team_starrers.size
+- classes = ["topic-icon", "activity-star"]
+- classes << "is-hidden" if total_count.zero?
+- classes << "is-starred" if starred_by_me
+- icon_class = starred_by_me ? "fa-solid fa-star" : "fa-regular fa-star"
+div class=classes.join(" ") id=dom_id(topic, "stars") data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+  i class=icon_class
+  - if total_count > 2
+    span.topic-icon-badge = total_count
+  - if starred_by_me || team_starrers.any?
+    .topic-icon-hover data-hover-popover-target="popover" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+      - if starred_by_me
+        - my_alias = current_user.person&.default_alias || current_user.aliases&.first
+        - if my_alias
+          - participant_stub = { alias: my_alias }
+          - role_label = my_alias.contributor_badge || "User"
+          = render partial: "participant_row", locals: { participant: participant_stub, avatar_size: 32, tooltip: "#{my_alias.name} (#{role_label})" }
+      - team_starrers.each do |alias_record|
+        - participant_stub = { alias: alias_record }
+        - role_label = alias_record.contributor_badge || "User"
+        = render partial: "participant_row", locals: { participant: participant_stub, avatar_size: 32, tooltip: "#{alias_record.name} (#{role_label})" }

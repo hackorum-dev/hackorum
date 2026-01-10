@@ -11,6 +11,8 @@ class User < ApplicationRecord
   has_many :notes, foreign_key: :author_id
   has_many :note_edits, foreign_key: :editor_id
   has_many :activities
+  has_many :topic_stars, dependent: :destroy
+  has_many :starred_topics, through: :topic_stars, source: :topic
 
   scope :active, -> { where(deleted_at: nil) }
 

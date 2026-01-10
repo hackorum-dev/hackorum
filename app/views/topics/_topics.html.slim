@@ -1,6 +1,6 @@
 - topics.each do |topic|
   tr id=dom_id(topic) class="topic-row" data-topic-id=topic.id data-last-message-id=topic.messages.maximum(:id)
-    = render partial: "topics/status_cell", locals: { topic: topic, state: {}, note_count: 0, team_readers: [] }
+    = render partial: "topics/status_cell", locals: { topic: topic, state: {}, note_count: 0, team_readers: [], star_data: {} }
     td.topic-activity data-label="Activity"
       - last_message = topic.messages.order(:created_at).last
       - replies_count = [topic.messages.count - 1, 0].max

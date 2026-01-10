@@ -26,7 +26,9 @@
             li = link_to "New for me", topics_path(filter: "new_for_me")
             li = link_to "Started by me", topics_path(filter: "started_by_me")
             li = link_to "I posted here", topics_path(filter: "messaged_by_me")
+            li = link_to "Starred by me", topics_path(filter: "starred_by_me")
             - current_user.teams.each do |team|
+              li = link_to "#{team.name}: starred by team", topics_path(filter: "starred_by_team", team_id: team.id)
               li = link_to "#{team.name}: not yet read by team", topics_path(filter: "team_unread", team_id: team.id)
               li = link_to "#{team.name}: my teammates are reading", topics_path(filter: "team_reading_others", team_id: team.id)
               li = link_to "#{team.name}: my team is reading", topics_path(filter: "team_reading_any", team_id: team.id)

@@ -1,0 +1,2 @@
+= turbo_stream.replace dom_id(@topic, "star_button") do
+  = render "star_button", topic: @topic, starred: TopicStar.exists?(user: current_user, topic: @topic)

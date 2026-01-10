@@ -1,0 +1,7 @@
+- starred = local_assigns[:starred] || false
+- star_path = starred ? unstar_topic_path(topic) : star_topic_path(topic)
+- method = starred ? :delete : :post
+- icon_class = starred ? "fa-solid fa-star" : "fa-regular fa-star"
+- tooltip = starred ? "Unstar" : "Star"
+= link_to star_path, method: method, data: { turbo_method: method, turbo_stream: true }, class: "topic-icon activity-star #{starred ? 'is-starred' : ''}", title: tooltip, id: dom_id(topic, "star_button") do
+  i class=icon_class

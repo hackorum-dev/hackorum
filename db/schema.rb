@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_30_121500) do
+ActiveRecord::Schema[8.0].define(version: 2026_01_10_125815) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -537,6 +537,16 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_30_121500) do
     t.index ["user_id"], name: "index_thread_awarenesses_on_user_id"
   end
 
+  create_table "topic_stars", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "topic_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["topic_id"], name: "index_topic_stars_on_topic_id"
+    t.index ["user_id", "topic_id"], name: "index_topic_stars_on_user_id_and_topic_id", unique: true
+    t.index ["user_id"], name: "index_topic_stars_on_user_id"
+  end
+
   create_table "topics", force: :cascade do |t|
     t.string "title", null: false
     t.bigint "creator_id", null: false
@@ -613,6 +623,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_30_121500) do
   add_foreign_key "team_members", "users"
   add_foreign_key "thread_awarenesses", "topics"
   add_foreign_key "thread_awarenesses", "users"
+  add_foreign_key "topic_stars", "topics"
+  add_foreign_key "topic_stars", "users"
   add_foreign_key "topics", "aliases", column: "creator_id"
   add_foreign_key "user_tokens", "users"
   add_foreign_key "users", "people"

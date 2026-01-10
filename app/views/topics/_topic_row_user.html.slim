@@ -2,9 +2,10 @@
 - note_count = note_count.to_i
 - participation = participation || {}
 - team_readers = team_readers || []
+- star_data = star_data || {}
 
 tr id=dom_id(topic) class="topic-row topic-#{state[:status] || 'new'}" data-topic-id=topic.id data-last-message-id=topic.messages.maximum(:id)
-  = render partial: "topics/status_cell", locals: { topic: topic, state: state, note_count: note_count, team_readers: team_readers }
+  = render partial: "topics/status_cell", locals: { topic: topic, state: state, note_count: note_count, team_readers: team_readers, star_data: star_data }
   td.topic-activity data-label="Activity"
     - last_message = topic.messages.order(:created_at).last
     - replies_count = [topic.messages.count - 1, 0].max

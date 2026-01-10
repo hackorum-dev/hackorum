@@ -46,6 +46,8 @@ Rails.application.routes.draw do
     member do
       post :aware
       post :read_all
+      post :star
+      delete :unstar
     end
   end
   resources :activities, only: [:index] do

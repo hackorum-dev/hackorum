@@ -166,7 +166,10 @@
 
 .topic-header
   .topic-title-section
-    h1 = @topic.title
+    .topic-title-with-star
+      - if user_signed_in?
+        = render "star_button", topic: @topic, starred: @is_starred
+      h1 = @topic.title
     .topic-meta
       span.creator Started by #{@topic.creator.name}
       span.date #{time_ago_in_words(@topic.created_at)} ago
