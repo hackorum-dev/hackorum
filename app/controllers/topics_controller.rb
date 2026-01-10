@@ -719,7 +719,9 @@ class TopicsController < ApplicationController
       .where(commitfest_patch_topics: { topic_id: @topic.id })
       .order("commitfests.end_date DESC, commitfests.start_date DESC")
 
-    @commitfest_sidebar_entries = entries.map do |entry|
+    deduped_entries = entries.uniq { |entry| entry.commitfest_patch.external_id }
+
+    @commitfest_sidebar_entries = deduped_entries.map do |entry|
       patch = entry.commitfest_patch
       {
         commitfest_name: entry.commitfest.name,
@@ -731,10 +733,10 @@ class TopicsController < ApplicationController
       }
     end
 
-    reviewers = entries.flat_map { |entry| Topic.parse_csv_list(entry.commitfest_patch.reviewers) }
+    reviewers = deduped_entries.flat_map { |entry| Topic.parse_csv_list(entry.commitfest_patch.reviewers) }
     @commitfest_reviewers = reviewers.uniq
 
-    committers = entries.map { |entry| entry.commitfest_patch.committer.to_s.strip }.reject(&:blank?).uniq
+    committers = deduped_entries.map { |entry| entry.commitfest_patch.committer.to_s.strip }.reject(&:blank?).uniq
     @commitfest_committers = committers
   end
 
