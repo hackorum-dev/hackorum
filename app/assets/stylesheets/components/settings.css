@@ -131,3 +131,52 @@
 .settings-google-svg {
   display: block;
 }
+
+/* Settings sidebar navigation */
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  padding: var(--spacing-4) 0;
+}
+
+.settings-nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3) var(--spacing-4);
+  border-radius: var(--border-radius-md);
+  text-decoration: none;
+  color: var(--color-text-primary);
+  transition: background-color var(--transition-fast);
+  font-weight: var(--font-weight-medium);
+}
+
+.settings-nav-link:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.settings-nav-link.active {
+  background-color: var(--color-primary-100);
+  color: var(--color-primary-700);
+  font-weight: var(--font-weight-semibold);
+}
+
+.settings-nav-link.danger {
+  color: var(--color-danger-text);
+}
+
+.settings-nav-link.danger:hover {
+  background-color: var(--color-danger-bg-hover);
+}
+
+.settings-nav-link i {
+  width: 20px;
+  text-align: center;
+}
+
+.settings-nav-divider {
+  height: 1px;
+  background-color: var(--color-border);
+  margin: var(--spacing-2) 0;
+}

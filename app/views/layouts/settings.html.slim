@@ -1,0 +1,26 @@
+- content_for :title, "Settings"
+
+- content_for :sidebar do
+  .sidebar.settings-sidebar
+    nav.settings-nav
+      = link_to settings_account_path, class: settings_nav_link_class(:account) do
+        i.fas.fa-envelope
+        span Account & Emails
+      = link_to settings_profile_path, class: settings_nav_link_class(:profile) do
+        i.fas.fa-user
+        span Profile
+      = link_to settings_password_path, class: settings_nav_link_class(:password) do
+        i.fas.fa-lock
+        span Password
+      = link_to settings_teams_path, class: settings_nav_link_class(:teams) do
+        i.fas.fa-users
+        span Teams
+      = link_to settings_import_path, class: settings_nav_link_class(:import) do
+        i.fas.fa-download
+        span Import
+      .settings-nav-divider
+      = link_to settings_deletion_path, class: settings_nav_link_class(:deletion, danger: true) do
+        i.fas.fa-exclamation-triangle
+        span Delete Account
+
+= render template: 'layouts/application'

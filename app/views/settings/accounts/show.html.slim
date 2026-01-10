@@ -1,32 +1,5 @@
-- content_for :title, "Settings"
-
 .settings-page
-  h1 Settings
-
-  .settings-section
-    h2 Username
-    - if current_user.username.blank?
-      .settings-warning You have no username set. Please choose one.
-    = form_with model: current_user, url: username_path, method: :patch, local: true do |f|
-      .form-group
-        = f.label :username
-        = f.text_field :username, placeholder: "your_name", value: current_user.username
-      = f.submit "Save username", class: "button-primary"
-
-  .settings-section
-    h2 Change password
-    = form_with url: update_current_password_path, method: :patch, local: true, data: { turbo: false } do
-      - if current_user.password_digest.present?
-        .form-group
-          = label_tag :current_password, "Current password"
-          = password_field_tag :current_password, nil, required: true
-      .form-group
-        = label_tag :password, "New password"
-        = password_field_tag :password, nil, required: true
-      .form-group
-        = label_tag :password_confirmation, "Confirm new password"
-        = password_field_tag :password_confirmation, nil, required: true
-      = submit_tag "Update password", class: "button-primary"
+  h1 Account & Emails
 
   .settings-section
     h2 Connected accounts
@@ -57,7 +30,7 @@
 
   .settings-section
     h2 Email addresses
-    = form_with url: emails_path, method: :post, local: true, class: "email-form", data: { turbo: false } do |f|
+    = form_with url: settings_emails_path, method: :post, local: true, class: "email-form", data: { turbo: false } do |f|
       .form-group
         = f.label :email, "Add email"
         = f.email_field :email, required: true, placeholder: "user@example.com"
@@ -79,21 +52,8 @@
               td = (al.id == @default_alias_id) ? "Yes" : "No"
               td
                 - unless al.id == @default_alias_id
-                  = button_to "Make primary", primary_email_path(al), method: :post, class: "button-secondary"
+                  = button_to "Make primary", primary_settings_email_path(al), method: :post, class: "button-secondary"
                 - unless al.id == @default_alias_id
-                  = button_to "Remove", email_path(al), method: :delete, data: { turbo_confirm: "Remove this email?" }, class: "button-danger"
+                  = button_to "Remove", settings_email_path(al), method: :delete, data: { turbo_confirm: "Remove this email?" }, class: "button-danger"
     - else
       p No emails yet.
-
-  .settings-section
-    h2 Teams
-    = link_to "Manage teams", teams_path, class: "button-secondary"
-
-  .settings-section
-    h2 Import
-    = link_to "Import existing read status", new_read_status_import_path, class: "button-secondary"
-
-  .settings-section
-    h2 Danger zone
-    p Deleting your account will remove your data. This cannot be undone.
-    = link_to "Delete account", new_account_deletion_path, class: "button-danger"

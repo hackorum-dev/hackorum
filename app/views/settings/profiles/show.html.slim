@@ -1,0 +1,12 @@
+.settings-page
+  h1 Profile
+
+  .settings-section
+    h2 Username
+    - if current_user.username.blank?
+      .settings-warning You have no username set. Please choose one.
+    = form_with model: current_user, url: settings_username_path, method: :patch, local: true do |f|
+      .form-group
+        = f.label :username
+        = f.text_field :username, placeholder: "your_name", value: current_user.username
+      = f.submit "Save username", class: "button-primary"

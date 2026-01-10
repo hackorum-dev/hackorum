@@ -19,12 +19,12 @@ class OmniauthCallbacksController < ApplicationController
     if linking && current_user
       if identity
         if identity.user_id != current_user.id
-          return redirect_to settings_path, alert: 'That Google account is already linked to another user.'
+          return redirect_to settings_account_path, alert: 'That Google account is already linked to another user.'
         end
-        return redirect_to settings_path, notice: 'That Google account is already linked to your account.'
+        return redirect_to settings_account_path, notice: 'That Google account is already linked to your account.'
       else
         if Alias.by_email(email).where.not(user_id: [nil, current_user.id]).exists?
-          return redirect_to settings_path, alert: 'Email is linked to another account. Delete that account first to release it.'
+          return redirect_to settings_account_path, alert: 'Email is linked to another account. Delete that account first to release it.'
         end
 
         aliases = Alias.by_email(email).where(user_id: [nil, current_user.id])
@@ -53,7 +53,7 @@ class OmniauthCallbacksController < ApplicationController
       end
 
       identity.update!(last_used_at: Time.current, email: email, raw_info: auth.to_json)
-      return redirect_to settings_path, notice: 'Google account linked.'
+      return redirect_to settings_account_path, notice: 'Google account linked.'
     end
 
     if identity

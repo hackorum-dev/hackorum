@@ -1,11 +1,9 @@
-- content_for :title, "Delete account"
-
 .settings-page
   h1 Delete account
   p This will detach all your emails and delete your login methods. Archive data remains.
   p This action is permanent.
 
-  = form_with url: account_deletion_path, method: :post, data: { turbo: false } do
+  = form_with url: settings_deletion_path, method: :post, data: { turbo: false } do
     .form-group
       = label_tag :confirmation, "Type DELETE to confirm"
       = text_field_tag :confirmation, nil, required: true, placeholder: "DELETE"

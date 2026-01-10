@@ -26,8 +26,8 @@ RSpec.describe 'Emails management', type: :request do
     sign_in(email: 'me@example.com')
 
     perform_enqueued_jobs do
-      post emails_path, params: { email: 'new-address@example.com' }
-      expect(response).to redirect_to(settings_path)
+      post settings_emails_path, params: { email: 'new-address@example.com' }
+      expect(response).to redirect_to(settings_account_path)
     end
 
     raw = extract_raw_token_from_mailer
@@ -36,7 +36,7 @@ RSpec.describe 'Emails management', type: :request do
     delete session_path
 
     get verification_path(token: raw)
-    expect(response).to redirect_to(settings_path)
+    expect(response).to redirect_to(settings_account_path)
 
     expect(Alias.by_email('new-address@example.com').where(user_id: user.id)).to exist
 
@@ -53,9 +53,9 @@ RSpec.describe 'Emails management', type: :request do
 
     sign_in(email: 'me2@example.com')
     expect {
-      post emails_path, params: { email: 'taken@example.com' }
+      post settings_emails_path, params: { email: 'taken@example.com' }
     }.not_to change { UserToken.count }
-    expect(response).to redirect_to(settings_path)
+    expect(response).to redirect_to(settings_account_path)
   end
 
   it 'attaches all matching aliases when the email exists multiple times' do
@@ -69,13 +69,13 @@ RSpec.describe 'Emails management', type: :request do
     sign_in(email: 'me-multi@example.com')
 
     perform_enqueued_jobs do
-      post emails_path, params: { email: 'multi@example.com' }
-      expect(response).to redirect_to(settings_path)
+      post settings_emails_path, params: { email: 'multi@example.com' }
+      expect(response).to redirect_to(settings_account_path)
     end
 
     raw = extract_raw_token_from_mailer
     get verification_path(token: raw)
-    expect(response).to redirect_to(settings_path)
+    expect(response).to redirect_to(settings_account_path)
 
     aliases = Alias.by_email('multi@example.com')
     expect(aliases.count).to eq(2)
@@ -97,7 +97,7 @@ RSpec.describe 'Emails management', type: :request do
 
     get verification_path(token: raw)
 
-    expect(response).to redirect_to(settings_path)
+    expect(response).to redirect_to(settings_account_path)
     expect(flash[:alert]).to match(/different user/)
     expect(Alias.by_email('token-user@example.com').pluck(:user_id).uniq).to eq([token_user.id])
   ensure

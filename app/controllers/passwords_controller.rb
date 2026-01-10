@@ -1,6 +1,4 @@
 class PasswordsController < ApplicationController
-  before_action :require_authentication, only: [:update_current]
-
   def new
   end
 
@@ -30,21 +28,6 @@ class PasswordsController < ApplicationController
     else
       flash.now[:alert] = 'Could not update password.'
       render :edit, status: :unprocessable_entity
-    end
-  end
-
-  def update_current
-    user = current_user
-    if user.password_digest.present?
-      unless user.authenticate(params[:current_password])
-        return redirect_to settings_path, alert: "Current password is incorrect"
-      end
-    end
-
-    if user.update(password: params[:password], password_confirmation: params[:password_confirmation])
-      redirect_to settings_path, notice: "Password updated."
-    else
-      redirect_to settings_path, alert: user.errors.full_messages.to_sentence
     end
   end
 end

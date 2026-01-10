@@ -1,5 +1,3 @@
-- content_for :title, "Teams"
-
 .settings-page
   h1 Teams
 
@@ -10,14 +8,14 @@
         ul.team-list
           - @your_teams.each do |team|
             li
-              = link_to team.name, team_path(team)
+              = link_to team.name, settings_team_path(team)
               span.team-meta = " - #{team.team_members.count} member(s)"
       - else
         p You are not in any teams yet.
 
     .teams-section
       h2 Create a team
-      = form_with model: Team.new, url: teams_path, method: :post, local: true do |f|
+      = form_with model: Team.new, url: settings_teams_path, method: :post, local: true do |f|
         .form-group
           = f.label :name
           = f.text_field :name, required: true, placeholder: "Team name"
@@ -29,7 +27,7 @@
       ul.team-list
         - @all_teams.each do |team|
           li
-            = link_to team.name, team_path(team)
+            = link_to team.name, settings_team_path(team)
             span.team-meta = " - #{team.team_members.count} member(s)"
     - else
       p No teams yet.

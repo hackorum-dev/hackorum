@@ -81,7 +81,7 @@ RSpec.describe 'OmniAuth Google', type: :request do
       sign_in_with_google(link: true)
     }.to change(Identity, :count).by(1)
 
-    expect(response).to redirect_to(settings_path)
+    expect(response).to redirect_to(settings_account_path)
     identity = Identity.last
     expect(identity.user_id).to eq(user.id)
     expect(Alias.by_email('linkme@example.com').where(user_id: user.id)).to exist
@@ -103,11 +103,11 @@ RSpec.describe 'OmniAuth Google', type: :request do
 
     mock_google_oauth(uid: 'uid-dup', email: 'dup@example.com')
     sign_in_with_google(link: true)
-    expect(response).to redirect_to(settings_path)
+    expect(response).to redirect_to(settings_account_path)
 
     mock_google_oauth(uid: 'uid-dup', email: 'dup@example.com')
     sign_in_with_google(link: true)
-    expect(response).to redirect_to(settings_path)
+    expect(response).to redirect_to(settings_account_path)
     expect(flash[:notice]).to match(/already linked to your account/i)
   end
 
@@ -121,7 +121,7 @@ RSpec.describe 'OmniAuth Google', type: :request do
       sign_in_with_google(link: true)
     }.to change(Identity, :count).by(1)
 
-    expect(response).to redirect_to(settings_path)
+    expect(response).to redirect_to(settings_account_path)
     unclaimed.reload
     expect(unclaimed.user_id).to eq(user.id)
     expect(unclaimed.verified_at).to be_present
@@ -137,7 +137,7 @@ RSpec.describe 'OmniAuth Google', type: :request do
       sign_in_with_google(link: true)
     }.to change(Identity, :count).by(1)
 
-    expect(response).to redirect_to(settings_path)
+    expect(response).to redirect_to(settings_account_path)
     owned.reload
     expect(owned.user_id).to eq(user.id)
     expect(owned.verified_at).to be_present
@@ -155,7 +155,7 @@ RSpec.describe 'OmniAuth Google', type: :request do
       sign_in_with_google(link: true)
     }.not_to change(Identity, :count)
 
-    expect(response).to redirect_to(settings_path)
+    expect(response).to redirect_to(settings_account_path)
     expect(flash[:alert]).to match(/linked to another account/i)
   end
 
@@ -170,7 +170,7 @@ RSpec.describe 'OmniAuth Google', type: :request do
       sign_in_with_google(link: true)
     }.to change(Identity, :count).by(1)
 
-    expect(response).to redirect_to(settings_path)
+    expect(response).to redirect_to(settings_account_path)
     expect(Identity.find_by(uid: 'uid-secondary')&.user_id).to eq(user.id)
     expect(Alias.by_email('second@example.com').where(user_id: user.id)).to exist
 

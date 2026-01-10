@@ -31,9 +31,9 @@ RSpec.describe "TeamMembers", type: :request do
       sign_in(email: "member@example.com")
 
       expect {
-        post team_team_members_path(team), params: { username: "invitee" }
+        post settings_team_team_members_path(team), params: { username: "invitee" }
       }.not_to change(TeamMember, :count)
-      expect(response).to redirect_to(team_path(team))
+      expect(response).to redirect_to(settings_team_path(team))
     end
 
     it "allows admins to add members" do
@@ -41,9 +41,9 @@ RSpec.describe "TeamMembers", type: :request do
       sign_in(email: "admin@example.com")
 
       expect {
-        post team_team_members_path(team), params: { username: "invitee" }
+        post settings_team_team_members_path(team), params: { username: "invitee" }
       }.to change(TeamMember, :count).by(1)
-      expect(response).to redirect_to(team_path(team))
+      expect(response).to redirect_to(settings_team_path(team))
     end
   end
 end

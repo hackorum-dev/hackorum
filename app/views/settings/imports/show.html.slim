@@ -1,12 +1,10 @@
-- content_for :title, "Import read status"
-
 .settings-page
   h1 Import existing read status
 
   .settings-section
     ul
       li
-        p Upload a CSV file with rows like: 
+        p Upload a CSV file with rows like:
         pre message_id,notemode,note
       li All mentioned message_ids that are present in hackorum will be marked as read.
       li If a proper note is present for the message_id, it will be also created or updated
@@ -19,7 +17,7 @@
       li Notes are stored as "!autoimport &lt;your note&gt;" so you can include @mentions and #tags.
       li Each message/topic can only have one autoimport message - if there's already one, the upload will overwrite the existing note.
 
-    = form_with url: read_status_imports_path, method: :post, local: true, multipart: true, data: { turbo: false } do
+    = form_with url: settings_import_path, method: :post, local: true, multipart: true, data: { turbo: false } do
       .form-group
         = label_tag :import_file, "CSV file"
         = file_field_tag :import_file, accept: ".csv,text/csv", required: true

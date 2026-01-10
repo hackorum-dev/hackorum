@@ -80,12 +80,12 @@ class VerificationsController < ApplicationController
     user.update!(person_id: person.id) if user.person_id.nil?
 
     if user_signed_in? && current_user.id != user.id
-      return redirect_to settings_path, alert: 'This verification link belongs to a different user.'
+      return redirect_to settings_account_path, alert: 'This verification link belongs to a different user.'
     end
 
     email = token.email
     if Alias.by_email(email).where.not(user_id: [nil, user.id]).exists?
-      return redirect_to settings_path, alert: 'Email is linked to another account. Delete that account first to release it.'
+      return redirect_to settings_account_path, alert: 'Email is linked to another account. Delete that account first to release it.'
     end
 
     aliases = Alias.by_email(email)
@@ -99,6 +99,6 @@ class VerificationsController < ApplicationController
       person.update!(default_alias_id: al.id) if person.default_alias_id.nil?
     end
 
-    redirect_to settings_path, notice: 'Email added and verified.'
+    redirect_to settings_account_path, notice: 'Email added and verified.'
   end
 end

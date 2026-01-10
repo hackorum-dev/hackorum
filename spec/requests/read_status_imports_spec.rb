@@ -26,7 +26,7 @@ RSpec.describe "Read status imports", type: :request do
   end
 
   it "requires authentication" do
-    get new_read_status_import_path
+    get settings_import_path
     expect(response).to redirect_to(new_session_path)
   end
 
@@ -45,7 +45,7 @@ RSpec.describe "Read status imports", type: :request do
       <missing@example.com>,message,Missing message
     CSV
 
-    post read_status_imports_path, params: { import_file: upload_csv(csv) }
+    post settings_import_path, params: { import_file: upload_csv(csv) }
 
     note = Note.active.find_by(author: user, message_id: message1.id)
     expect(note).to be_present
@@ -80,7 +80,7 @@ RSpec.describe "Read status imports", type: :request do
       #{message.message_id},message,New text
     CSV
 
-    post read_status_imports_path, params: { import_file: upload_csv(csv) }
+    post settings_import_path, params: { import_file: upload_csv(csv) }
 
     note = Note.active.find_by(author: user, message_id: message.id)
     expect(note.body).to eq("!autoimport New text")
@@ -99,7 +99,7 @@ RSpec.describe "Read status imports", type: :request do
       #{message.message_id},topic,Thread note #tag
     CSV
 
-    post read_status_imports_path, params: { import_file: upload_csv(csv) }
+    post settings_import_path, params: { import_file: upload_csv(csv) }
 
     note = Note.active.find_by(author: user, topic_id: message.topic_id, message_id: nil)
     expect(note).to be_present

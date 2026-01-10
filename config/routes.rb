@@ -13,14 +13,27 @@ Rails.application.routes.draw do
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
-  # Main application routes
   root "topics#index"
-  
-  resources :teams do
-    resources :team_members, only: [:create, :destroy]
+
+  # Settings namespace
+  namespace :settings do
+    root "accounts#show"
+    resource :account, only: [:show]
+    resource :profile, only: [:show]
+    resource :password, only: [:show]
+    resource :import, only: [:show, :create]
+    resource :deletion, only: [:show, :create]
+
+    resources :teams, only: [:index, :show, :create, :destroy] do
+      resources :team_members, only: [:create, :destroy]
+    end
+
+    resource :username, only: [:update]
+    patch "password/current", to: "passwords#update_current", as: :update_current_password
+    resources :emails, only: [:create, :destroy] do
+      post :primary, on: :member
+    end
   end
-  resource :username, only: [:update]
-  patch "/password/current", to: "passwords#update_current", as: :update_current_password
   resources :topics, only: [:index, :show] do
     collection do
       get :search
@@ -39,7 +52,6 @@ Rails.application.routes.draw do
     post :mark_all_read, on: :collection
   end
   resources :notes, only: [:create, :update, :destroy]
-  resources :read_status_imports, only: [:new, :create]
   get "stats", to: "stats#show", as: :stats
   get "stats/data", to: "stats#data", as: :stats_data
   get "person/*email/contributions/:year", to: "people#contributions", as: :person_contributions, format: false
@@ -52,11 +64,6 @@ Rails.application.routes.draw do
   resource :registration, only: [:new, :create]
   get '/verify', to: 'verifications#show', as: :verification
   resource :password, only: [:new, :create, :edit, :update]
-  resource :settings, only: [:show]
-  resources :emails, only: [:create, :destroy] do
-    post :primary, on: :member
-  end
-  resource :account_deletion, only: [:new, :create]
 
   # OmniAuth callbacks
   get '/auth/:provider/callback', to: 'omniauth_callbacks#google_oauth2'

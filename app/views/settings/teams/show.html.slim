@@ -1,11 +1,9 @@
-- content_for :title, @team.name
-
 .settings-page
   h1 = @team.name
 
   - if @can_manage
     .team-actions
-      = button_to "Delete team", team_path(@team), method: :delete, data: { turbo_confirm: "Delete this team?" }, class: "button-danger"
+      = button_to "Delete team", settings_team_path(@team), method: :delete, data: { turbo_confirm: "Delete this team?" }, class: "button-danger"
 
   .team-members
     h2 Members
@@ -17,16 +15,16 @@
             - if member.role_admin?
               span.role-badge Admin
             - if @can_manage && member.user_id != current_user&.id
-              = button_to "Remove", team_team_member_path(@team, member), method: :delete, class: "button-secondary", data: { turbo_confirm: "Remove this member?" }
+              = button_to "Remove", settings_team_team_member_path(@team, member), method: :delete, class: "button-secondary", data: { turbo_confirm: "Remove this member?" }
             - if member.user_id == current_user&.id && !member.role_admin?
-              = button_to "Leave team", team_team_member_path(@team, member), method: :delete, class: "button-secondary", data: { turbo_confirm: "Leave this team?" }
+              = button_to "Leave team", settings_team_team_member_path(@team, member), method: :delete, class: "button-secondary", data: { turbo_confirm: "Leave this team?" }
     - else
       p No members yet.
 
   - if @can_invite
     .invite-section
       h2 Add member
-      = form_with url: team_team_members_path(@team), method: :post, local: true do |f|
+      = form_with url: settings_team_team_members_path(@team), method: :post, local: true do |f|
         .form-group
           = label_tag :username, "Username"
           = text_field_tag :username, nil, required: true, placeholder: "existing_username"

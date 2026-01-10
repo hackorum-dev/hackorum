@@ -25,7 +25,7 @@ RSpec.describe "Teams", type: :request do
     end
 
     it "redirects guests to sign in" do
-      get team_path(team)
+      get settings_team_path(team)
       expect(response).to redirect_to(new_session_path)
     end
 
@@ -33,7 +33,7 @@ RSpec.describe "Teams", type: :request do
       attach_verified_alias(non_member, email: "non-member@example.com")
       sign_in(email: "non-member@example.com")
 
-      get team_path(team)
+      get settings_team_path(team)
       expect(response).to have_http_status(:not_found)
     end
 
@@ -41,7 +41,7 @@ RSpec.describe "Teams", type: :request do
       attach_verified_alias(member, email: "member@example.com")
       sign_in(email: "member@example.com")
 
-      get team_path(team)
+      get settings_team_path(team)
       expect(response).to have_http_status(:success)
     end
   end
@@ -60,8 +60,8 @@ RSpec.describe "Teams", type: :request do
       attach_verified_alias(member, email: "member@example.com")
       sign_in(email: "member@example.com")
 
-      delete team_path(team)
-      expect(response).to redirect_to(team_path(team))
+      delete settings_team_path(team)
+      expect(response).to redirect_to(settings_team_path(team))
       expect(Team.exists?(team.id)).to be(true)
     end
 
@@ -70,7 +70,7 @@ RSpec.describe "Teams", type: :request do
       sign_in(email: "admin@example.com")
 
       expect {
-        delete team_path(team)
+        delete settings_team_path(team)
       }.to change(Team, :count).by(-1)
     end
   end
