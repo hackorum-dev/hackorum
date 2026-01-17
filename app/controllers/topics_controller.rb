@@ -36,7 +36,19 @@ class TopicsController < ApplicationController
   end
 
   def show
-    messages_scope = @topic.messages.includes(:sender, { reply_to: :sender }, :attachments)
+    messages_scope = @topic.messages.includes(
+      :attachments,
+      :sender,
+      :sender_person,
+      { sender_person: :default_alias },
+      {
+        reply_to: [
+          :sender,
+          :sender_person,
+          { sender_person: :default_alias }
+        ]
+      }
+    )
 
     @messages = messages_scope.order(created_at: :asc)
     @message_numbers = @messages.each_with_index.to_h { |msg, idx| [msg.id, idx + 1] }
@@ -245,7 +257,11 @@ class TopicsController < ApplicationController
   private
 
   def set_topic
-    @topic = Topic.find(params[:id])
+    @topic = Topic.includes(
+      :creator,
+      :creator_person,
+      creator_person: :default_alias
+    ).find(params[:id])
   end
 
   def build_participants_sidebar_data(_messages_scope)
@@ -792,7 +808,12 @@ class TopicsController < ApplicationController
   def load_notes
     notes = Note.active.visible_to(current_user)
                 .where(topic: @topic)
-                .includes(:author, :note_tags, note_mentions: :mentionable)
+                .includes(
+                  :note_tags,
+                  { author: { person: :default_alias } },
+                  { last_editor: { person: :default_alias } },
+                  { note_mentions: :mentionable }
+                )
                 .order(:created_at)
 
     @notes_by_message = Hash.new { |h, k| h[k] = [] }
