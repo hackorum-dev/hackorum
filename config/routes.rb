@@ -4,9 +4,13 @@ Rails.application.routes.draw do
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
-  # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
-  # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
+
+  if Rails.env.development?
+    get "preview/maintenance" => ->(env) {
+      PendingMigrationCatcher.new(nil).send(:render_maintenance_page, nil)
+    }
+  end
   get "messages/by-id/*message_id", to: "messages#by_message_id", as: :message_by_id, format: false
 
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
