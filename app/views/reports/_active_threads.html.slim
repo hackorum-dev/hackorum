@@ -1,0 +1,35 @@
+.reports-section
+  h2.reports-section-title Active Threads
+
+  - if @active_threads.any?
+    .reports-threads-list
+      - @active_threads.each do |topic|
+        .reports-thread-card
+          .reports-thread-main
+            = link_to topic.title, topic_path(topic), class: "reports-thread-title"
+            .reports-thread-meta
+              span.reports-thread-stat
+                i.fa.fa-envelope
+                =<> topic.period_messages
+                |  messages
+              span.reports-thread-stat
+                i.fa.fa-users
+                =<> topic.period_participants
+                |  participants
+              - if topic.last_activity_at
+                span.reports-thread-time
+                  |  Last active:
+                  =<  smart_time_display(topic.last_activity_at)
+
+          .reports-thread-participants
+            - participants = @thread_participants[topic.id]&.first(5) || []
+            - if participants.any?
+              .reports-thread-avatars
+                - participants.each do |tp|
+                  - person = tp.person
+                  - primary_alias = person&.default_alias
+                  - next unless primary_alias
+                  = link_to person_path(primary_alias.email), class: "reports-thread-avatar-link", title: person.display_name do
+                    = image_tag primary_alias.gravatar_url(size: 24), class: "reports-thread-avatar", alt: person.display_name
+  - else
+    p.reports-empty No active threads in this period.

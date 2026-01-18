@@ -1,0 +1,12 @@
+- content_for :title, period_title(@period_type, @year, week: @week, month: @month)
+
+- content_for :sidebar do
+  .sidebar
+    = render "sidebar"
+
+.reports-page
+  = render "header"
+  = render "summary_stats"
+  = render "activity_rankings"
+  = render "active_threads"
+  = render "new_contributors"

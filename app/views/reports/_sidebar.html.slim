@@ -1,0 +1,38 @@
+.sidebar-section
+  h2.sidebar-heading Notable Threads
+
+  - if @most_active_thread
+    .notable-thread
+      span.notable-thread-label Most Active
+      = link_to @most_active_thread.title, topic_path(@most_active_thread), class: "notable-thread-link"
+      span.notable-thread-stat = "#{@most_active_thread.period_messages} messages"
+
+  - if @most_diverse_thread && @most_diverse_thread.id != @most_active_thread&.id
+    .notable-thread
+      span.notable-thread-label Most Diverse
+      = link_to @most_diverse_thread.title, topic_path(@most_diverse_thread), class: "notable-thread-link"
+      span.notable-thread-stat = "#{@most_diverse_thread.period_participants} participants"
+
+  - if @longest_thread && @longest_thread.id != @most_active_thread&.id && @longest_thread.id != @most_diverse_thread&.id
+    .notable-thread
+      span.notable-thread-label Longest Running
+      = link_to @longest_thread.title, topic_path(@longest_thread), class: "notable-thread-link"
+      span.notable-thread-stat = "#{@longest_thread.active_days} days active"
+
+  - unless @most_active_thread || @most_diverse_thread || @longest_thread
+    p.sidebar-empty No notable threads in this period.
+
+.sidebar-section
+  h2.sidebar-heading Jump To Period
+
+  = form_tag(reports_path, method: :get, class: "jump-to-form") do
+    .jump-to-fields
+      = select_tag :year, options_for_select(@available_years, @year), class: "jump-to-select"
+      - if @period_type == "weekly"
+        = select_tag :week, options_for_select((1..weeks_in_year(@year)).map { |w| ["Week #{w}", w] }, @week), class: "jump-to-select"
+      - else
+        = select_tag :month, options_for_select(Date::MONTHNAMES.compact.each_with_index.map { |m, i| [m, i + 1] }, @month), class: "jump-to-select"
+      = hidden_field_tag :period_type, @period_type
+      = hidden_field_tag :filter, @filter if @filter != "all"
+    button.jump-to-button type="submit"
+      | Go

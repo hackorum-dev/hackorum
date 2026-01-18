@@ -1,0 +1,27 @@
+.reports-section
+  h2.reports-section-title Activity Rankings
+
+  .reports-rankings data-controller="tabs"
+    .reports-rankings-tabs role="tablist"
+      - ranking_tabs.each_with_index do |tab, index|
+        button.reports-tab type="button" role="tab" data-tabs-target="tab" data-action="click->tabs#select" data-index=index class=(index == 0 ? "is-active" : "")
+          = tab[:label]
+
+    .reports-rankings-content
+      - ranking_tabs.each_with_index do |tab, index|
+        .reports-ranking-panel data-tabs-target="panel" class=(index == 0 ? "is-active" : "") role="tabpanel"
+          - entries = @rankings[tab[:key].to_sym]
+          - if entries.any?
+            ol.reports-ranking-list
+              - entries.each do |entry|
+                li.reports-ranking-entry class=(entry[:rank] <= 3 ? "is-top-three" : "")
+                  span.reports-ranking-rank = entry[:rank]
+                  - person = entry[:person]
+                  - primary_alias = person.default_alias
+                  = link_to person_path(primary_alias&.email || person.id), class: "reports-ranking-person" do
+                    = image_tag primary_alias&.gravatar_url(size: 32) || "", class: "reports-ranking-avatar", alt: person.display_name
+                    span.reports-ranking-name = person.display_name
+                  = contributor_status_badge(person)
+                  span.reports-ranking-count = entry[:count]
+          - else
+            p.reports-empty No activity in this period.

@@ -1,0 +1,20 @@
+.reports-section.reports-section-newcomers
+  h2.reports-section-title New Participants
+
+  - if @newcomers.any?
+    p.reports-newcomers-intro
+      = @newcomer_count
+      |  #{@newcomer_count == 1 ? 'person' : 'people'} joined the discussion this #{@period_type == 'weekly' ? 'week' : 'month'}.
+
+    .reports-newcomers-list
+      - @newcomers.each do |entry|
+        - person = entry[:person]
+        - primary_alias = person.default_alias
+        .reports-newcomer-card
+          = link_to person_path(primary_alias&.email || person.id), class: "reports-newcomer-link" do
+            = image_tag primary_alias&.gravatar_url(size: 48) || "", class: "reports-newcomer-avatar", alt: person.display_name
+            .reports-newcomer-info
+              span.reports-newcomer-name = person.display_name
+              span.reports-newcomer-count = pluralize(entry[:count], "message")
+  - else
+    p.reports-empty No new contributors in this period.

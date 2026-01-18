@@ -64,6 +64,11 @@ Rails.application.routes.draw do
   get "stats", to: "stats#show", as: :stats
   get "stats/data", to: "stats#data", as: :stats_data
 
+  # Reports
+  get "reports", to: "reports#index", as: :reports
+  get "reports/weekly/:year/:week", to: "reports#show", defaults: { period_type: "weekly" }, as: :weekly_report
+  get "reports/monthly/:year/:month", to: "reports#show", defaults: { period_type: "monthly" }, as: :monthly_report
+
   # Help pages
   resources :help, only: [:index, :show], param: :slug
   get "person/*email/contributions/:year", to: "people#contributions", as: :person_contributions, format: false

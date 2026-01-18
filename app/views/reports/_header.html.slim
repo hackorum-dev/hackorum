@@ -1,0 +1,32 @@
+.reports-header
+  .reports-header-nav
+    .reports-header-period
+      = link_to previous_report_path(@period_type, @year, week: @week, month: @month), class: "reports-nav-arrow" do
+        i.fa.fa-chevron-left
+        span.sr-only Previous
+      h1.reports-title
+        = period_title(@period_type, @year, week: @week, month: @month)
+      - unless is_current_or_future_period?(@period_type, @year, week: @week, month: @month)
+        = link_to next_report_path(@period_type, @year, week: @week, month: @month), class: "reports-nav-arrow" do
+          i.fa.fa-chevron-right
+          span.sr-only Next
+      - else
+        span.reports-nav-arrow.reports-nav-disabled
+          i.fa.fa-chevron-right
+
+    .reports-header-subtitle
+      = period_subtitle(@period_type, @year, week: @week, month: @month)
+
+  .reports-header-controls
+    .reports-period-toggle
+      - if @period_type == "weekly"
+        span.reports-toggle-active Weekly
+        = link_to "Monthly", toggle_period_type_path, class: "reports-toggle-link"
+      - else
+        = link_to "Weekly", toggle_period_type_path, class: "reports-toggle-link"
+        span.reports-toggle-active Monthly
+
+    .reports-filter-pills
+      = link_to "All", filter_path("all"), class: "reports-filter-pill #{@filter == 'all' ? 'is-active' : ''}"
+      = link_to "Community", filter_path("community"), class: "reports-filter-pill #{@filter == 'community' ? 'is-active' : ''}"
+      = link_to "Contributors", filter_path("contributors"), class: "reports-filter-pill #{@filter == 'contributors' ? 'is-active' : ''}"

@@ -1,0 +1,44 @@
+.reports-stats
+  .reports-stat-card
+    .reports-stat-icon
+      i.fa.fa-envelope
+    .reports-stat-content
+      .reports-stat-value = @stats&.messages_total || 0
+      .reports-stat-label Messages
+      - change = stat_change(@stats&.messages_total, @previous_stats&.messages_total)
+      - if change
+        .reports-stat-change class=stat_change_class(change)
+          = stat_change_text(change)
+
+  .reports-stat-card
+    .reports-stat-icon
+      i.fa.fa-users
+    .reports-stat-content
+      .reports-stat-value = @stats&.participants_active || 0
+      .reports-stat-label Active People
+      - change = stat_change(@stats&.participants_active, @previous_stats&.participants_active)
+      - if change
+        .reports-stat-change class=stat_change_class(change)
+          = stat_change_text(change)
+
+  .reports-stat-card
+    .reports-stat-icon
+      i.fa.fa-comments
+    .reports-stat-content
+      .reports-stat-value = @stats&.topics_new || 0
+      .reports-stat-label New Threads
+      - change = stat_change(@stats&.topics_new, @previous_stats&.topics_new)
+      - if change
+        .reports-stat-change class=stat_change_class(change)
+          = stat_change_text(change)
+
+  .reports-stat-card
+    .reports-stat-icon
+      i.fa.fa-user-plus
+    .reports-stat-content
+      .reports-stat-value = @stats&.participants_new || 0
+      .reports-stat-label Newcomers
+      - change = stat_change(@stats&.participants_new, @previous_stats&.participants_new)
+      - if change
+        .reports-stat-change class=stat_change_class(change)
+          = stat_change_text(change)
