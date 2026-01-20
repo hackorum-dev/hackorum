@@ -1,0 +1,102 @@
+- content_for :title, "Preview Merge"
+
+.admin-merge-container
+  h1 Preview Merge
+
+  .merge-warning
+    i.fas.fa-exclamation-triangle
+    strong Warning:
+    |  This action cannot be undone. All messages from the source topic will be permanently moved to the target topic.
+
+  .merge-comparison
+    .comparison-column.source-column
+      h2 Source Topic
+      .topic-card
+        .topic-title = @preview[:source][:title]
+        .topic-stats
+          .stat-item
+            .stat-value = @preview[:source][:message_count]
+            .stat-label Messages
+          .stat-item
+            .stat-value = @preview[:source][:participant_count]
+            .stat-label Participants
+        .topic-dates
+          - if @preview[:source][:first_message_at]
+            .date-item
+              span.date-label First message:
+              span.date-value = @preview[:source][:first_message_at].strftime('%Y-%m-%d')
+          - if @preview[:source][:last_message_at]
+            .date-item
+              span.date-label Last message:
+              span.date-value = @preview[:source][:last_message_at].strftime('%Y-%m-%d')
+        - if @preview[:source][:participants].any?
+          .topic-participants
+            h4 Top Participants
+            ul
+              - @preview[:source][:participants].each do |p|
+                li
+                  = p[:name]
+                  span.participant-count = "(#{p[:message_count]} messages)"
+
+    .comparison-arrow
+      i.fas.fa-arrow-right
+
+    .comparison-column.target-column
+      h2 Target Topic
+      .topic-card
+        .topic-title = @preview[:target][:title]
+        .topic-stats
+          .stat-item
+            .stat-value = @preview[:target][:message_count]
+            .stat-label Messages
+          .stat-item
+            .stat-value = @preview[:target][:participant_count]
+            .stat-label Participants
+        .topic-dates
+          - if @preview[:target][:first_message_at]
+            .date-item
+              span.date-label First message:
+              span.date-value = @preview[:target][:first_message_at].strftime('%Y-%m-%d')
+          - if @preview[:target][:last_message_at]
+            .date-item
+              span.date-label Last message:
+              span.date-value = @preview[:target][:last_message_at].strftime('%Y-%m-%d')
+        - if @preview[:target][:participants].any?
+          .topic-participants
+            h4 Top Participants
+            ul
+              - @preview[:target][:participants].each do |p|
+                li
+                  = p[:name]
+                  span.participant-count = "(#{p[:message_count]} messages)"
+
+  .merge-result-preview
+    h2 After Merge
+    .result-stats
+      .stat-item
+        .stat-value = @preview[:result][:total_message_count]
+        .stat-label Total Messages
+      .stat-item
+        .stat-value = @preview[:result][:total_participant_count]
+        .stat-label Total Participants
+      - if @preview[:result][:cross_topic_replies] > 0
+        .stat-item.highlight
+          .stat-value = @preview[:result][:cross_topic_replies]
+          .stat-label Cross-Topic Replies
+      - if @preview[:result][:notes_to_move] > 0
+        .stat-item
+          .stat-value = @preview[:result][:notes_to_move]
+          .stat-label Notes to Move
+
+  = form_tag admin_topic_merge_path(@source_topic), method: :post, class: "merge-form", data: { turbo: false } do
+    = hidden_field_tag :target_topic_id, @target_topic.id
+
+    .form-group
+      = label_tag :merge_reason, "Reason for merge (optional)"
+      = text_area_tag :merge_reason, nil, class: "form-input", rows: 2, placeholder: "e.g., Split thread that should be one conversation"
+
+    .merge-actions
+      = link_to "Back", new_admin_topic_merge_path(@source_topic), class: "button button-secondary"
+      button.button.button-danger type="submit" data-confirm="Are you sure you want to merge these topics? This action cannot be undone."
+        i.fas.fa-compress-arrows-alt
+        |  Confirm Merge

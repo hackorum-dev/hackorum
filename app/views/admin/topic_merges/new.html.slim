@@ -1,0 +1,63 @@
+- content_for :title, "Merge Topic"
+
+.admin-merge-container
+  h1 Merge Topic
+
+  .merge-source-card
+    h2 Source Topic (will be merged into target)
+    .topic-info
+      .topic-title = @source_topic.title
+      .topic-meta
+        span.meta-item
+          strong Messages:
+          = @source_topic.message_count
+        span.meta-item
+          strong Participants:
+          = @source_topic.participant_count
+        span.meta-item
+          strong Created:
+          = @source_topic.created_at.strftime('%Y-%m-%d')
+        - if @source_topic.last_message_at
+          span.meta-item
+            strong Last activity:
+            = time_ago_in_words(@source_topic.last_message_at)
+            |  ago
+
+  .merge-target-section
+    h2 Select Target Topic
+    p Messages from the source topic will be moved to the target topic.
+
+    - if @suggestions.any?
+      .suggestions-section
+        h3 Suggested Targets (similar titles)
+        .suggestions-list
+          - @suggestions.each do |suggestion|
+            .suggestion-item
+              = form_tag preview_admin_topic_merge_path(@source_topic), method: :post, data: { turbo: false } do
+                = hidden_field_tag :target_topic_id, suggestion.id
+                .suggestion-info
+                  .suggestion-title = suggestion.title
+                  .suggestion-meta
+                    span.meta-item
+                      = suggestion.message_count
+                      |  messages
+                    span.meta-item
+                      = suggestion.participant_count
+                      |  participants
+                    - if suggestion.last_message_at
+                      span.meta-item
+                        | Last activity:
+                        = time_ago_in_words(suggestion.last_message_at)
+                        |  ago
+                button.button.button-primary type="submit" Select
+
+    .manual-entry-section
+      h3 Or Enter Topic ID
+      = form_tag preview_admin_topic_merge_path(@source_topic), method: :post, class: "manual-entry-form", data: { turbo: false } do
+        .form-group
+          = label_tag :target_topic_id, "Target Topic ID"
+          = text_field_tag :target_topic_id, nil, placeholder: "Enter topic ID", class: "form-input"
+        button.button.button-primary type="submit" Preview Merge
+
+  .merge-actions
+    = link_to "Cancel", topic_path(@source_topic), class: "button button-secondary"

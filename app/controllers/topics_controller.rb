@@ -262,6 +262,11 @@ class TopicsController < ApplicationController
       :creator_person,
       creator_person: :default_alias
     ).find(params[:id])
+
+    if @topic.merged?
+      redirect_to topic_path(@topic.final_topic), status: :moved_permanently
+      return
+    end
   end
 
   def build_participants_sidebar_data(_messages_scope)

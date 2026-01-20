@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_01_20_172042) do
+ActiveRecord::Schema[8.0].define(version: 2026_01_20_184149) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -207,6 +207,16 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_20_172042) do
     t.index ["alias_id"], name: "index_mentions_on_alias_id"
     t.index ["message_id"], name: "index_mentions_on_message_id"
     t.index ["person_id"], name: "index_mentions_on_person_id"
+  end
+
+  create_table "message_moves", force: :cascade do |t|
+    t.bigint "topic_merge_id", null: false
+    t.bigint "message_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["message_id"], name: "index_message_moves_on_message_id"
+    t.index ["topic_merge_id", "message_id"], name: "index_message_moves_on_topic_merge_id_and_message_id", unique: true
+    t.index ["topic_merge_id"], name: "index_message_moves_on_topic_merge_id"
   end
 
   create_table "message_read_ranges", force: :cascade do |t|
@@ -547,6 +557,18 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_20_172042) do
     t.index ["user_id"], name: "index_thread_awarenesses_on_user_id"
   end
 
+  create_table "topic_merges", force: :cascade do |t|
+    t.bigint "source_topic_id", null: false
+    t.bigint "target_topic_id", null: false
+    t.bigint "merged_by_id"
+    t.text "merge_reason"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["merged_by_id"], name: "index_topic_merges_on_merged_by_id"
+    t.index ["source_topic_id"], name: "index_topic_merges_on_source_topic_id", unique: true
+    t.index ["target_topic_id"], name: "index_topic_merges_on_target_topic_id"
+  end
+
   create_table "topic_participants", force: :cascade do |t|
     t.bigint "topic_id", null: false
     t.bigint "person_id", null: false
@@ -587,10 +609,12 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_20_172042) do
     t.integer "message_count", default: 0, null: false
     t.boolean "has_attachments", default: false, null: false
     t.bigint "last_message_id"
+    t.bigint "merged_into_topic_id"
     t.index ["created_at"], name: "index_topics_on_created_at"
     t.index ["creator_id"], name: "index_topics_on_creator_id"
     t.index ["creator_person_id"], name: "index_topics_on_creator_person_id"
     t.index ["last_message_at"], name: "index_topics_on_last_message_at"
+    t.index ["merged_into_topic_id"], name: "index_topics_on_merged_into_topic_id"
     t.index ["title"], name: "index_topics_on_title_trgm", opclass: :gin_trgm_ops, using: :gin
   end
 
@@ -643,6 +667,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_20_172042) do
   add_foreign_key "mentions", "aliases"
   add_foreign_key "mentions", "messages"
   add_foreign_key "mentions", "people"
+  add_foreign_key "message_moves", "messages"
+  add_foreign_key "message_moves", "topic_merges"
   add_foreign_key "message_read_ranges", "topics"
   add_foreign_key "message_read_ranges", "users"
   add_foreign_key "messages", "aliases", column: "sender_id"
@@ -663,6 +689,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_20_172042) do
   add_foreign_key "team_members", "users"
   add_foreign_key "thread_awarenesses", "topics"
   add_foreign_key "thread_awarenesses", "users"
+  add_foreign_key "topic_merges", "topics", column: "source_topic_id"
+  add_foreign_key "topic_merges", "topics", column: "target_topic_id"
+  add_foreign_key "topic_merges", "users", column: "merged_by_id"
   add_foreign_key "topic_participants", "people"
   add_foreign_key "topic_participants", "topics"
   add_foreign_key "topic_stars", "topics"
@@ -671,6 +700,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_20_172042) do
   add_foreign_key "topics", "messages", column: "last_message_id"
   add_foreign_key "topics", "people", column: "creator_person_id"
   add_foreign_key "topics", "people", column: "last_sender_person_id"
+  add_foreign_key "topics", "topics", column: "merged_into_topic_id"
   add_foreign_key "user_tokens", "users"
   add_foreign_key "users", "people"
 end

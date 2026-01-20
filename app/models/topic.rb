@@ -11,6 +11,7 @@ class Topic < ApplicationRecord
   belongs_to :creator, class_name: 'Alias', inverse_of: :topics
   belongs_to :creator_person, class_name: 'Person'
   belongs_to :last_sender_person, class_name: 'Person', optional: true
+  belongs_to :merged_into_topic, class_name: 'Topic', optional: true
   has_many :messages
   has_many :attachments, through: :messages
   has_many :notes, dependent: :destroy
@@ -25,6 +26,12 @@ class Topic < ApplicationRecord
   has_many :contributor_topic_participants,
            -> { where(is_contributor: true).order(message_count: :desc) },
            class_name: 'TopicParticipant'
+  has_many :topics_merged_into_this, class_name: 'Topic', foreign_key: :merged_into_topic_id
+  has_one :topic_merge_as_source, class_name: 'TopicMerge', foreign_key: :source_topic_id
+  has_many :topic_merges_as_target, class_name: 'TopicMerge', foreign_key: :target_topic_id
+
+  scope :active, -> { where(merged_into_topic_id: nil) }
+  scope :merged, -> { where.not(merged_into_topic_id: nil) }
 
   validates :title, presence: true
 
@@ -295,5 +302,43 @@ class Topic < ApplicationRecord
   def self.parse_csv_list(value)
     return [] if value.blank?
     value.to_s.split(",").map(&:strip).reject(&:blank?).uniq
+  end
+
+  def merged?
+    merged_into_topic_id.present?
+  end
+
+  def final_topic
+    return self unless merged?
+
+    visited = Set.new([id])
+    current = merged_into_topic
+
+    while current&.merged?
+      break if visited.include?(current.id) # Prevent infinite loops
+
+      visited << current.id
+      current = current.merged_into_topic
+    end
+
+    current || self
+  end
+
+  def self.normalize_title(title)
+    title.to_s
+         .gsub(/\A\s*(Re|Fwd|Fw):\s*/i, '')
+         .gsub(/\s+/, ' ')
+         .strip
+  end
+
+  def self.suggest_merge_targets(source_topic, limit: 10)
+    normalized = normalize_title(source_topic.title)
+    return none if normalized.blank?
+
+    active
+      .where.not(id: source_topic.id)
+      .where("similarity(title, ?) > 0.3", normalized)
+      .order(Arel.sql(sanitize_sql_array(["similarity(title, ?) DESC", normalized])))
+      .limit(limit)
   end
 end

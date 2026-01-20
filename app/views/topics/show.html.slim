@@ -182,6 +182,11 @@
       span.creator Started by #{@topic.creator_display_alias.name}
       span.date #{time_ago_in_words(@topic.created_at)} ago
       span.message-count #{@messages.size} messages
+    - if current_admin?
+      .admin-actions
+        = link_to new_admin_topic_merge_path(@topic), class: "button button-secondary button-small" do
+          i.fas.fa-compress-arrows-alt
+          |  Merge Topic
 
 - if user_signed_in?
   - thread_notes = @notes_by_message&.[](:thread) || []

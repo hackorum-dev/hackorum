@@ -1,6 +1,12 @@
 Rails.application.routes.draw do
   namespace :admin do
     resources :imap_sync_states, only: [:index]
+    resources :topic_merges, only: [:index]
+    resources :topics, only: [] do
+      resource :merge, controller: 'topic_merges', only: [:new, :create] do
+        post :preview
+      end
+    end
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

@@ -1,0 +1,39 @@
+- content_for :title, "Topic Merge Audit Log"
+
+.admin-merge-container
+  h1 Topic Merge Audit Log
+
+  - if @topic_merges.empty?
+    .empty-state
+      p No topics have been merged yet.
+  - else
+    .merge-log-table
+      table
+        thead
+          tr
+            th Merged At
+            th Source Topic
+            th Target Topic
+            th Merged By
+            th Reason
+        tbody
+          - @topic_merges.each do |merge|
+            tr
+              td.merge-date = merge.created_at.strftime('%Y-%m-%d %H:%M')
+              td.source-topic
+                = link_to merge.source_topic.title, topic_path(merge.source_topic)
+                span.topic-id = "(##{merge.source_topic.id})"
+                span.merged-badge Merged
+              td.target-topic
+                = link_to merge.target_topic.title, topic_path(merge.target_topic)
+                span.topic-id = "(##{merge.target_topic.id})"
+              td.merged-by
+                - if merge.merged_by
+                  = merge.merged_by.username || merge.merged_by.person&.default_alias&.name || "User ##{merge.merged_by.id}"
+                - else
+                  span.text-muted Automated
+              td.merge-reason
+                - if merge.merge_reason.present?
+                  = truncate(merge.merge_reason, length: 100)
+                - else
+                  span.text-muted -
