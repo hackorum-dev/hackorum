@@ -149,7 +149,7 @@ class ImapIdleRunner
     msg = nil
     ActiveRecord::Base.transaction do
       msg = instrument('ingestor.ingest', uid: uid) do
-        @ingestor.ingest_raw(raw)
+        @ingestor.ingest_raw(raw, trust_date: true)
       end
     end
 

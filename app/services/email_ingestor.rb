@@ -1,13 +1,13 @@
 # frozen_string_literal: true
 
 class EmailIngestor
-  def ingest_raw(raw_message, fallback_threading: false)
+  def ingest_raw(raw_message, fallback_threading: false, trust_date: false)
     m = Mail.new(raw_message)
 
     message_id = clean_reference(m.message_id)
     message_id = nil if message_id.blank?
     return nil unless message_id
-    sent_at = sanitize_email_date(m.date, m[:date], message_id)
+    sent_at = trust_date ? m.date : sanitize_email_date(m.date, m[:date], message_id)
 
     body = normalize_body(extract_body(m))
     existing_message = Message.find_by_message_id(message_id)
@@ -302,10 +302,17 @@ class EmailIngestor
   end
 
   def sanitize_email_date(mail_date, mail_date_header, message_id)
-    current_time = Time.now
-    return mail_date if mail_date.nil? || (mail_date >= Time.parse('1996-01-01') && mail_date <= current_time)
+    return mail_date if mail_date.nil?
 
-    original_date = mail_date
+    current_time_utc = Time.now.utc
+    mail_date_utc = mail_date.utc
+    min_valid_date = Time.parse('1996-01-01 00:00:00 UTC')
+    future_tolerance = 24 * 3600
+
+    if mail_date_utc >= min_valid_date && mail_date_utc <= current_time_utc + future_tolerance
+      return mail_date
+    end
+
     sanitized_date = mail_date
 
     if mail_date_header && mail_date_header.to_s =~ /\b(\d{2})\s+\w+\s+(\d{2,4})\b/
@@ -320,7 +327,7 @@ class EmailIngestor
       end
     end
 
-    if sanitized_date > current_time || sanitized_date.year < 1996
+    if sanitized_date.utc > current_time_utc + future_tolerance || sanitized_date.year < 1996
       sanitized_date = Time.parse('2000-01-01 00:00:00 UTC')
     end
 
