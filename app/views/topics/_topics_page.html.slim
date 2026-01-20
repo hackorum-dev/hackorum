@@ -33,7 +33,7 @@
           - role_label = participant.contributor_badge
           - badge_text = role_label ? "#{participant.name} (#{role_label})" : participant.name
           = link_to person_path(participant.email), class: "participant-avatar-link" do
-            = image_tag participant.display_gravatar_url(size: 32), class: css_classes.join(" "), alt: participant.name, title: badge_text
+            = image_tag participant.gravatar_url(size: 32), class: css_classes.join(" "), alt: participant.name, title: badge_text
       - if topic.participant_count > 5
         span.participants-count +#{topic.participant_count - 5}
     .topic-column.replies-col

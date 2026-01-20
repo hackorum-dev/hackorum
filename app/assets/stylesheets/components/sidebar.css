@@ -45,6 +45,16 @@
   }
 }
 
+@media (max-width: 900px) {
+  .sidebar {
+    position: static;
+    top: auto;
+    max-height: none;
+    height: 100%;
+    padding-right: 0;
+  }
+}
+
 .sidebar-section {
   margin-bottom: var(--spacing-8);
 }
