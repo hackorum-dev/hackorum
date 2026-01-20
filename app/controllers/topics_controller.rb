@@ -5,7 +5,7 @@ class TopicsController < ApplicationController
 
   def index
     @search_query = nil
-    base_query = apply_filters(Topic.includes(:creator))
+    base_query = apply_filters(Topic.includes(:creator, creator_person: :default_alias, last_sender_person: :default_alias))
 
     apply_cursor_pagination(base_query)
     preload_topic_participants
@@ -240,7 +240,7 @@ class TopicsController < ApplicationController
     return head :unauthorized unless user_signed_in?
     return head :ok if topic_ids.empty?
 
-    @topics = Topic.includes(:creator).where(id: topic_ids)
+    @topics = Topic.includes(:creator, creator_person: :default_alias, last_sender_person: :default_alias).where(id: topic_ids)
     preload_topic_states
     preload_note_counts
     preload_participation_flags
@@ -771,7 +771,7 @@ class TopicsController < ApplicationController
   end
 
   def topics_base_query(search_query: nil)
-    return apply_filters(Topic.includes(:creator)) if search_query.nil?
+    return apply_filters(Topic.includes(:creator, creator_person: :default_alias, last_sender_person: :default_alias)) if search_query.nil?
 
     cleaned_query = search_query.to_s.strip
     return Topic.none if cleaned_query.blank?
@@ -790,7 +790,6 @@ class TopicsController < ApplicationController
     union_sql = "(#{title_sql}) UNION (#{message_sql})"
 
     Topic.where("topics.id IN (#{union_sql})")
-         .includes(:creator)
   end
 
   def viewing_since_param
@@ -930,7 +929,7 @@ class TopicsController < ApplicationController
     ids = entries.map { |e| e[:id] }
     return [] if ids.empty?
 
-    topics_map = Topic.includes(:creator).where(id: ids).index_by(&:id)
+    topics_map = Topic.includes(:creator, creator_person: :default_alias, last_sender_person: :default_alias).where(id: ids).index_by(&:id)
     entries.filter_map do |entry|
       topic = topics_map[entry[:id]]
       next unless topic

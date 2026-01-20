@@ -8,21 +8,24 @@ const MAX_WIDTH = 960
 const MAX_WIDTH_RATIO = 0.75
 
 export default class extends Controller {
-  static targets = ["layout", "sidebar", "resizer", "toggleButton", "toggleIcon"]
+  static targets = ["layout", "sidebar", "resizer", "toggleButton", "toggleIcon", "overlay"]
 
   connect() {
+    this.handleWindowResize = this.handleWindowResize.bind(this)
+    this.handleDocumentClick = this.handleDocumentClick.bind(this)
+    window.addEventListener("resize", this.handleWindowResize)
+    document.addEventListener("click", this.handleDocumentClick)
+
     if (!this.hasLayoutTarget || !this.hasSidebarTarget) {
       return
     }
-
-    this.handleWindowResize = this.handleWindowResize.bind(this)
-    window.addEventListener("resize", this.handleWindowResize)
 
     this.applyStoredState()
   }
 
   disconnect() {
     window.removeEventListener("resize", this.handleWindowResize)
+    document.removeEventListener("click", this.handleDocumentClick)
     this.stopResize()
   }
 
@@ -83,6 +86,15 @@ export default class extends Controller {
   }
 
   handleWindowResize() {
+    if (this.isMobile()) {
+      this.closeMobile()
+      return
+    }
+
+    if (!this.hasLayoutTarget || !this.hasSidebarTarget) {
+      return
+    }
+
     if (this.isCollapsed()) {
       return
     }
@@ -117,6 +129,74 @@ export default class extends Controller {
     }
     this.setSidebarWidth(this.clampWidth(this.readWidth()))
     this.updateToggleIcon()
+  }
+
+  toggleMobile() {
+    if (!this.isMobile()) {
+      this.toggle()
+      return
+    }
+
+    if (this.isMobileOpen()) {
+      this.closeMobile()
+    } else {
+      this.openMobile()
+    }
+  }
+
+  openMobile() {
+    document.body.classList.add("mobile-sidebar-open")
+  }
+
+  closeMobile() {
+    document.body.classList.remove("mobile-sidebar-open")
+  }
+
+  isMobileOpen() {
+    return document.body.classList.contains("mobile-sidebar-open")
+  }
+
+  isMobile() {
+    return window.matchMedia("(max-width: 900px)").matches
+  }
+
+  closeOnNavigate(event) {
+    if (!this.isMobile()) {
+      return
+    }
+
+    const link = event.target.closest("a")
+    if (!link) {
+      return
+    }
+
+    this.closeMobile()
+  }
+
+  closeMenuOnNavigate() {
+    const menu = document.querySelector(".mobile-nav-dropdown[open]")
+    if (!menu) {
+      return
+    }
+
+    menu.removeAttribute("open")
+  }
+
+  handleDocumentClick(event) {
+    if (!this.isMobile()) {
+      return
+    }
+
+    const menu = document.querySelector(".mobile-nav-dropdown[open]")
+    if (!menu) {
+      return
+    }
+
+    if (menu.contains(event.target)) {
+      return
+    }
+
+    menu.removeAttribute("open")
   }
 
   updateToggleIcon() {

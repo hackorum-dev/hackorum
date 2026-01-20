@@ -247,6 +247,31 @@
   padding: var(--spacing-2) var(--spacing-3);
 }
 
+@media (max-width: 900px) {
+  .settings-page .email-table {
+    table-layout: fixed;
+  }
+
+  .settings-page .email-table th,
+  .settings-page .email-table td {
+    padding: var(--spacing-2);
+    font-size: var(--font-size-xs);
+    word-break: break-word;
+    white-space: normal;
+  }
+
+  .settings-page .email-table td:last-child {
+    flex-wrap: wrap;
+    gap: var(--spacing-2);
+  }
+
+  .settings-page .email-table .button-secondary,
+  .settings-page .email-table .button-danger {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .settings-page .team-list,
 .settings-page .member-list {
   list-style: none;

@@ -29,16 +29,45 @@ html data-theme="light"
     - if ENV["UMAMI_WEBSITE_ID"].present?
       - umami_host = ENV["UMAMI_HOST"].presence || "https://umami.hackorum.dev"
       script[async defer data-website-id=ENV["UMAMI_WEBSITE_ID"] src="#{umami_host}/script.js"]
-  body
+  body class=(content_for?(:sidebar) ? "has-sidebar" : nil) data-controller="sidebar"
     - if user_signed_in? && current_user.username.blank?
       .global-warning
         span Please set a username in Settings.
     nav.main-navigation
       .nav-container
         .nav-brand
+          - if content_for?(:sidebar)
+            button.nav-burger type="button" aria-label="Toggle sidebar" data-action="click->sidebar#toggleMobile"
+              i.fa-solid.fa-bars
           = link_to root_path, class: "brand-link" do
             img.brand-icon src="/icon.png" alt="Hackorum" width="24" height="24"
             span.brand-text Hackorum
+          details.mobile-nav-dropdown
+            summary.mobile-nav-toggle aria-label="Open menu"
+              span.mobile-nav-label Menu
+              i.fa-solid.fa-caret-down
+            .mobile-nav-menu data-action="click->sidebar#closeMenuOnNavigate"
+              = link_to "Topics", topics_path, class: "nav-link"
+              = link_to "Search", topics_path(anchor: "search"), class: "nav-link"
+              = link_to "Statistics", stats_path, class: "nav-link"
+              = link_to "Reports", reports_path, class: "nav-link"
+              = link_to "Help", help_index_path, class: "nav-link"
+              button.nav-link.theme-toggle type="button" aria-label="Toggle theme" data-controller="theme" data-action="click->theme#toggle"
+                i.fas.fa-moon data-theme-target="icon"
+                span data-theme-target="label" Theme
+              - if user_signed_in?
+                - if current_user&.person&.default_alias
+                  span.nav-user = current_user.person.default_alias.name
+                - unread = activity_unread_count
+                = link_to activities_path, class: "nav-link nav-link-activity", title: "Activity" do
+                  i.fa-regular.fa-bell
+                  - if unread.positive?
+                    span.nav-badge = unread
+                = link_to "Settings", settings_root_path, class: "nav-link"
+                = button_to "Sign out", session_path, method: :delete, class: "nav-link", form: { style: 'display:inline' }, data: { turbo: false }
+              - else
+                = link_to "Sign in", new_session_path, class: "nav-link"
+                = link_to "Register", new_registration_path, class: "nav-link"
           span.tagline PostgreSQL Hackers Archive
         .nav-links
           = link_to "Topics", topics_path, class: "nav-link"
@@ -67,12 +96,13 @@ html data-theme="light"
               = link_to "Register", new_registration_path, class: "nav-link"
 
     - if content_for?(:sidebar)
-      .page-layout.with-sidebar data-controller="sidebar" data-sidebar-target="layout"
-        .layout-sidebar#layout-sidebar data-sidebar-target="sidebar"
+      .page-layout.with-sidebar data-sidebar-target="layout"
+        .layout-sidebar#layout-sidebar data-sidebar-target="sidebar" data-action="click->sidebar#closeOnNavigate"
           = yield :sidebar
         .layout-sidebar-resizer data-sidebar-target="resizer" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" data-action="mousedown->sidebar#startResize touchstart->sidebar#startResize"
           button.sidebar-collapse-button type="button" aria-label="Toggle sidebar" data-action="click->sidebar#toggle" data-sidebar-target="toggleButton"
             span data-sidebar-target="toggleIcon" ◀
+        .layout-sidebar-overlay data-sidebar-target="overlay" data-action="click->sidebar#closeMobile"
         main.container
           - flash.each do |type, message|
             .flash class=type
