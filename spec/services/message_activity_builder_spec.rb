@@ -55,6 +55,50 @@ RSpec.describe MessageActivityBuilder do
       end
     end
 
+    context "marking message as read for sender" do
+      it "marks the message as read for registered user sender" do
+        builder.process!
+
+        expect(MessageReadRange.covering?(user: sender_user, topic: topic, message_id: message.id)).to be true
+      end
+
+      it "marks thread awareness for registered user sender" do
+        builder.process!
+
+        expect(ThreadAwareness.covering?(user: sender_user, topic: topic, message_id: message.id)).to be true
+      end
+
+      it "does not mark message as read for guest sender" do
+        guest_alias = create(:alias, user: nil)
+        guest_message = create(:message, topic: topic, sender: guest_alias)
+        guest_builder = described_class.new(guest_message)
+
+        expect {
+          guest_builder.process!
+        }.not_to change { MessageReadRange.count }
+      end
+
+      it "does not mark thread awareness for guest sender" do
+        guest_alias = create(:alias, user: nil)
+        guest_message = create(:message, topic: topic, sender: guest_alias)
+        guest_builder = described_class.new(guest_message)
+
+        expect {
+          guest_builder.process!
+        }.not_to change { ThreadAwareness.count }
+      end
+
+      it "extends existing thread awareness" do
+        # Create initial awareness
+        ThreadAwareness.mark_until(user: sender_user, topic: topic, until_message_id: message.id - 10)
+
+        builder.process!
+
+        awareness = ThreadAwareness.find_by(user: sender_user, topic: topic)
+        expect(awareness.aware_until_message_id).to eq(message.id)
+      end
+    end
+
     context "activity creation" do
       let(:starring_user1) { create(:user) }
       let(:starring_user2) { create(:user) }

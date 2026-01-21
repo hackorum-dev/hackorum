@@ -8,6 +8,7 @@ class MessageActivityBuilder
   def process!
     ActiveRecord::Base.transaction do
       auto_star_topic_for_sender
+      mark_message_read_for_sender
       fan_out_to_starring_users
     end
   end
@@ -21,6 +22,24 @@ class MessageActivityBuilder
     TopicStar.find_or_create_by(user: sender_user, topic: @message.topic)
   rescue ActiveRecord::RecordNotUnique
     # Race condition - another process already created the star
+  end
+
+  def mark_message_read_for_sender
+    sender_user = @message.sender.user
+    return unless sender_user
+
+    MessageReadRange.add_range(
+      user: sender_user,
+      topic: @message.topic,
+      start_id: @message.id,
+      end_id: @message.id
+    )
+
+    ThreadAwareness.mark_until(
+      user: sender_user,
+      topic: @message.topic,
+      until_message_id: @message.id
+    )
   end
 
   def fan_out_to_starring_users
