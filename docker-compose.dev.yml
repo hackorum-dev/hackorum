@@ -5,7 +5,7 @@ services:
       - .env.development
     volumes:
       - db-data:/var/lib/postgresql
-      - ./deploy/postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./deploy/postgres/init/01_pg_stat_statements.sql:/docker-entrypoint-initdb.d/01_pg_stat_statements.sql:ro
     ports:
       - "15432:5432"
     command:
