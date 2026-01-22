@@ -124,6 +124,10 @@
   gap: 6px;
 }
 
+.nav-mobile-bell {
+  display: none;
+}
+
 .nav-link-activity i {
   font-size: 1.05em;
 }
@@ -225,6 +229,11 @@
   .nav-links,
   .nav-right {
     display: none;
+  }
+
+  .nav-mobile-bell {
+    display: inline-flex;
+    margin-left: auto;
   }
 
   body.has-sidebar .nav-burger {
