@@ -62,7 +62,7 @@
                 - when :sent_followup_patch
                   span.activity-tag.tag-patch Follow-up patch
             td
-              = link_to topic.title, topic_path(topic), class: "activity-topic"
+              = link_to topic.title, topic_path(topic, anchor: "message-#{entry[:message].id}"), class: "activity-topic", data: { turbo_frame: "_top" }
             td
               = time_ago_in_words(entry[:sent_at])
               |  ago
