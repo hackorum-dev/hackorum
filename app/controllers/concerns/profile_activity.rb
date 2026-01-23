@@ -46,7 +46,6 @@ module ProfileActivity
     scope ||= Message.where(sender_person_id: ids)
     messages = scope.includes(:topic, :attachments)
                     .order(created_at: :desc)
-                    .limit(100)
 
     return [] if messages.empty?
 
@@ -81,7 +80,7 @@ module ProfileActivity
       entries = entries.select { |e| (e[:activity_types].to_set & filter_symbols).any? }
     end
 
-    entries.first(20)
+    entries
   end
 
   def build_activity_summary(scope: nil, filters: nil)
