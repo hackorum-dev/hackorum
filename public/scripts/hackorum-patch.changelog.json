@@ -6,7 +6,8 @@
       "date": "2026-01-21",
       "changes": [
         "Added version check to notify users of updates",
-        "Added support for base-commit line from git format-patch --base"
+        "Added support for base-commit line from git format-patch --base",
+        "Added support for .diff files (applied with git apply and committed individually)"
       ]
     },
     {

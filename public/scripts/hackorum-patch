@@ -22,6 +22,7 @@ class HackorumPatch
     @temp_dir = nil
     @local_archive = nil
     @using_local_file = false
+    @using_diff_mode = false
 
     parse_options!(argv)
 
@@ -79,7 +80,11 @@ class HackorumPatch
       create_branch(base_commit)
     end
 
-    apply_patches(patch_files)
+    if @using_diff_mode
+      apply_diffs(patch_files)
+    else
+      apply_patches(patch_files)
+    end
     cleanup_temp_files
 
     print_success_message(use_worktree ? worktree_path : nil)
@@ -350,14 +355,7 @@ class HackorumPatch
     end
 
     all_files = Dir.glob(File.join(@temp_dir, "*")).sort
-    patch_files = all_files.select { |f| f.end_with?(".patch") }
-    skipped = all_files.size - patch_files.size
-    msg = "[OK] Downloaded and extracted #{patch_files.size} patches"
-    msg += " (skipped #{skipped} non-patch files)" if skipped > 0
-    puts msg
-    puts ""
-
-    patch_files
+    categorize_and_report_files(all_files)
   end
 
   def extract_local_patchset
@@ -379,14 +377,32 @@ class HackorumPatch
     end
 
     all_files = Dir.glob(File.join(@temp_dir, "*")).sort
+    categorize_and_report_files(all_files)
+  end
+
+  def categorize_and_report_files(all_files)
     patch_files = all_files.select { |f| f.end_with?(".patch") }
-    skipped = all_files.size - patch_files.size
-    msg = "[OK] Extracted #{patch_files.size} patches"
-    msg += " (skipped #{skipped} non-patch files)" if skipped > 0
+    diff_files = all_files.select { |f| f.end_with?(".diff") }
+    skipped = all_files.size - patch_files.size - diff_files.size
+
+    if !patch_files.empty? && !diff_files.empty?
+      raise "Mixed patch and diff files detected. Archives must contain only .patch files OR only .diff files, not both."
+    end
+
+    if patch_files.empty? && diff_files.empty?
+      raise "No patch or diff files found in archive"
+    end
+
+    @using_diff_mode = !diff_files.empty?
+    files = @using_diff_mode ? diff_files : patch_files
+    file_type = @using_diff_mode ? "diffs" : "patches"
+
+    msg = "[OK] Extracted #{files.size} #{file_type}"
+    msg += " (skipped #{skipped} other files)" if skipped > 0
     puts msg
     puts ""
 
-    patch_files
+    files
   end
 
   def detect_base_commit(patch_files_dir)
@@ -397,10 +413,12 @@ class HackorumPatch
     end
 
     patch_files = Dir.glob(File.join(patch_files_dir, "*.patch")).sort
-    return detect_default_branch_head if patch_files.empty?
+    diff_files = Dir.glob(File.join(patch_files_dir, "*.diff")).sort
+    all_patch_files = patch_files + diff_files
+    return detect_default_branch_head if all_patch_files.empty?
 
     # First, check for base-commit line (from git format-patch --base)
-    base_commit = detect_base_commit_from_base_line(patch_files)
+    base_commit = detect_base_commit_from_base_line(all_patch_files)
     if base_commit
       puts "[OK] Base commit: #{base_commit} (from base-commit line)"
       puts ""
@@ -410,7 +428,7 @@ class HackorumPatch
     # Fall back to index hash detection
     puts "Detecting base commit from patch index entries..."
 
-    first_patch = patch_files.first
+    first_patch = all_patch_files.first
     index_hashes = []
     new_file_count = 0
     content = File.read(first_patch)
@@ -560,6 +578,53 @@ class HackorumPatch
 
     puts ""
     puts "[OK] All patches applied successfully"
+    puts ""
+  end
+
+  def apply_diffs(diff_files)
+    puts "Applying #{diff_files.size} diff files..."
+    puts ""
+
+    diff_files.each_with_index do |diff_file, idx|
+      basename = File.basename(diff_file, ".diff")
+      puts "  [#{idx + 1}/#{diff_files.size}] #{File.basename(diff_file)}"
+
+      # Apply the diff
+      output = `git apply --3way #{Shellwords.escape(diff_file)} 2>&1`
+      success = $?.success?
+
+      output.each_line { |line| puts "    #{line}" } unless output.strip.empty?
+
+      unless success
+        puts ""
+        puts "[FAIL] Failed to apply #{File.basename(diff_file)}"
+        puts ""
+        puts "You can resolve conflicts manually and retry."
+        raise "Diff application failed"
+      end
+
+      # Stage all changes
+      unless system("git add -A > /dev/null 2>&1")
+        raise "Failed to stage changes for #{File.basename(diff_file)}"
+      end
+
+      # Commit with simple message
+      commit_msg = "Apply #{basename}"
+      unless system("git commit -m #{Shellwords.escape(commit_msg)} > /dev/null 2>&1")
+        # Check if there's actually anything to commit
+        status = `git status --porcelain`.strip
+        if status.empty?
+          puts "    (no changes to commit)"
+        else
+          raise "Failed to commit #{File.basename(diff_file)}"
+        end
+      else
+        puts "    Committed: #{commit_msg}"
+      end
+    end
+
+    puts ""
+    puts "[OK] All diffs applied and committed successfully"
     puts ""
   end
 
