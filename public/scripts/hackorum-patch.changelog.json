@@ -7,7 +7,8 @@
       "changes": [
         "Added version check to notify users of updates",
         "Added support for base-commit line from git format-patch --base",
-        "Added support for .diff files (applied with git apply and committed individually)"
+        "Added support for .diff files (applied with git apply and committed individually)",
+        "Fixed base commit detection for --force re-application and multi-patch series"
       ]
     },
     {

@@ -425,51 +425,72 @@ class HackorumPatch
       return base_commit
     end
 
-    # Fall back to index hash detection
-    puts "Detecting base commit from patch index entries..."
+    # Fall back to index hash detection using file paths
+    puts "Detecting base commit from patch file paths..."
 
-    first_patch = all_patch_files.first
-    index_hashes = []
-    new_file_count = 0
-    content = File.read(first_patch)
-    content.scan(/^index ([0-9a-f]+)\.\.([0-9a-f]+)/) do |before_hash, after_hash|
-      if before_hash =~ /^0+$/
-        new_file_count += 1
-      else
-        index_hashes << before_hash
+    # Extract file paths and their "before" blob hashes from all patches
+    # Only record the FIRST occurrence of each file - later patches in a series
+    # will have "before" hashes that are the result of earlier patches, not the original state
+    file_info = {}  # path => before_hash
+    all_patch_files.each do |patch_file|
+      content = File.read(patch_file)
+      # Format: diff --git a/path b/path followed by index abc123..def456
+      content.scan(/^diff --git a\/(.+?) b\/\1\n(?:.*?\n)*?index ([0-9a-f]+)\.\.([0-9a-f]+)/m) do |path, before_hash, after_hash|
+        next if before_hash =~ /^0+$/  # Skip new files
+        next if file_info.key?(path)   # Only use first occurrence
+        file_info[path] = before_hash
       end
     end
 
-    if index_hashes.empty?
-      puts "  No index entries found in first patch (#{new_file_count} new files)"
+    if file_info.empty?
+      puts "  No modified files found in patches (all new files?)"
       return detect_default_branch_head
     end
 
-    puts "  Found #{index_hashes.size} index entries in first patch (skipped #{new_file_count} new files)"
-    puts "  Searching for base commit (this may take a moment)..."
+    puts "  Found #{file_info.size} modified files across #{all_patch_files.size} patches"
 
-    candidates = []
-    index_hashes.each_with_index do |hash, idx|
-      puts "  Checking index #{idx + 1}/#{index_hashes.size}..."
+    default_branch = detect_default_branch_head
 
-      output = `git log --all --pretty=format:%H --find-object=#{hash} -n 1 2>/dev/null`.strip
-      if !output.empty? && output =~ /^[0-9a-f]{40}$/
-        candidates << output
-        puts "    Found commit: #{output[0..7]}..."
+    # Check if the "before" hashes match what's at the default branch HEAD
+    # This confirms HEAD is the correct base
+    default_head = `git rev-parse #{default_branch} 2>/dev/null`.strip
+    all_match = file_info.all? do |path, before_hash|
+      current_hash = `git rev-parse #{default_head}:#{path} 2>/dev/null`.strip
+      current_hash == before_hash || current_hash.start_with?(before_hash) || before_hash.start_with?(current_hash)
+    end
+
+    if all_match
+      puts "  All file hashes match #{default_branch} HEAD"
+      puts "[OK] Base commit: #{default_head} (#{default_branch})"
+      puts ""
+      return default_head
+    end
+
+    # Hashes don't match HEAD, search history for a matching commit
+    puts "  File hashes don't match HEAD, searching history..."
+
+    # Find commits on the default branch that touched these files
+    paths = file_info.keys.map { |p| Shellwords.escape(p) }.join(" ")
+    commits = `git log #{default_branch} --pretty=format:%H -n 50 -- #{paths} 2>/dev/null`.strip.split("\n")
+
+    commits.each do |commit|
+      next if commit.empty?
+
+      matches = file_info.all? do |path, before_hash|
+        blob_hash = `git rev-parse #{commit}:#{path} 2>/dev/null`.strip
+        blob_hash == before_hash || blob_hash.start_with?(before_hash) || before_hash.start_with?(blob_hash)
+      end
+
+      if matches
+        puts "  Found matching commit: #{commit[0..11]}..."
+        puts "[OK] Base commit: #{commit}"
+        puts ""
+        return commit
       end
     end
 
-    if candidates.empty?
-      puts "  Could not detect base commit from index entries"
-      return detect_default_branch_head
-    end
-
-    base_commit = candidates.first
-    puts "  Using commit: #{base_commit[0..7]}... as base"
-    puts "[OK] Base commit: #{base_commit}"
-    puts ""
-
-    base_commit
+    puts "  Could not find matching commit in history"
+    detect_default_branch_head
   end
 
   def detect_base_commit_from_base_line(patch_files)
@@ -488,7 +509,7 @@ class HackorumPatch
   end
 
   def detect_default_branch_head
-    %w[origin/master master].each do |ref|
+    %w[master origin/master].each do |ref|
       if system("git rev-parse --verify #{ref} > /dev/null 2>&1")
         return ref
       end
