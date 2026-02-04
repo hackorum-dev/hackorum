@@ -142,14 +142,10 @@
 
 .thread-actions {
   margin-bottom: var(--spacing-4);
-
-  & .button-secondary {
-    padding: var(--spacing-2) var(--spacing-4);
-    border: var(--border-width) solid var(--color-border);
-    background: var(--color-bg-card);
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-  }
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2);
 }
 
 .message-subject {
