@@ -74,6 +74,12 @@
   color: var(--color-text-muted);
 }
 
+@media (max-width: 1500px) {
+  .tagline {
+    visibility: hidden;
+  }
+}
+
 .nav-links {
   display: flex;
   gap: var(--spacing-6);
