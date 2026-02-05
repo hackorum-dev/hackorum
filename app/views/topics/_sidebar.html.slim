@@ -6,8 +6,12 @@
       .sidebar-section
         .sidebar-content
           .topics-actions data-controller="topics-aware" data-topics-aware-aware-url-value=aware_bulk_topics_path data-topics-aware-aware-all-url-value=aware_all_topics_path data-topics-aware-confirm-visible-value="Mark the displayed threads as aware?" data-topics-aware-confirm-all-value="Mark ALL threads as aware up to now? This will clear the 'New' status everywhere."
-            button.mark-aware-button data-action="click->topics-aware#markVisibleAware" Mark displayed threads aware
-            button.mark-aware-button.secondary data-action="click->topics-aware#markAllAware" Mark everything up to now aware
+            button.mark-aware-button data-action="click->topics-aware#markVisibleAware" title="Mark the displayed threads as aware" aria-label="Mark displayed threads aware"
+              i.fa-regular.fa-eye aria-hidden="true"
+              span Mark visible
+            button.mark-aware-button.secondary data-action="click->topics-aware#markAllAware" title="Mark ALL threads as aware up to now. This clears the New status everywhere." aria-label="Mark all threads aware"
+              i.fa-regular.fa-circle-check aria-hidden="true"
+              span Mark all
 
     .sidebar-section#search data-controller="search-focus" data-search-focus-target="section"
       .sidebar-search.sidebar-content
