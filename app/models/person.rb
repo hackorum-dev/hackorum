@@ -98,7 +98,17 @@ class Person < ApplicationRecord
   def cleanup_orphaned_person(person)
     return if person.user.present?
     return if Alias.where(person_id: person.id).exists?
+    reassign_authored_records(person)
     person.destroy!
+  end
+
+  def reassign_authored_records(old_person)
+    Topic.where(creator_person_id: old_person.id).update_all(creator_person_id: id)
+    Topic.where(last_sender_person_id: old_person.id).update_all(last_sender_person_id: id)
+    Message.where(sender_person_id: old_person.id).update_all(sender_person_id: id)
+    Mention.where(person_id: old_person.id).update_all(person_id: id)
+    TopicParticipant.where(person_id: old_person.id).where.not(topic_id: TopicParticipant.where(person_id: id).select(:topic_id)).update_all(person_id: id)
+    TopicParticipant.where(person_id: old_person.id).delete_all
   end
 
   def merge_contributor_memberships_from(other_person)
