@@ -49,7 +49,7 @@
         - @team_members.each do |member|
           li.member-item
             .member-info
-              = member.user.aliases.first&.name || "User ##{member.user.id}"
+              = display_name_for_user(member.user)
               - if member.role_admin?
                 span.role-badge Admin
             .member-actions
