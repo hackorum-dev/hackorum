@@ -37,13 +37,18 @@ module Settings
 
     def destroy
       al = current_user.person.aliases.find(params[:id])
+
       if current_user.person&.default_alias_id == al.id
-        redirect_to settings_account_path, alert: 'Cannot remove primary alias.'
-      else
-        new_person = Person.create!(default_alias_id: al.id)
-        al.update!(user_id: nil, verified_at: nil, person_id: new_person.id)
-        redirect_to settings_account_path, notice: 'Email removed.'
+        return redirect_to settings_account_path, alert: 'Cannot remove primary alias.'
       end
+
+      mention_count = Mention.where(alias_id: al.id).count
+      if al.sender_count > 0 || mention_count > 0
+        return redirect_to settings_account_path, alert: 'Cannot remove alias with message history.'
+      end
+
+      al.destroy!
+      redirect_to settings_account_path, notice: 'Alias removed.'
     end
 
     def primary

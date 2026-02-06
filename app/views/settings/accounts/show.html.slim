@@ -46,6 +46,7 @@
           tr
             th Name
             th Email
+            th Messages
             th Verified
             th Primary
             th Actions
@@ -57,12 +58,15 @@
                 = al.email
                 - if al.mention_only?
                   span.alias-badge.mention-only (mention only)
+              td.message-counts title="Sent / CC'd"
+                = "#{al.sender_count} / #{@mention_counts[al.id] || 0}"
               td = al.verified_at ? "Yes" : "No"
               td = (al.id == @default_alias_id) ? "Yes" : "No"
               td
                 - unless al.id == @default_alias_id
                   = button_to "Make primary", primary_settings_email_path(al), method: :post, class: "button-secondary"
-                - unless al.id == @default_alias_id
+                - has_messages = al.sender_count > 0 || (@mention_counts[al.id] || 0) > 0
+                - if al.id != @default_alias_id && !has_messages
                   = button_to "Remove", settings_email_path(al), method: :delete, data: { turbo_confirm: "Remove this email?" }, class: "button-danger"
     - else
       p No emails yet.

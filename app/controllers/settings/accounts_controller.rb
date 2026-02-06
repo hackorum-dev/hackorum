@@ -9,6 +9,10 @@ module Settings
       ) || []
       @identities = current_user.identities.order(:provider, :email, :uid)
       @default_alias_id = current_user.person&.default_alias_id
+
+      # Preload mention counts (CC/TO) for all aliases
+      alias_ids = @aliases.map(&:id)
+      @mention_counts = alias_ids.any? ? Mention.where(alias_id: alias_ids).group(:alias_id).count : {}
     end
 
     private

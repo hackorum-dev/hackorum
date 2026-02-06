@@ -201,6 +201,73 @@ RSpec.describe 'Emails management', type: :request do
     expect(aliases.first.name).to eq('Existing Name')
   end
 
+  describe 'alias removal' do
+    it 'allows removing alias with no messages' do
+      user = create(:user, password: 'secret', password_confirmation: 'secret')
+      primary = attach_verified_alias(user, email: 'me@example.com')
+      secondary = create(:alias, user: user, person: user.person, email: 'other@example.com', name: 'Other', verified_at: Time.current, sender_count: 0)
+
+      sign_in(email: 'me@example.com')
+
+      expect {
+        delete settings_email_path(secondary)
+      }.to change { Alias.count }.by(-1)
+
+      expect(response).to redirect_to(settings_account_path)
+      expect(flash[:notice]).to eq('Alias removed.')
+      expect(Alias.find_by(id: secondary.id)).to be_nil
+    end
+
+    it 'blocks removing alias with sent messages' do
+      user = create(:user, password: 'secret', password_confirmation: 'secret')
+      primary = attach_verified_alias(user, email: 'me@example.com')
+      secondary = create(:alias, user: user, person: user.person, email: 'other@example.com', name: 'Other', verified_at: Time.current, sender_count: 5)
+
+      sign_in(email: 'me@example.com')
+
+      expect {
+        delete settings_email_path(secondary)
+      }.not_to change { user.person.aliases.count }
+
+      expect(response).to redirect_to(settings_account_path)
+      expect(flash[:alert]).to match(/message history/)
+    end
+
+    it 'blocks removing alias with CC mentions' do
+      user = create(:user, password: 'secret', password_confirmation: 'secret')
+      primary = attach_verified_alias(user, email: 'me@example.com')
+      secondary = create(:alias, user: user, person: user.person, email: 'other@example.com', name: 'Other', verified_at: Time.current, sender_count: 0)
+
+      # Create a mention for this alias
+      topic = create(:topic)
+      message = create(:message, topic: topic)
+      create(:mention, message: message, alias: secondary, person: user.person)
+
+      sign_in(email: 'me@example.com')
+
+      expect {
+        delete settings_email_path(secondary)
+      }.not_to change { user.person.aliases.count }
+
+      expect(response).to redirect_to(settings_account_path)
+      expect(flash[:alert]).to match(/message history/)
+    end
+
+    it 'blocks removing primary alias' do
+      user = create(:user, password: 'secret', password_confirmation: 'secret')
+      primary = attach_verified_alias(user, email: 'me@example.com')
+
+      sign_in(email: 'me@example.com')
+
+      expect {
+        delete settings_email_path(primary)
+      }.not_to change { user.person.aliases.count }
+
+      expect(response).to redirect_to(settings_account_path)
+      expect(flash[:alert]).to match(/primary alias/)
+    end
+  end
+
   def extract_raw_token_from_mailer
     mail = ActionMailer::Base.deliveries.last
     expect(mail).to be_present
