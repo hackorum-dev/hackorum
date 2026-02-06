@@ -281,6 +281,11 @@ a.topic-icon {
 
 .topic-row.topic-read {
   color: var(--color-text-muted);
+  background: var(--color-bg-read);
+
+  &:hover {
+    background: var(--color-bg-read-hover);
+  }
 }
 
 .topic-icon-hover {

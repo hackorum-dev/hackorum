@@ -53,6 +53,8 @@
   --color-bg-card: var(--color-bg-container);
   --color-bg-card-hover: var(--color-gray-200);
   --color-bg-hover: var(--color-primary-2);
+  --color-bg-read-hover: var(--color-primary-1);
+  --color-bg-read: var(--color-primary-1);
   --color-bg-sidebar: #f3f4ff;
   --color-bg-sidebar-header: var(--color-primary-2);
   --color-bg-table-header: var(--color-primary-2);
@@ -144,6 +146,8 @@
   --color-bg-card: var(--color-gray-100);
   --color-bg-card-hover: var(--color-gray-300);
   --color-bg-hover: var(--color-gray-300);
+  --color-bg-read-hover: var(--color-primary-5);
+  --color-bg-read: var(--color-primary-4);
   --color-bg-sidebar: var(--color-primary-2);
   --color-bg-sidebar-header: var(--color-gray-100);
   --color-bg-table-header: var(--color-gray-100);
