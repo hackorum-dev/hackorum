@@ -5,6 +5,27 @@
 #new-topics-banner data-controller="new-topics-banner" data-new-topics-banner-url-value=new_topics_count_topics_path(q: @search_query, viewing_since: @viewing_since.iso8601) data-new-topics-banner-interval-ms-value="180000"
   = render partial: "new_topics_banner", locals: { count: @new_topics_count, viewing_since: @viewing_since, refresh_path: search_topics_path(q: @search_query) }
 
+- if @search_error.present?
+  .search-error
+    .search-error-icon
+      i.fas.fa-exclamation-triangle
+    .search-error-content
+      h3 Search Error
+      p = @search_error
+      p.search-error-help
+        | Check your query syntax or see the
+        =< link_to "search help", help_path("search")
+        |  for examples.
+
+- elsif @search_warnings.present?
+  .search-warnings
+    .search-warnings-header
+      i.fas.fa-info-circle
+      span Some parts of your search were adjusted:
+    ul.search-warnings-list
+      - @search_warnings.each do |warning|
+        li = warning
+
 - if @search_query.present?
   - if @topics.any?
     - if user_signed_in?

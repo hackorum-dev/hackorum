@@ -282,3 +282,22 @@
 .sidebar .commitfest-committers li + li {
   margin-top: var(--spacing-1);
 }
+
+.sidebar .search-help-link {
+  margin-top: var(--spacing-3);
+  text-align: center;
+}
+
+.sidebar .search-help-link a {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  transition: color var(--transition-fast);
+}
+
+.sidebar .search-help-link a:hover {
+  color: var(--color-text-link);
+}
