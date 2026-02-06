@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_02_05_191041) do
+ActiveRecord::Schema[8.0].define(version: 2026_02_06_173214) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -258,7 +258,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_05_191041) do
     t.datetime "updated_at", null: false
     t.bigint "sender_person_id", null: false
     t.string "reply_to_message_id"
+    t.virtual "body_tsv", type: :tsvector, as: "to_tsvector('english'::regconfig, COALESCE(body, ''::text))", stored: true
     t.index ["body"], name: "index_messages_on_body_trgm", opclass: :gin_trgm_ops, using: :gin
+    t.index ["body_tsv"], name: "index_messages_on_body_tsv", using: :gin
     t.index ["created_at", "sender_id"], name: "index_messages_on_created_at_and_sender_id"
     t.index ["created_at", "topic_id"], name: "index_messages_on_created_at_and_topic_id"
     t.index ["created_at"], name: "index_messages_on_created_at"
@@ -622,12 +624,14 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_05_191041) do
     t.boolean "has_attachments", default: false, null: false
     t.bigint "last_message_id"
     t.bigint "merged_into_topic_id"
+    t.virtual "title_tsv", type: :tsvector, as: "to_tsvector('english'::regconfig, (COALESCE(title, ''::character varying))::text)", stored: true
     t.index ["created_at"], name: "index_topics_on_created_at"
     t.index ["creator_id"], name: "index_topics_on_creator_id"
     t.index ["creator_person_id"], name: "index_topics_on_creator_person_id"
     t.index ["last_message_at"], name: "index_topics_on_last_message_at"
     t.index ["merged_into_topic_id"], name: "index_topics_on_merged_into_topic_id"
     t.index ["title"], name: "index_topics_on_title_trgm", opclass: :gin_trgm_ops, using: :gin
+    t.index ["title_tsv"], name: "index_topics_on_title_tsv", using: :gin
   end
 
   create_table "user_tokens", force: :cascade do |t|

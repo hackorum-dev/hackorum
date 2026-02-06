@@ -202,11 +202,34 @@ class TopicsController < ApplicationController
       return
     end
 
-    load_cached_search_results
+    @search_warnings = []
+
+    begin
+      # Parse the search query
+      parser = Search::QueryParser.new
+      ast = parser.parse(@search_query)
+
+      # Validate and collect warnings
+      validator = Search::QueryValidator.new(ast)
+      validated = validator.validate
+      @search_warnings += validated.warnings
+
+      # Build the ActiveRecord query
+      builder = Search::QueryBuilder.new(ast: validated.ast, user: current_user)
+      result = builder.build
+      @search_warnings += result.warnings
+
+      # Load results
+      load_search_results(result.relation)
+    rescue Parslet::ParseFailed => e
+      @search_error = format_parse_error(e)
+      @topics = []
+    end
 
     preload_topic_participants
     preload_commitfest_summaries
     preload_participation_flags if user_signed_in?
+    load_visible_tags if user_signed_in?
 
     respond_to do |format|
       format.html
@@ -857,41 +880,19 @@ class TopicsController < ApplicationController
     @is_starred = TopicStar.exists?(user: current_user, topic: @topic)
   end
 
-  def load_cached_search_results
+  SEARCH_PAGE_SIZE = 1000
+
+  def load_search_results(base_relation)
     @viewing_since = viewing_since_param
     longpage = params[:longpage].to_i
-    cache = SearchResultCache.new(query: @search_query, scope: "title_body", viewing_since: @viewing_since, longpage: longpage)
 
-    result = cache.fetch do |limit, offset|
-      build_search_query(@search_query)
-        .joins(:messages)
-        .where(messages: { created_at: ..@viewing_since })
-        .group('topics.id')
-        .select('topics.id, topics.creator_id, MAX(messages.created_at) as last_activity')
-        .order('MAX(messages.created_at) DESC, topics.id DESC')
-        .limit(limit)
-        .offset(offset)
-        .load
-    end
-
-    entries = result[:entries] || []
+    entries = execute_search_query(base_relation, longpage)
     sliced = slice_cached_entries(entries, params[:cursor])
 
-    if sliced[:entries].empty? && entries.size >= SearchResultCache::LONGPAGE_SIZE
+    # Handle pagination to next longpage if needed
+    if sliced[:entries].empty? && entries.size >= SEARCH_PAGE_SIZE
       longpage += 1
-      cache = SearchResultCache.new(query: @search_query, scope: "title_body", viewing_since: @viewing_since, longpage: longpage)
-      next_result = cache.fetch do |limit, offset|
-        build_search_query(@search_query)
-          .joins(:messages)
-          .where(messages: { created_at: ..@viewing_since })
-          .group('topics.id')
-          .select('topics.id, topics.creator_id, MAX(messages.created_at) as last_activity')
-          .order('MAX(messages.created_at) DESC, topics.id DESC')
-          .limit(limit)
-          .offset(offset)
-          .load
-      end
-      entries = next_result[:entries] || []
+      entries = execute_search_query(base_relation, longpage)
       sliced = slice_cached_entries(entries, params[:cursor])
     end
 
@@ -899,6 +900,38 @@ class TopicsController < ApplicationController
     @topics = hydrate_topics_from_entries(sliced[:entries])
     @topics = [] unless @topics
     @new_topics_count = 0
+  end
+
+  def execute_search_query(base_relation, longpage)
+    results = base_relation
+      .joins(:messages)
+      .where(messages: { created_at: ..@viewing_since })
+      .group("topics.id")
+      .select("topics.id, topics.creator_id, MAX(messages.created_at) as last_activity")
+      .order("MAX(messages.created_at) DESC, topics.id DESC")
+      .limit(SEARCH_PAGE_SIZE)
+      .offset(SEARCH_PAGE_SIZE * longpage)
+      .load
+
+    results.map do |row|
+      {
+        id: row.id,
+        last_activity: row.try(:last_activity)&.to_time || row.try(:created_at)&.to_time
+      }
+    end
+  end
+
+  def format_parse_error(error)
+    # Extract user-friendly error message from Parslet error
+    cause = error.parse_failure_cause
+    if cause
+      line = cause.pos.line_and_column.first rescue 1
+      "Syntax error at position #{line}: #{cause.message}"
+    else
+      "Invalid search syntax"
+    end
+  rescue StandardError
+    "Invalid search syntax"
   end
 
   def preload_commitfest_summaries

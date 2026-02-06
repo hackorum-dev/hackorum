@@ -18,6 +18,10 @@
         = form_with url: search_topics_path, method: :get, local: true do |f|
           = f.text_field :q, placeholder: "Search topics and messages...", class: "search-input", value: search_query, data: { "search-focus-target": "input" }
           = f.submit "Search", class: "search-button"
+        .search-help-link
+          = link_to help_path("search") do
+            i.fas.fa-question-circle
+            |  Search syntax help
 
     .sidebar-section
       h3.sidebar-heading Quick filters
