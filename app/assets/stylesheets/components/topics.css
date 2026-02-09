@@ -525,6 +525,7 @@ a.topic-icon {
 
   .topic-title-mobile {
     display: flex;
+    z-index: auto;
   }
 
   .topic-row-footer {
@@ -545,6 +546,9 @@ a.topic-icon {
     font-size: var(--font-size-2xs);
   }
 
+  .topic-icon-hover {
+    z-index: 200;
+  }
 }
 
 .topic-link {
