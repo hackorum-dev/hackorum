@@ -200,6 +200,8 @@
       - if user_signed_in?
         button.button.button-secondary.button-small data-action="click->thread-actions#markAllRead" Mark all messages read
       = link_to "Jump to latest", "#message-#{last_message.id}", class: "button button-secondary button-small", title: "Jump to latest message", "aria-label": "Jump to latest message"
+      - if user_signed_in?
+        = link_to "Jump to unread", "#first-unread", class: "button button-secondary button-small", title: "Jump to first unread message", "aria-label": "Jump to first unread message"
 
   - first_unread_found = false
   - @messages.each do |message|
