@@ -443,8 +443,7 @@ a.topic-icon {
 
 .topic-title-main {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: max-content;
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: stretch;
   gap: var(--spacing-2);
   height: 100%;
@@ -557,6 +556,9 @@ a.topic-icon {
   font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-lg);
   line-height: var(--line-height-relaxed);
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 
   &:hover {
     color: var(--color-text-link-hover);
