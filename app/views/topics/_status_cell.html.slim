@@ -5,7 +5,7 @@
   - total_count = topic.message_count
   - reading_unread_count = [total_count - read_count, 0].max
 - status_class = "status-#{status}"
-- status_class = "#{status_class} has-new-replies" if status.to_s == "reading" && reading_unread_count.to_i.positive?
+- status_class = "#{status_class} has-new-replies" if status.to_s == "reading"
 - star_data = star_data || {}
 td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") data-label="Topic"
   - creator = topic.creator_display_alias
@@ -13,13 +13,9 @@ td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") 
   .topic-title-main
     .topic-title-icons
       - if status.to_s == "reading"
-        - if reading_unread_count.to_i.positive?
-          = link_to topic_path(topic, anchor: "first-unread"), class: "topic-icon topic-icon-reading", title: "Jump to first unread message (#{reading_unread_count} unread)" do
-            i.fa-solid.fa-envelope
-            span.topic-icon-badge.topic-icon-badge-sup = reading_unread_count
-        - else
-          .topic-icon.topic-icon-reading title="All messages read"
-            i.fa-solid.fa-envelope
+        = link_to topic_path(topic, anchor: "first-unread"), class: "topic-icon topic-icon-reading", title: "Jump to first unread message (#{reading_unread_count} unread)" do
+          i.fa-solid.fa-envelope
+          span.topic-icon-badge.topic-icon-badge-sup = reading_unread_count
       = render partial: "topics/star_icon", locals: { topic: topic, star_data: star_data }
       = render partial: "topics/note_icon", locals: { topic: topic, count: note_count.to_i }
       = render partial: "topics/team_readers_icon", locals: { topic: topic, readers: team_readers }
@@ -47,13 +43,9 @@ td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") 
         .topic-icons
           .topic-title-icons
             - if status.to_s == "reading"
-              - if reading_unread_count.to_i.positive?
-                = link_to topic_path(topic, anchor: "first-unread"), class: "topic-icon topic-icon-reading", title: "Jump to first unread message (#{reading_unread_count} unread)" do
-                  i.fa-solid.fa-envelope
-                  span.topic-icon-badge.topic-icon-badge-sup = reading_unread_count
-              - else
-                .topic-icon.topic-icon-reading title="All messages read"
-                  i.fa-solid.fa-envelope
+              = link_to topic_path(topic, anchor: "first-unread"), class: "topic-icon topic-icon-reading", title: "Jump to first unread message (#{reading_unread_count} unread)" do
+                i.fa-solid.fa-envelope
+                span.topic-icon-badge.topic-icon-badge-sup = reading_unread_count
             = render partial: "topics/star_icon", locals: { topic: topic, star_data: star_data }
             = render partial: "topics/note_icon", locals: { topic: topic, count: note_count.to_i }
             = render partial: "topics/team_readers_icon", locals: { topic: topic, readers: team_readers }

@@ -4,13 +4,8 @@
 - team_readers = team_readers || []
 - star_data = star_data || {}
 - status = state[:status] || "new"
-- reading_unread_count = nil
-- if status.to_s == "reading"
-  - read_count = state[:read_count].to_i
-  - total_count = topic.message_count
-  - reading_unread_count = [total_count - read_count, 0].max
 - row_class = ["topic-row", "topic-#{status}"]
-- row_class << "has-new-replies" if status.to_s == "reading" && reading_unread_count.to_i.positive?
+- row_class << "has-new-replies" if status.to_s == "reading"
 - topic_participants_map ||= @topic_participants_map || {}
 - tp_data = topic_participants_map[topic.id] || {}
 - top_participants = tp_data[:top] || []
