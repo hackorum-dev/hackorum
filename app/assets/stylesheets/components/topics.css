@@ -82,6 +82,7 @@
   & .topic-participants {
     width: 250px;
     text-align: right;
+    white-space: nowrap;
 
     .topic-icon {
       margin: 0 4px;
@@ -89,7 +90,9 @@
     }
 
     .participants {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: nowrap;
     }
   }
 }
