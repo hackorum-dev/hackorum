@@ -5,6 +5,10 @@ body {
   transition: background-color var(--transition-normal), color var(--transition-normal);
 }
 
+html {
+  scroll-padding-top: calc(var(--nav-height) + var(--spacing-4));
+}
+
 .container {
   max-width: none;
   width: 100%;
