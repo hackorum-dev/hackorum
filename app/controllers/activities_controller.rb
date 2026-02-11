@@ -7,7 +7,7 @@ class ActivitiesController < ApplicationController
     @search_query = params[:q].to_s.strip
     @activities = base_scope
                     .then { |scope| apply_query(scope) }
-                    .includes(subject: [:topic, { message: :sender }])
+                    .includes(subject: [ :topic, { message: :sender } ])
                     .order(created_at: :desc)
                     .limit(100)
     mark_shown_as_read!(@activities)

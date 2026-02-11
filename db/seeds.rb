@@ -50,7 +50,7 @@ def create_user_with_alias(username:, name:, email:, admin: false, verified: tru
   )
   person.update!(default_alias_id: ali.id)
 
-  [user, ali]
+  [ user, ali ]
 end
 
 alice_user, alice_alias = create_user_with_alias(
@@ -597,16 +597,16 @@ long_messages << create_message(
   message_id_suffix: "repl-meeting-1"
 )
 
-senders_cycle = [bob_alias, carol_alias, dave_alias, alice_alias]
+senders_cycle = [ bob_alias, carol_alias, dave_alias, alice_alias ]
 (2..120).each do |i|
   sender = senders_cycle[(i - 2) % senders_cycle.length]
   reply_to = if i % 25 == 0
                long_messages.first
-             elsif i % 10 == 0
+  elsif i % 10 == 0
                long_messages[4] || long_messages.first
-             else
+  else
                long_messages.last
-             end
+  end
   long_messages << create_message(
     topic: long_topic,
     sender: sender,
@@ -662,7 +662,7 @@ moderate_msgs_1 << create_message(
 )
 
 (2..18).each do |i|
-  sender = [bob_alias, carol_alias, dave_alias][i % 3]
+  sender = [ bob_alias, carol_alias, dave_alias ][i % 3]
   moderate_msgs_1 << create_message(
     topic: moderate_topic_1,
     sender: sender,
@@ -736,7 +736,7 @@ five_part_topic = Topic.create!(
   updated_at: base_time + 16.days
 )
 
-five_participants = [alice_alias, bob_alias, carol_alias, dave_alias, legacy_alias]
+five_participants = [ alice_alias, bob_alias, carol_alias, dave_alias, legacy_alias ]
 five_msgs = []
 five_msgs << create_message(
   topic: five_part_topic,
@@ -767,7 +767,7 @@ six_part_topic = Topic.create!(
   updated_at: base_time + 17.days
 )
 
-six_participants = [alice_alias, bob_alias, carol_alias, dave_alias, legacy_alias, ci_bot_alias]
+six_participants = [ alice_alias, bob_alias, carol_alias, dave_alias, legacy_alias, ci_bot_alias ]
 six_msgs = []
 six_msgs << create_message(
   topic: six_part_topic,
@@ -793,7 +793,7 @@ end
 # Extra topics to fill multiple pages with variety
 extra_topics = []
 (1..50).each do |i|
-  creator = [alice_alias, bob_alias, carol_alias, dave_alias][i % 4]
+  creator = [ alice_alias, bob_alias, carol_alias, dave_alias ][i % 4]
   created_at = now - (15.days + i.hours)
   topic = Topic.create!(
     title: "Archive sampler #{i}",
@@ -814,7 +814,7 @@ extra_topics = []
   )
   msgs << create_message(
     topic: topic,
-    sender: [alice_alias, bob_alias, carol_alias, dave_alias][(i + 1) % 4],
+    sender: [ alice_alias, bob_alias, carol_alias, dave_alias ][(i + 1) % 4],
     subject: "Re: #{topic.title}",
     body: "Follow-up #{i}a to keep paging realistic.",
     created_at: created_at + 2.hours,
@@ -823,7 +823,7 @@ extra_topics = []
   )
   msgs << create_message(
     topic: topic,
-    sender: [alice_alias, bob_alias, carol_alias, dave_alias][(i + 2) % 4],
+    sender: [ alice_alias, bob_alias, carol_alias, dave_alias ][(i + 2) % 4],
     subject: "Re: #{topic.title}",
     body: "Follow-up #{i}b with another participant.",
     created_at: created_at + 4.hours,
@@ -953,7 +953,7 @@ carol_notes.create!(
 # Notes on extra sampler topics for visibility across pages
 extra_topics.each_with_index do |entry, idx|
   next unless (idx % 5).zero?
-  builder = [alice_notes, bob_notes, carol_notes][idx % 3]
+  builder = [ alice_notes, bob_notes, carol_notes ][idx % 3]
   message = entry[:messages][1] || entry[:messages].last
   builder.create!(
     topic: entry[:topic],

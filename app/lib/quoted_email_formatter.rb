@@ -26,8 +26,8 @@ class QuotedEmailFormatter
     @lines.map do |line|
       if line =~ /^\s*((?:>\s*)+)(.*)$/
         markers = Regexp.last_match(1)
-        depth = markers.count('>')
-        content = Regexp.last_match(2).sub(/\A\s/, '')
+        depth = markers.count(">")
+        content = Regexp.last_match(2).sub(/\A\s/, "")
         { depth: depth, text: content, blank: content.strip.empty? }
       else
         { depth: 0, text: line, blank: line.strip.empty? }
@@ -202,11 +202,11 @@ class QuotedEmailFormatter
   end
 
   def extract_message_id_from_url(url)
-    safe_url = url.gsub('+', '%2B')
+    safe_url = url.gsub("+", "%2B")
     decoded = CGI.unescape(safe_url)
     MESSAGE_ID_PATTERNS.each do |pattern|
       if (m = decoded.match(pattern))
-        return CGI.unescape(m[1].gsub('+', '%2B'))
+        return CGI.unescape(m[1].gsub("+", "%2B"))
       end
     end
     nil
@@ -256,15 +256,15 @@ class QuotedEmailFormatter
     return false if lines.empty?
 
     trimmed = lines.map { |l| l.lstrip }
-    return true if trimmed.first.start_with?('diff ')
-    return true if trimmed.any? { |l| l.start_with?('--- ', '+++ ', 'Index:') }
+    return true if trimmed.first.start_with?("diff ")
+    return true if trimmed.any? { |l| l.start_with?("--- ", "+++ ", "Index:") }
 
-    marker_flags = trimmed.map { |l| l.start_with?('+', '-', '@') }
+    marker_flags = trimmed.map { |l| l.start_with?("+", "-", "@") }
     marker_count = marker_flags.count(true)
-    has_plus = trimmed.any? { |l| l.start_with?('+') }
-    has_minus = trimmed.any? { |l| l.start_with?('-') }
-    has_hunk = trimmed.any? { |l| l.start_with?('@@') }
-    long_marker_lines = trimmed.any? { |l| l.length > 40 && l.start_with?('+', '-') }
+    has_plus = trimmed.any? { |l| l.start_with?("+") }
+    has_minus = trimmed.any? { |l| l.start_with?("-") }
+    has_hunk = trimmed.any? { |l| l.start_with?("@@") }
+    long_marker_lines = trimmed.any? { |l| l.length > 40 && l.start_with?("+", "-") }
     total = trimmed.length
 
     # Avoid treating pure "-" lists as diffs unless there is "+" or hunk context.

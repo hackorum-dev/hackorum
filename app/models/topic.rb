@@ -1,17 +1,17 @@
 class Topic < ApplicationRecord
   CONTRIBUTOR_TYPE_RANK = {
-    'core_team' => 1,
-    'committer' => 2,
-    'major_contributor' => 3,
-    'significant_contributor' => 4,
-    'past_major_contributor' => 5,
-    'past_significant_contributor' => 6
+    "core_team" => 1,
+    "committer" => 2,
+    "major_contributor" => 3,
+    "significant_contributor" => 4,
+    "past_major_contributor" => 5,
+    "past_significant_contributor" => 6
   }.freeze
 
-  belongs_to :creator, class_name: 'Alias', inverse_of: :topics
-  belongs_to :creator_person, class_name: 'Person'
-  belongs_to :last_sender_person, class_name: 'Person', optional: true
-  belongs_to :merged_into_topic, class_name: 'Topic', optional: true
+  belongs_to :creator, class_name: "Alias", inverse_of: :topics
+  belongs_to :creator_person, class_name: "Person"
+  belongs_to :last_sender_person, class_name: "Person", optional: true
+  belongs_to :merged_into_topic, class_name: "Topic", optional: true
   has_many :messages
   has_many :attachments, through: :messages
   has_many :notes, dependent: :destroy
@@ -22,13 +22,13 @@ class Topic < ApplicationRecord
   has_many :topic_participants, dependent: :delete_all
   has_many :top_topic_participants,
            -> { order(message_count: :desc).limit(5) },
-           class_name: 'TopicParticipant'
+           class_name: "TopicParticipant"
   has_many :contributor_topic_participants,
            -> { where(is_contributor: true).order(message_count: :desc) },
-           class_name: 'TopicParticipant'
-  has_many :topics_merged_into_this, class_name: 'Topic', foreign_key: :merged_into_topic_id
-  has_one :topic_merge_as_source, class_name: 'TopicMerge', foreign_key: :source_topic_id
-  has_many :topic_merges_as_target, class_name: 'TopicMerge', foreign_key: :target_topic_id
+           class_name: "TopicParticipant"
+  has_many :topics_merged_into_this, class_name: "Topic", foreign_key: :merged_into_topic_id
+  has_one :topic_merge_as_source, class_name: "TopicMerge", foreign_key: :source_topic_id
+  has_many :topic_merges_as_target, class_name: "TopicMerge", foreign_key: :target_topic_id
 
   scope :active, -> { where(merged_into_topic_id: nil) }
   scope :merged, -> { where.not(merged_into_topic_id: nil) }
@@ -42,8 +42,8 @@ class Topic < ApplicationRecord
   def participant_aliases(limit: 10)
     # Get all unique senders from messages, with their message counts
     sender_counts = messages.group(:sender_id)
-                            .select('sender_id, COUNT(*) as message_count')
-                            .order('message_count DESC')
+                            .select("sender_id, COUNT(*) as message_count")
+                            .order("message_count DESC")
                             .limit(50)
                             .index_by(&:sender_id)
 
@@ -57,7 +57,7 @@ class Topic < ApplicationRecord
 
     participants << first_sender if first_sender
 
-    first_and_last = [first_sender&.id, last_sender&.id].compact.uniq
+    first_and_last = [ first_sender&.id, last_sender&.id ].compact.uniq
     other_senders = sender_ids - first_and_last
     other_participants = other_senders
       .map { |id| senders_by_id[id] }
@@ -76,19 +76,19 @@ class Topic < ApplicationRecord
 
   def participant_alias_stats(limit: 10)
     stats = messages.group(:sender_id)
-                    .select('sender_id, COUNT(*) as message_count, MAX(messages.created_at) AS last_at')
-                    .order('message_count DESC')
+                    .select("sender_id, COUNT(*) as message_count, MAX(messages.created_at) AS last_at")
+                    .order("message_count DESC")
                     .limit(50)
                     .index_by(&:sender_id)
 
     first_sender = messages.order(:created_at).first&.sender
     last_sender = messages.order(:created_at).last&.sender
 
-    missing_ids = [first_sender&.id, last_sender&.id].compact.uniq - stats.keys
+    missing_ids = [ first_sender&.id, last_sender&.id ].compact.uniq - stats.keys
     if missing_ids.any?
       extra_stats = messages.where(sender_id: missing_ids)
                             .group(:sender_id)
-                            .select('sender_id, COUNT(*) as message_count, MAX(messages.created_at) AS last_at')
+                            .select("sender_id, COUNT(*) as message_count, MAX(messages.created_at) AS last_at")
                             .index_by(&:sender_id)
       stats.merge!(extra_stats)
     end
@@ -112,9 +112,9 @@ class Topic < ApplicationRecord
 
     participants << entry_for.call(first_sender) if first_sender
 
-    first_and_last = [first_sender&.id, last_sender&.id].compact.uniq
+    first_and_last = [ first_sender&.id, last_sender&.id ].compact.uniq
     other_senders = sender_ids - first_and_last
-    remaining = [limit - first_and_last.length, 0].max
+    remaining = [ limit - first_and_last.length, 0 ].max
     other_participants = other_senders
       .map { |id| senders_by_id[id] }
       .compact
@@ -158,8 +158,8 @@ class Topic < ApplicationRecord
 
       stats = messages.joins(sender: :person)
                       .where(people: { id: contributor_ids })
-                      .group('people.id')
-                      .select('people.id AS person_id, COUNT(*) AS message_count, MAX(messages.created_at) AS last_at')
+                      .group("people.id")
+                      .select("people.id AS person_id, COUNT(*) AS message_count, MAX(messages.created_at) AS last_at")
 
       people = Person.includes(:default_alias, :contributor_memberships).where(id: stats.map(&:person_id)).index_by(&:id)
 
@@ -174,7 +174,7 @@ class Topic < ApplicationRecord
           message_count: row.read_attribute(:message_count).to_i,
           last_at: row.read_attribute(:last_at)
         }
-      end.compact.sort_by { |p| [-p[:message_count], p[:alias].name] }
+      end.compact.sort_by { |p| [ -p[:message_count], p[:alias].name ] }
     end
   end
 
@@ -192,10 +192,10 @@ class Topic < ApplicationRecord
     # Aggregate message stats per person
     stats = messages.group(:sender_person_id)
                     .select(
-                      'sender_person_id',
-                      'COUNT(*) AS msg_count',
-                      'MIN(messages.created_at) AS first_at',
-                      'MAX(messages.created_at) AS last_at'
+                      "sender_person_id",
+                      "COUNT(*) AS msg_count",
+                      "MIN(messages.created_at) AS first_at",
+                      "MAX(messages.created_at) AS last_at"
                     )
 
     # Clear existing participants and rebuild
@@ -246,7 +246,7 @@ class Topic < ApplicationRecord
     ids = Array(topic_ids).map(&:to_i).uniq
     return {} if ids.empty?
 
-    sql = ApplicationRecord.sanitize_sql_array([<<~SQL, ids])
+    sql = ApplicationRecord.sanitize_sql_array([ <<~SQL, ids ])
       SELECT DISTINCT ON (cptop.topic_id)
         cptop.topic_id,
         cf.external_id AS commitfest_external_id,
@@ -311,7 +311,7 @@ class Topic < ApplicationRecord
   def final_topic
     return self unless merged?
 
-    visited = Set.new([id])
+    visited = Set.new([ id ])
     current = merged_into_topic
 
     while current&.merged?
@@ -326,8 +326,8 @@ class Topic < ApplicationRecord
 
   def self.normalize_title(title)
     title.to_s
-         .gsub(/\A\s*(Re|Fwd|Fw):\s*/i, '')
-         .gsub(/\s+/, ' ')
+         .gsub(/\A\s*(Re|Fwd|Fw):\s*/i, "")
+         .gsub(/\s+/, " ")
          .strip
   end
 
@@ -338,7 +338,7 @@ class Topic < ApplicationRecord
     active
       .where.not(id: source_topic.id)
       .where("similarity(title, ?) > 0.3", normalized)
-      .order(Arel.sql(sanitize_sql_array(["similarity(title, ?) DESC", normalized])))
+      .order(Arel.sql(sanitize_sql_array([ "similarity(title, ?) DESC", normalized ])))
       .limit(limit)
   end
 end

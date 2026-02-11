@@ -18,8 +18,8 @@ class CreateNotesAndActivities < ActiveRecord::Migration[8.0]
 
       t.timestamps
 
-      t.index [:note_id, :mentionable_type, :mentionable_id], unique: true, name: "index_note_mentions_unique"
-      t.index [:mentionable_type, :mentionable_id]
+      t.index [ :note_id, :mentionable_type, :mentionable_id ], unique: true, name: "index_note_mentions_unique"
+      t.index [ :mentionable_type, :mentionable_id ]
     end
 
     create_table :note_tags do |t|
@@ -28,7 +28,7 @@ class CreateNotesAndActivities < ActiveRecord::Migration[8.0]
 
       t.timestamps
 
-      t.index [:note_id, :tag], unique: true
+      t.index [ :note_id, :tag ], unique: true
       t.index :tag
     end
 
@@ -51,9 +51,9 @@ class CreateNotesAndActivities < ActiveRecord::Migration[8.0]
 
       t.timestamps
 
-      t.index [:user_id, :read_at]
-      t.index [:user_id, :id]
-      t.index [:subject_type, :subject_id]
+      t.index [ :user_id, :read_at ]
+      t.index [ :user_id, :id ]
+      t.index [ :subject_type, :subject_id ]
     end
   end
 end

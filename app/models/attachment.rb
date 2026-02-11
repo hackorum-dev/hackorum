@@ -6,13 +6,13 @@ class Attachment < ApplicationRecord
   after_destroy :update_topic_has_attachments
 
   def patch?
-    file_name&.ends_with?('.patch') || file_name&.ends_with?('.diff') || patch_content?
+    file_name&.ends_with?(".patch") || file_name&.ends_with?(".diff") || patch_content?
   end
 
   def patch_extension?
-    file_name&.ends_with?('.patch') || file_name&.ends_with?('.diff')
+    file_name&.ends_with?(".patch") || file_name&.ends_with?(".diff")
   end
-  
+
   def decoded_body
     Base64.decode64(body) if body.present?
   end
@@ -27,16 +27,16 @@ class Attachment < ApplicationRecord
 
     raw.encode("UTF-8", invalid: :replace, undef: :replace, replace: "\uFFFD")
   end
-  
+
   private
 
   def patch_content?
-    decoded_body&.starts_with?('diff ') ||
-    decoded_body&.starts_with?('--- ') ||
-    decoded_body&.starts_with?('*** ') ||
-    decoded_body&.starts_with?('Index:') ||
-    decoded_body&.include?('@@') ||
-    decoded_body&.include?('***************')
+    decoded_body&.starts_with?("diff ") ||
+    decoded_body&.starts_with?("--- ") ||
+    decoded_body&.starts_with?("*** ") ||
+    decoded_body&.starts_with?("Index:") ||
+    decoded_body&.include?("@@") ||
+    decoded_body&.include?("***************")
   end
 
   def mark_topic_has_attachments

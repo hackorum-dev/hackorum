@@ -20,7 +20,7 @@ class RegistrationsController < ApplicationController
 
     password_digest = BCrypt::Password.create(password)
 
-    purpose = 'register'
+    purpose = "register"
     ttl = 1.hour
     token, raw = UserToken.issue!(
       purpose: purpose,
@@ -41,6 +41,6 @@ class RegistrationsController < ApplicationController
     end
 
     UserMailer.verification_email(token, raw).deliver_later
-    redirect_to root_path, notice: 'Verification email sent. Please check your inbox.'
+    redirect_to root_path, notice: "Verification email sent. Please check your inbox."
   end
 end

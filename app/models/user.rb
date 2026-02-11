@@ -37,7 +37,7 @@ class User < ApplicationRecord
   validates :username, presence: true, on: :registration
 
   before_save :release_old_username_reservation
-  after_commit :reserve_username, on: [:create, :update]
+  after_commit :reserve_username, on: [ :create, :update ]
   after_destroy :release_name_reservation
 
   private

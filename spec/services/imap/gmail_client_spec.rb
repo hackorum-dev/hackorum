@@ -22,15 +22,15 @@ RSpec.describe Imap::GmailClient, type: :service do
   it 'searches for UIDs greater than last_uid' do
     client = described_class.new(username: 'u', password: 'p', mailbox: 'list-mail')
     client.connect!
-    expect(imap_double).to receive(:uid_search).with(["UID", "101:*"]).and_return([101, 102])
+    expect(imap_double).to receive(:uid_search).with([ "UID", "101:*" ]).and_return([ 101, 102 ])
     uids = client.uid_search_greater_than(100)
-    expect(uids).to eq([101, 102])
+    expect(uids).to eq([ 101, 102 ])
   end
 
   it 'fetches RFC822 by UID' do
     client = described_class.new(username: 'u', password: 'p', mailbox: 'list-mail')
     client.connect!
-    fetch_resp = [double('Data', attr: { 'RFC822' => "raw message" })]
+    fetch_resp = [ double('Data', attr: { 'RFC822' => "raw message" }) ]
     expect(imap_double).to receive(:uid_fetch).with(123, 'RFC822').and_return(fetch_resp)
     raw = client.uid_fetch_rfc822(123)
     expect(raw).to eq('raw message')
@@ -39,7 +39,7 @@ RSpec.describe Imap::GmailClient, type: :service do
   it 'marks a message as seen' do
     client = described_class.new(username: 'u', password: 'p', mailbox: 'list-mail')
     client.connect!
-    expect(imap_double).to receive(:uid_store).with(123, '+FLAGS.SILENT', [:Seen])
+    expect(imap_double).to receive(:uid_store).with(123, '+FLAGS.SILENT', [ :Seen ])
     expect(client.mark_seen(123)).to be true
   end
 

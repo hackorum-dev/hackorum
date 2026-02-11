@@ -5,4 +5,3 @@ module EmailNormalizer
     email.to_s.strip.downcase.presence
   end
 end
-

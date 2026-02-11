@@ -1,10 +1,10 @@
 class Message < ApplicationRecord
   belongs_to :topic
-  belongs_to :sender, class_name: 'Alias', inverse_of: :messages, counter_cache: :sender_count
-  belongs_to :sender_person, class_name: 'Person'
-  belongs_to :reply_to, class_name: 'Message', inverse_of: :replies, optional: true
+  belongs_to :sender, class_name: "Alias", inverse_of: :messages, counter_cache: :sender_count
+  belongs_to :sender_person, class_name: "Person"
+  belongs_to :reply_to, class_name: "Message", inverse_of: :replies, optional: true
 
-  has_many :replies, class_name: 'Message', foreign_key: "reply_to_id", inverse_of: :reply_to
+  has_many :replies, class_name: "Message", foreign_key: "reply_to_id", inverse_of: :reply_to
   has_many :attachments
 
   has_many :mentions

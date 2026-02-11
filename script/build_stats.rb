@@ -631,12 +631,11 @@ class StatsAggregator
     payload = rows.map { |row| row.transform_keys(&:to_sym).merge(created_at: now, updated_at: now) }
     hist_model.insert_all!(payload) unless payload.empty?
   end
-
 end
 
 class RetentionAggregator
-  PERIOD_MONTHS = [1, 3].freeze
-  HORIZON_MONTHS = [3, 6, 12, 18, 24, 30, 36, 48, 60].freeze
+  PERIOD_MONTHS = [ 1, 3 ].freeze
+  HORIZON_MONTHS = [ 3, 6, 12, 18, 24, 30, 36, 48, 60 ].freeze
   SEGMENTS = [
     { key: "all", reply_filter: false },
     { key: "replied_to_others", reply_filter: true }
@@ -900,11 +899,11 @@ range_start = from_date || first_message
 range_end = to_date || Date.current
 
 granularities = case granularity
-                when :all then [:daily, :weekly, :monthly]
-                when :daily, :weekly, :monthly then [granularity]
-                else
+when :all then [ :daily, :weekly, :monthly ]
+when :daily, :weekly, :monthly then [ granularity ]
+else
                   raise "Usage: ruby script/build_stats.rb [daily|weekly|monthly|all]"
-                end
+end
 
 granularities.each do |gran|
   puts "Computing #{gran} stats from #{range_start} to #{range_end}..."

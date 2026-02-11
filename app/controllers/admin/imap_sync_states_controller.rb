@@ -21,4 +21,3 @@ class Admin::ImapSyncStatesController < Admin::BaseController
     end
   end
 end
-

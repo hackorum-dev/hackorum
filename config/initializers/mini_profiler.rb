@@ -2,7 +2,7 @@
 
 Rack::MiniProfiler.config.position = "right"
 Rack::MiniProfiler.config.skip_paths ||= []
-Rack::MiniProfiler.config.skip_paths += ["/up"]
+Rack::MiniProfiler.config.skip_paths += [ "/up" ]
 Rack::MiniProfiler.config.enable_hotwire_turbo_drive_support = true
 
 if Rails.env.development?

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Admin::UsersController < Admin::BaseController
-  before_action :set_user, only: [:toggle_admin, :new_email, :confirm_email, :add_email]
+  before_action :set_user, only: [ :toggle_admin, :new_email, :confirm_email, :add_email ]
 
   def active_admin_section
     :users
@@ -9,7 +9,7 @@ class Admin::UsersController < Admin::BaseController
 
   def index
     @users = User.active
-                 .includes(person: [:default_alias, :aliases])
+                 .includes(person: [ :default_alias, :aliases ])
                  .order(created_at: :desc)
                  .limit(params.fetch(:limit, 50).to_i)
                  .offset(params.fetch(:offset, 0).to_i)
@@ -34,7 +34,7 @@ class Admin::UsersController < Admin::BaseController
     end
 
     @existing_aliases = Alias.by_email(@email)
-    @owned_by_other = @existing_aliases.where.not(user_id: [nil, @user.id]).exists?
+    @owned_by_other = @existing_aliases.where.not(user_id: [ nil, @user.id ]).exists?
   end
 
   def add_email
@@ -48,7 +48,7 @@ class Admin::UsersController < Admin::BaseController
 
     aliases = Alias.by_email(email)
 
-    if aliases.where.not(user_id: [nil, @user.id]).exists?
+    if aliases.where.not(user_id: [ nil, @user.id ]).exists?
       return redirect_to admin_users_path, alert: "Email is linked to another account. Cannot associate."
     end
 

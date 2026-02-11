@@ -177,7 +177,7 @@ module ProfileActivity
 
   def build_contribution_weeks(year, filters: nil)
     ids = person_ids_for_query
-    return [[], []] if ids.blank?
+    return [ [], [] ] if ids.blank?
 
     year = year.to_i
     wday_start = @week_start_day || WeekCalculation::DEFAULT_WEEK_START
@@ -208,7 +208,7 @@ module ProfileActivity
     end
 
     month_spans = build_month_spans(weeks_data)
-    [weeks_data, month_spans]
+    [ weeks_data, month_spans ]
   end
 
   def build_month_spans(weeks_data)
@@ -218,10 +218,10 @@ module ProfileActivity
 
     weeks_data.each do |week|
       first_date = week[:days].first[:date]
-      month_key = [first_date.year, first_date.month]
+      month_key = [ first_date.year, first_date.month ]
       if current_month != month_key
         if current_month
-          month_spans << { label: Date.new(current_month[0], current_month[1], 1).strftime('%b'), year: current_month[0], month: current_month[1], span: current_span }
+          month_spans << { label: Date.new(current_month[0], current_month[1], 1).strftime("%b"), year: current_month[0], month: current_month[1], span: current_span }
         end
         current_month = month_key
         current_span = 1
@@ -230,7 +230,7 @@ module ProfileActivity
       end
     end
 
-    month_spans << { label: Date.new(current_month[0], current_month[1], 1).strftime('%b'), year: current_month[0], month: current_month[1], span: current_span } if current_month
+    month_spans << { label: Date.new(current_month[0], current_month[1], 1).strftime("%b"), year: current_month[0], month: current_month[1], span: current_span } if current_month
     month_spans
   end
 

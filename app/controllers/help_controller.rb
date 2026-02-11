@@ -6,7 +6,7 @@ class HelpController < ApplicationController
   PAGES = {
     "search" => "Advanced Search Guide",
     "hackorum-patch" => "Applying Patches with hackorum-patch",
-    "account-linking" => "Account Linking & Multiple Emails",
+    "account-linking" => "Account Linking & Multiple Emails"
   }.freeze
 
   def index

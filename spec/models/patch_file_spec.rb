@@ -7,7 +7,7 @@ RSpec.describe PatchFile, type: :model do
 
   describe "validations" do
     subject { build(:patch_file) }
-    
+
     it "is valid with valid attributes" do
       expect(subject).to be_valid
     end
@@ -26,7 +26,7 @@ RSpec.describe PatchFile, type: :model do
     it "validates status values" do
       subject.status = 'invalid'
       expect(subject).not_to be_valid
-      
+
       %w[added modified deleted renamed].each do |status|
         subject.status = status
         expect(subject).to be_valid

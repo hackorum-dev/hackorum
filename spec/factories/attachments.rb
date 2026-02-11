@@ -18,7 +18,7 @@ FactoryBot.define do
       content_type { "text/plain" }
       body { Base64.encode64("configuration file content") }
     end
-    
+
     trait :patch_file do
       file_name { "feature.patch" }
       content_type { "text/plain" }

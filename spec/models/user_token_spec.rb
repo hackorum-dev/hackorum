@@ -11,4 +11,3 @@ RSpec.describe UserToken, type: :model do
     expect(UserToken.consume!(raw, purpose: 'register')).to be_nil
   end
 end
-

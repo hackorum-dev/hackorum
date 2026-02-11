@@ -18,7 +18,7 @@ class AddMessageCountToMessageReadRanges < ActiveRecord::Migration[7.1]
       MigrationMessageReadRange.find_in_batches(batch_size: 500) do |batch|
         updates = batch.map do |range|
           count = MigrationMessage.where(topic_id: range.topic_id, id: range.range_start_message_id..range.range_end_message_id).count
-          [range.id, count]
+          [ range.id, count ]
         end
 
         updates.each_slice(100) do |slice|

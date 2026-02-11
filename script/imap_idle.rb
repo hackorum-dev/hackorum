@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
+
 #
 # IMAP IDLE runner for continuous Gmail ingestion
 #

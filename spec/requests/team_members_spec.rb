@@ -120,6 +120,5 @@ RSpec.describe "TeamMembers", type: :request do
       expect(flash[:alert]).to eq("Admins only")
       expect(other_admin_record.reload.role).to eq("admin")
     end
-
   end
 end

@@ -1,8 +1,8 @@
 class Alias < ApplicationRecord
   belongs_to :person
   belongs_to :user, optional: true
-  has_many :topics, class_name: 'Topic', foreign_key: "creator_id", inverse_of: :creator
-  has_many :messages, class_name: 'Message', foreign_key: "sender_id", inverse_of: :sender
+  has_many :topics, class_name: "Topic", foreign_key: "creator_id", inverse_of: :creator
+  has_many :messages, class_name: "Message", foreign_key: "sender_id", inverse_of: :sender
   has_many :attachments, through: :messages
 
   validates :name, presence: true
@@ -17,7 +17,7 @@ class Alias < ApplicationRecord
     where("lower(trim(email)) = lower(trim(?))", email)
   }
 
-  scope :with_sent_messages, -> { where('sender_count > 0') }
+  scope :with_sent_messages, -> { where("sender_count > 0") }
   scope :mention_only, -> { where(sender_count: 0) }
 
   def mention_only?
@@ -25,11 +25,11 @@ class Alias < ApplicationRecord
   end
 
   def noname?
-    name == 'Noname'
+    name == "Noname"
   end
 
   def gravatar_url(size: 80)
-    require 'digest/md5'
+    require "digest/md5"
     hash = Digest::MD5.hexdigest(email.downcase.strip)
     "https://www.gravatar.com/avatar/#{hash}?s=#{size}&d=identicon"
   end
@@ -43,12 +43,12 @@ class Alias < ApplicationRecord
   end
 
   CONTRIBUTOR_RANK = {
-    'core_team' => 1,
-    'committer' => 2,
-    'major_contributor' => 3,
-    'significant_contributor' => 4,
-    'past_major_contributor' => 5,
-    'past_significant_contributor' => 6
+    "core_team" => 1,
+    "committer" => 2,
+    "major_contributor" => 3,
+    "significant_contributor" => 4,
+    "past_major_contributor" => 5,
+    "past_significant_contributor" => 6
   }.freeze
 
   def contributor?
@@ -63,16 +63,16 @@ class Alias < ApplicationRecord
   end
 
   def core_team?
-    contributor_membership_types.include?('core_team')
+    contributor_membership_types.include?("core_team")
   end
 
   def committer?
-    contributor_membership_types.include?('committer')
+    contributor_membership_types.include?("committer")
   end
 
   def past_contributor?
     types = contributor_membership_types
-    types.include?('past_major_contributor') || types.include?('past_significant_contributor')
+    types.include?("past_major_contributor") || types.include?("past_significant_contributor")
   end
 
   def current_contributor?
@@ -80,11 +80,11 @@ class Alias < ApplicationRecord
   end
 
   def major_contributor?
-    contributor_membership_types.include?('major_contributor')
+    contributor_membership_types.include?("major_contributor")
   end
 
   def significant_contributor?
-    contributor_membership_types.include?('significant_contributor')
+    contributor_membership_types.include?("significant_contributor")
   end
 
   def contributor_membership_types
@@ -97,12 +97,12 @@ class Alias < ApplicationRecord
     return nil unless contributor?
 
     case contributor_type
-    when 'core_team' then 'Core Team'
-    when 'committer' then 'Committer'
-    when 'major_contributor' then 'Major Contributor'
-    when 'significant_contributor' then 'Contributor'
-    when 'past_major_contributor' then 'Past Contributor'
-    when 'past_significant_contributor' then 'Past Contributor'
+    when "core_team" then "Core Team"
+    when "committer" then "Committer"
+    when "major_contributor" then "Major Contributor"
+    when "significant_contributor" then "Contributor"
+    when "past_major_contributor" then "Past Contributor"
+    when "past_significant_contributor" then "Past Contributor"
     end
   end
 

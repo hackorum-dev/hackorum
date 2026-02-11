@@ -6,4 +6,3 @@ class AddAuthFieldsToUsers < ActiveRecord::Migration[8.0]
     add_index :users, :deleted_at
   end
 end
-

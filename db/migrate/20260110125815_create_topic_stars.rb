@@ -7,6 +7,6 @@ class CreateTopicStars < ActiveRecord::Migration[8.0]
       t.timestamps
     end
 
-    add_index :topic_stars, [:user_id, :topic_id], unique: true
+    add_index :topic_stars, [ :user_id, :topic_id ], unique: true
   end
 end

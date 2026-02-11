@@ -10,6 +10,6 @@ class CreatePageLoadStats < ActiveRecord::Migration[8.0]
     end
 
     add_index :page_load_stats, :created_at
-    add_index :page_load_stats, [:controller, :action]
+    add_index :page_load_stats, [ :controller, :action ]
   end
 end

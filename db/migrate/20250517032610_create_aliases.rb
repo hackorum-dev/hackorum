@@ -9,6 +9,6 @@ class CreateAliases < ActiveRecord::Migration[8.0]
       t.timestamps
     end
 
-    add_index :aliases, [:name, :email], unique: true
+    add_index :aliases, [ :name, :email ], unique: true
   end
 end

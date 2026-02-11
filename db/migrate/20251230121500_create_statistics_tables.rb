@@ -146,7 +146,7 @@ class CreateStatisticsTables < ActiveRecord::Migration[8.0]
 
       t.timestamps
     end
-    add_index :stats_longevity_daily, [:interval_start, :bucket], unique: true, name: "index_stats_longevity_daily_on_interval_bucket"
+    add_index :stats_longevity_daily, [ :interval_start, :bucket ], unique: true, name: "index_stats_longevity_daily_on_interval_bucket"
 
     create_table :stats_retention_monthly do |t|
       t.date :cohort_start, null: false
@@ -159,7 +159,7 @@ class CreateStatisticsTables < ActiveRecord::Migration[8.0]
 
       t.timestamps
     end
-    add_index :stats_retention_monthly, [:period_months, :segment, :cohort_start, :months_since], unique: true
+    add_index :stats_retention_monthly, [ :period_months, :segment, :cohort_start, :months_since ], unique: true
 
     create_table :stats_retention_milestones do |t|
       t.date :cohort_start, null: false
@@ -171,7 +171,7 @@ class CreateStatisticsTables < ActiveRecord::Migration[8.0]
 
       t.timestamps
     end
-    add_index :stats_retention_milestones, [:period_months, :segment, :cohort_start, :horizon_months], unique: true, name: "index_stats_retention_milestones_on_period_segment_horizon"
+    add_index :stats_retention_milestones, [ :period_months, :segment, :cohort_start, :horizon_months ], unique: true, name: "index_stats_retention_milestones_on_period_segment_horizon"
 
     create_table :stats_longevity_weekly do |t|
       t.date :interval_start, null: false
@@ -181,7 +181,7 @@ class CreateStatisticsTables < ActiveRecord::Migration[8.0]
 
       t.timestamps
     end
-    add_index :stats_longevity_weekly, [:interval_start, :bucket], unique: true, name: "index_stats_longevity_weekly_on_interval_bucket"
+    add_index :stats_longevity_weekly, [ :interval_start, :bucket ], unique: true, name: "index_stats_longevity_weekly_on_interval_bucket"
 
     create_table :stats_longevity_monthly do |t|
       t.date :interval_start, null: false
@@ -191,11 +191,11 @@ class CreateStatisticsTables < ActiveRecord::Migration[8.0]
 
       t.timestamps
     end
-    add_index :stats_longevity_monthly, [:interval_start, :bucket], unique: true, name: "index_stats_longevity_monthly_on_interval_bucket"
+    add_index :stats_longevity_monthly, [ :interval_start, :bucket ], unique: true, name: "index_stats_longevity_monthly_on_interval_bucket"
 
     add_index :messages, :created_at
-    add_index :messages, [:created_at, :topic_id]
-    add_index :messages, [:created_at, :sender_id]
+    add_index :messages, [ :created_at, :topic_id ]
+    add_index :messages, [ :created_at, :sender_id ]
     add_index :topics, :created_at
   end
 end

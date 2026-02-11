@@ -2,10 +2,10 @@
 
 module SettingsHelper
   def settings_nav_link_class(section, danger: false)
-    classes = ['settings-nav-link']
-    classes << 'active' if active_settings_section == section
-    classes << 'danger' if danger
-    classes.join(' ')
+    classes = [ "settings-nav-link" ]
+    classes << "active" if active_settings_section == section
+    classes << "danger" if danger
+    classes.join(" ")
   end
 
   def active_settings_section

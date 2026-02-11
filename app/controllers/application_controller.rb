@@ -8,9 +8,9 @@ class ApplicationController < ActionController::Base
   before_action :authorize_mini_profiler
 
   private
-  
+
   def render_404
-    render file: Rails.root.join('public', '404.html'), status: :not_found, layout: false
+    render file: Rails.root.join("public", "404.html"), status: :not_found, layout: false
   end
 
   def current_user
@@ -28,7 +28,7 @@ class ApplicationController < ActionController::Base
   end
 
   def require_authentication
-    redirect_to new_session_path, alert: 'Please sign in' unless user_signed_in?
+    redirect_to new_session_path, alert: "Please sign in" unless user_signed_in?
   end
 
   def authorize_mini_profiler

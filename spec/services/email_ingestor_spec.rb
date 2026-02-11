@@ -54,7 +54,7 @@ RSpec.describe EmailIngestor do
     context "auto-starring" do
       it "creates star for registered sender" do
         sender_alias = create(:alias, email: "sender@example.com", user: user1)
-        allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([sender_alias])
+        allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([ sender_alias ])
 
         expect {
           ingestor.ingest_raw(raw_email)
@@ -67,7 +67,7 @@ RSpec.describe EmailIngestor do
 
       it "does not create star for guest sender" do
         guest_alias = create(:alias, email: "sender@example.com", user: nil)
-        allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([guest_alias])
+        allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([ guest_alias ])
 
         expect {
           ingestor.ingest_raw(raw_email)
@@ -76,7 +76,7 @@ RSpec.describe EmailIngestor do
 
       it "is idempotent - handles existing stars" do
         sender_alias = create(:alias, email: "sender@example.com", user: user1)
-        allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([sender_alias])
+        allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([ sender_alias ])
 
         first_message = ingestor.ingest_raw(raw_email)
         expect(TopicStar.count).to eq(1)
@@ -95,7 +95,7 @@ RSpec.describe EmailIngestor do
     context "activity creation" do
       it "creates activities for users who have starred the topic (excluding sender)" do
         sender_alias = create(:alias, email: "sender@example.com", user: user1)
-        allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([sender_alias])
+        allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([ sender_alias ])
 
         first_message = ingestor.ingest_raw(raw_email)
         topic = first_message.topic
@@ -106,7 +106,7 @@ RSpec.describe EmailIngestor do
         reply_sender_alias = create(:alias, email: "replier@example.com", user: reply_sender)
         reply_email = raw_email.gsub("<test123@example.com>", "<reply123@example.com>")
         reply_email = reply_email.gsub("Subject: Test Subject", "Subject: Re: Test Subject\nIn-Reply-To: <test123@example.com>")
-        allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([reply_sender_alias])
+        allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([ reply_sender_alias ])
 
         reply_message = nil
         # Activities created for user1 and user2 (not reply_sender since they're the sender)
@@ -115,12 +115,12 @@ RSpec.describe EmailIngestor do
         }.to change { Activity.where(activity_type: "topic_message_received").count }.by(2)
 
         activities = Activity.where(activity_type: "topic_message_received", subject: reply_message)
-        expect(activities.pluck(:user_id)).to match_array([user1.id, user2.id])
+        expect(activities.pluck(:user_id)).to match_array([ user1.id, user2.id ])
       end
 
       it "does not create activity for the sender even if they starred the topic" do
         sender_alias = create(:alias, email: "sender@example.com", user: user1)
-        allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([sender_alias])
+        allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([ sender_alias ])
 
         first_message = ingestor.ingest_raw(raw_email)
         topic = first_message.topic
@@ -145,7 +145,7 @@ RSpec.describe EmailIngestor do
 
       it "includes correct payload in activities" do
         sender_alias = create(:alias, email: "sender@example.com", name: "Test Sender", user: user1)
-        allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([sender_alias])
+        allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([ sender_alias ])
 
         first_message = ingestor.ingest_raw(raw_email)
         topic = first_message.topic
@@ -155,7 +155,7 @@ RSpec.describe EmailIngestor do
         reply_sender_alias = create(:alias, email: "replier@example.com", name: "Reply Sender")
         reply_email = raw_email.gsub("<test123@example.com>", "<reply789@example.com>")
         reply_email = reply_email.gsub("Subject: Test Subject", "Subject: Re: Test Subject\nIn-Reply-To: <test123@example.com>")
-        allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([reply_sender_alias])
+        allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([ reply_sender_alias ])
 
         reply_message = ingestor.ingest_raw(reply_email)
 

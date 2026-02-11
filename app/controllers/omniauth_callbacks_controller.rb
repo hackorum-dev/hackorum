@@ -1,12 +1,12 @@
 class OmniauthCallbacksController < ApplicationController
   def google_oauth2
-    auth = request.env['omniauth.auth']
-    provider = auth['provider']
-    uid = auth['uid']
-    info = auth['info'] || {}
-    email = info['email']
-    omniauth_params = request.env['omniauth.params'] || {}
-    linking = omniauth_params['link'].present?
+    auth = request.env["omniauth.auth"]
+    provider = auth["provider"]
+    uid = auth["uid"]
+    info = auth["info"] || {}
+    email = info["email"]
+    omniauth_params = request.env["omniauth.params"] || {}
+    linking = omniauth_params["link"].present?
     current_person = current_user&.person
 
     if current_user && current_person.nil?
@@ -19,15 +19,15 @@ class OmniauthCallbacksController < ApplicationController
     if linking && current_user
       if identity
         if identity.user_id != current_user.id
-          return redirect_to settings_account_path, alert: 'That Google account is already linked to another user.'
+          return redirect_to settings_account_path, alert: "That Google account is already linked to another user."
         end
-        return redirect_to settings_account_path, notice: 'That Google account is already linked to your account.'
+        return redirect_to settings_account_path, notice: "That Google account is already linked to your account."
       else
-        if Alias.by_email(email).where.not(user_id: [nil, current_user.id]).exists?
-          return redirect_to settings_account_path, alert: 'Email is linked to another account. Delete that account first to release it.'
+        if Alias.by_email(email).where.not(user_id: [ nil, current_user.id ]).exists?
+          return redirect_to settings_account_path, alert: "Email is linked to another account. Delete that account first to release it."
         end
 
-        aliases = Alias.by_email(email).where(user_id: [nil, current_user.id])
+        aliases = Alias.by_email(email).where(user_id: [ nil, current_user.id ])
         if aliases.exists?
           aliases.find_each do |al|
             current_person.attach_alias!(al, user: current_user)
@@ -38,7 +38,7 @@ class OmniauthCallbacksController < ApplicationController
             current_person.update!(default_alias_id: primary.id) if primary
           end
         else
-          name = info['name'].presence || email
+          name = info["name"].presence || email
           al = Alias.create!(
             person: current_person,
             user: current_user,
@@ -53,7 +53,7 @@ class OmniauthCallbacksController < ApplicationController
       end
 
       identity.update!(last_used_at: Time.current, email: email, raw_info: auth.to_json)
-      return redirect_to settings_account_path, notice: 'Google account linked.'
+      return redirect_to settings_account_path, notice: "Google account linked."
     end
 
     if identity
@@ -62,13 +62,13 @@ class OmniauthCallbacksController < ApplicationController
       # Do not attach to existing users from the login flow.
       alias_user = Alias.by_email(email).where.not(user_id: nil).includes(:user).first&.user
       if alias_user
-        return redirect_to new_session_path, alert: 'That Google account is already associated with an existing user. Link it from Settings instead.'
+        return redirect_to new_session_path, alert: "That Google account is already associated with an existing user. Link it from Settings instead."
       end
       person = Person.find_or_create_by_email(email)
       user = User.create!(person_id: person.id)
 
       # If no aliases exist for this email, create one
-      aliases = Alias.by_email(email).where(user_id: [nil, user.id])
+      aliases = Alias.by_email(email).where(user_id: [ nil, user.id ])
       if aliases.exists?
         aliases.find_each do |al|
           person.attach_alias!(al, user: user)
@@ -79,7 +79,7 @@ class OmniauthCallbacksController < ApplicationController
           person.update!(default_alias_id: primary.id) if primary
         end
       else
-        name = info['name'].presence || email
+        name = info["name"].presence || email
         al = Alias.create!(person: person, user: user, name: name, email: email, verified_at: Time.current)
         person.update!(default_alias_id: al.id) if person.default_alias_id.nil?
       end
@@ -91,9 +91,9 @@ class OmniauthCallbacksController < ApplicationController
 
     reset_session
     session[:user_id] = identity.user_id
-    redirect_to root_path, notice: 'Signed in with Google'
+    redirect_to root_path, notice: "Signed in with Google"
   rescue => e
     Rails.logger.error("OIDC error: #{e.class}: #{e.message}")
-    redirect_to new_session_path, alert: 'Could not sign in with Google.'
+    redirect_to new_session_path, alert: "Could not sign in with Google."
   end
 end

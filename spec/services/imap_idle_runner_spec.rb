@@ -19,7 +19,7 @@ RSpec.describe ImapIdleRunner, type: :service do
       # IMAP interactions
       allow(imap_client).to receive(:connect!).and_return(true)
       allow(imap_client).to receive(:disconnect!).and_return(true)
-    expect(imap_client).to receive(:uids_after).with(0).and_return([101])
+    expect(imap_client).to receive(:uids_after).with(0).and_return([ 101 ])
     # Build a small raw email
     raw = <<~MAIL
       From: Test <test@example.com>

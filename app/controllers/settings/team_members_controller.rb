@@ -71,13 +71,13 @@ module Settings
     def authorize_invite!
       return if @team.admin?(current_user)
       redirect_to settings_team_path(@team), alert: "Admins only"
-      return
+      nil
     end
 
     def authorize_admin!
       return if @team.admin?(current_user)
       redirect_to settings_team_path(@team), alert: "Admins only"
-      return
+      nil
     end
   end
 end

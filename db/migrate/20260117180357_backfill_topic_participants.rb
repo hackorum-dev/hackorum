@@ -55,7 +55,7 @@ class BackfillTopicParticipants < ActiveRecord::Migration[8.0]
 
     TopicParticipant.upsert_all(
       participants_data,
-      unique_by: [:topic_id, :person_id]
+      unique_by: [ :topic_id, :person_id ]
     )
 
     last_stat = stats.max_by { |_, _, _, last_at| last_at }

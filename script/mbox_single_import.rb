@@ -48,7 +48,7 @@ puts "Scanning #{mbox_path} for #{target_id}..."
 
 File.open(mbox_path, "r") do |f|
   f.each_line do |line|
-    line = line.encode("utf-8", :invalid => :replace)
+    line = line.encode("utf-8", invalid: :replace)
 
     if line.match(/^From [^@]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+/i)
       if process_message(message, target_id, update_existing: update_existing)

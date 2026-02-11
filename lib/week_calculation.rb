@@ -39,7 +39,7 @@ module WeekCalculation
     dec31 = Date.new(year, 12, 31)
     start_date = week_start_for(jan1, wday_start)
     end_date = week_start_for(dec31, wday_start) + 6
-    [start_date, end_date]
+    [ start_date, end_date ]
   end
 
   # Returns the 1-based week number for a date within a year's week grid.

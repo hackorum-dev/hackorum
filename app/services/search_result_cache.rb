@@ -4,13 +4,13 @@ class SearchResultCache
   CACHE_VERSION = "v1"
   LONGPAGE_SIZE = 1000
   CACHE_TTL = 6.hours
-  CACHE_THRESHOLD_SECONDS = 0.4 
+  CACHE_THRESHOLD_SECONDS = 0.4
 
   def initialize(query:, scope:, viewing_since:, longpage: 0, cache: Rails.cache)
     @query = query.to_s
     @scope = scope.to_s
     @viewing_since = viewing_since
-    @longpage = [longpage.to_i, 0].max
+    @longpage = [ longpage.to_i, 0 ].max
     @cache = cache
   end
 

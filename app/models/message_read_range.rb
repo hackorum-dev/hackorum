@@ -8,8 +8,8 @@ class MessageReadRange < ApplicationRecord
   validate :range_order
 
   def self.add_range(user:, topic:, start_id:, end_id:, read_at: Time.current)
-    s = [start_id, end_id].min
-    e = [start_id, end_id].max
+    s = [ start_id, end_id ].min
+    e = [ start_id, end_id ].max
 
     transaction do
       overlapping = lock.where(user:, topic:)
@@ -19,8 +19,8 @@ class MessageReadRange < ApplicationRecord
         ranges = overlapping.pluck(:range_start_message_id, :range_end_message_id)
         min_start = ranges.map(&:first).min
         max_end = ranges.map(&:last).max
-        s = [s, min_start].min
-        e = [e, max_end].max
+        s = [ s, min_start ].min
+        e = [ e, max_end ].max
         overlapping.delete_all
       end
 

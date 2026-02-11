@@ -67,7 +67,7 @@ module Search
 
       if value == "me"
         return Result.empty(warning: "Must be signed in to use 'me'") unless @user
-        return Result.users([@user.id])
+        return Result.users([ @user.id ])
       end
 
       # Check for team (must be member for state selectors due to privacy)
@@ -108,7 +108,7 @@ module Search
       person_id = @user.person_id
       return Result.empty(warning: "User has no associated person") unless person_id
 
-      Result.persons([person_id])
+      Result.persons([ person_id ])
     end
 
     def resolve_contributor_type(value)

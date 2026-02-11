@@ -11,7 +11,7 @@ class CreateIdentities < ActiveRecord::Migration[8.0]
       t.timestamps
     end
 
-    add_index :identities, [:provider, :uid], unique: true
+    add_index :identities, [ :provider, :uid ], unique: true
     # Functional index for email lookups
     execute <<~SQL
       CREATE INDEX IF NOT EXISTS index_identities_on_lower_trim_email

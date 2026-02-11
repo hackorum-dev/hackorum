@@ -10,4 +10,3 @@ class AttachmentsController < ApplicationController
     send_data data, filename: filename, type: content_type, disposition: "attachment"
   end
 end
-

@@ -2,7 +2,7 @@
 
 class NotesController < ApplicationController
   before_action :require_authentication
-  before_action :set_note, only: [:update, :destroy]
+  before_action :set_note, only: [ :update, :destroy ]
 
   def create
     topic = Topic.find(note_params[:topic_id])
@@ -62,7 +62,7 @@ class NotesController < ApplicationController
     end
     unless @note.author_id == current_user.id
       redirect_back fallback_location: topic_path(@note.topic), alert: "You can edit or delete your own notes"
-      return
+      nil
     end
   end
 

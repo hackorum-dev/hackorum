@@ -34,7 +34,7 @@ class UserToken < ApplicationRecord
       expires_at: Time.current + ttl,
       metadata: metadata
     )
-    [record, raw]
+    [ record, raw ]
   end
 
   def self.consume!(raw, purpose: nil)
@@ -51,7 +51,7 @@ class UserToken < ApplicationRecord
   end
 
   def self.cleanup_expired!(older_than: 1.day)
-    where('expires_at < ? OR consumed_at < ?', older_than.ago, older_than.ago).destroy_all
+    where("expires_at < ? OR consumed_at < ?", older_than.ago, older_than.ago).destroy_all
   end
 
   private

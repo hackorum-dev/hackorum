@@ -2,10 +2,10 @@
 
 module Settings
   class TeamsController < Settings::BaseController
-    before_action :set_team, only: [:show, :update, :destroy]
-    before_action :require_team_accessible!, only: [:show]
-    before_action :require_team_admin!, only: [:update, :destroy]
-    skip_before_action :require_authentication, only: [:index, :show]
+    before_action :set_team, only: [ :show, :update, :destroy ]
+    before_action :require_team_accessible!, only: [ :show ]
+    before_action :require_team_admin!, only: [ :update, :destroy ]
+    skip_before_action :require_authentication, only: [ :index, :show ]
 
     def index
       @your_teams = user_signed_in? ? current_user.teams.includes(team_members: :user) : []

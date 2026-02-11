@@ -2,9 +2,9 @@
 
 module AdminHelper
   def admin_nav_link_class(section)
-    classes = ['settings-nav-link']
-    classes << 'active' if active_admin_section == section
-    classes.join(' ')
+    classes = [ "settings-nav-link" ]
+    classes << "active" if active_admin_section == section
+    classes.join(" ")
   end
 
   def active_admin_section

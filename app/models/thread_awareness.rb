@@ -10,7 +10,7 @@ class ThreadAwareness < ApplicationRecord
     transaction do
       record = lock.find_or_initialize_by(user:, topic:)
       record.aware_at = aware_at if record.new_record?
-      record.aware_until_message_id = [record.aware_until_message_id || 0, until_message_id].max
+      record.aware_until_message_id = [ record.aware_until_message_id || 0, until_message_id ].max
       record.save!
       record
     end

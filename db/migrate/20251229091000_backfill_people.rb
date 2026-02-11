@@ -45,7 +45,7 @@ class BackfillPeople < ActiveRecord::Migration[8.0]
       end
 
       MigrationAlias.where(user_id: user.id).find_each do |al|
-        MigrationAlias.by_email(al.email).where(user_id: [nil, user.id]).update_all(person_id: person.id)
+        MigrationAlias.by_email(al.email).where(user_id: [ nil, user.id ]).update_all(person_id: person.id)
       end
     end
 

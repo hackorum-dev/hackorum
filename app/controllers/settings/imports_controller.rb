@@ -131,7 +131,7 @@ module Settings
         end
       else
         CSV.parse(content, headers: false).map do |row|
-          [row[0], row[1], row[2]]
+          [ row[0], row[1], row[2] ]
         end
       end
     end

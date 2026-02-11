@@ -35,8 +35,8 @@ class PersonIdPropagationJob < ApplicationJob
         # Merge stats into existing record
         existing.update!(
           message_count: existing.message_count + old_tp.message_count,
-          first_message_at: [existing.first_message_at, old_tp.first_message_at].min,
-          last_message_at: [existing.last_message_at, old_tp.last_message_at].max,
+          first_message_at: [ existing.first_message_at, old_tp.first_message_at ].min,
+          last_message_at: [ existing.last_message_at, old_tp.last_message_at ].max,
           is_contributor: is_new_contributor
         )
         old_tp.destroy!

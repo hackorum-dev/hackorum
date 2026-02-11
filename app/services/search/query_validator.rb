@@ -23,7 +23,7 @@ module Search
     TAG_SELECTORS = %i[tag].freeze
 
     ALL_SELECTORS = (DATE_SELECTORS + COUNT_SELECTORS + AUTHOR_SELECTORS +
-                     STATE_SELECTORS + CONTENT_SELECTORS + TAG_SELECTORS + [:has]).freeze
+                     STATE_SELECTORS + CONTENT_SELECTORS + TAG_SELECTORS + [ :has ]).freeze
 
     HAS_VALUES = %w[attachment patch contributor committer core_team].freeze
 
@@ -92,24 +92,24 @@ module Search
 
       # Validate based on selector type
       validated = case key
-                  when *DATE_SELECTORS
+      when *DATE_SELECTORS
                     validate_date_selector(node)
-                  when *COUNT_SELECTORS
+      when *COUNT_SELECTORS
                     validate_count_selector(node)
-                  when *AUTHOR_SELECTORS
+      when *AUTHOR_SELECTORS
                     validate_author_selector(node)
-                  when *STATE_SELECTORS
+      when *STATE_SELECTORS
                     validate_state_selector(node)
-                  when *CONTENT_SELECTORS
+      when *CONTENT_SELECTORS
                     validate_content_selector(node)
-                  when *TAG_SELECTORS
+      when *TAG_SELECTORS
                     validate_tag_selector(node)
-                  when :has
+      when :has
                     validate_has_selector(node)
-                  else
+      else
                     @warnings << "Unknown selector '#{key}:' was ignored"
                     nil
-                  end
+      end
 
       return nil unless validated
 
@@ -209,7 +209,7 @@ module Search
       end
 
       # Extract the number to check it's valid
-      number = value.gsub(/[<>=]/, '').to_i
+      number = value.gsub(/[<>=]/, "").to_i
       if number < 0
         @warnings << "Negative count '#{value}' for '#{node[:key]}:' was ignored"
         return nil
@@ -271,7 +271,7 @@ module Search
 
       # Check if text looks like a selector (word:something)
       if value.match?(/\A[a-z_]+:[^\s]*\z/i)
-        potential_key = value.split(':').first.downcase
+        potential_key = value.split(":").first.downcase
         check_for_selector_typo(potential_key, value)
       end
 

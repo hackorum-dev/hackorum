@@ -55,7 +55,7 @@ class NoteBuilder
       note.note_tags.create!(tag:)
     end
 
-    [mentionables, tags]
+    [ mentionables, tags ]
   end
 
   def extract_mentions(text)
@@ -99,9 +99,9 @@ class NoteBuilder
     mentionables = names.map do |name|
       reservation = reservations[name]
       record = case reservation.owner_type
-               when "User" then users[reservation.owner_id]
-               when "Team" then teams[reservation.owner_id]
-               end
+      when "User" then users[reservation.owner_id]
+      when "Team" then teams[reservation.owner_id]
+      end
       raise Error, "Unknown mention: @#{name}" unless record
       validate_mention_permission!(record, name)
       record
@@ -148,10 +148,10 @@ class NoteBuilder
     team_ids = mentionables.select { |m| m.is_a?(Team) }.map(&:id)
     team_member_ids = if team_ids.any?
                         TeamMember.where(team_id: team_ids).pluck(:user_id)
-                      else
+    else
                         []
-                      end
+    end
 
-    ([note.author_id] + user_ids + team_member_ids).compact.uniq
+    ([ note.author_id ] + user_ids + team_member_ids).compact.uniq
   end
 end

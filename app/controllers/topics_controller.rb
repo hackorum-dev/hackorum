@@ -1,7 +1,7 @@
 class TopicsController < ApplicationController
-  before_action :set_topic, only: [:show, :aware, :read_all, :star, :unstar, :latest_patchset]
-  before_action :require_authentication, only: [:aware, :aware_bulk, :aware_all, :read_all, :star, :unstar]
-  before_action :require_team_membership, only: [:index, :new_topics_count]
+  before_action :set_topic, only: [ :show, :aware, :read_all, :star, :unstar, :latest_patchset ]
+  before_action :require_authentication, only: [ :aware, :aware_bulk, :aware_all, :read_all, :star, :unstar ]
+  before_action :require_team_membership, only: [ :index, :new_topics_count ]
 
   def index
     @search_query = nil
@@ -19,7 +19,7 @@ class TopicsController < ApplicationController
       format.html
       format.turbo_stream do
         body = topics_turbo_stream_cache_fetch do
-          render_to_string(:index, formats: [:turbo_stream])
+          render_to_string(:index, formats: [ :turbo_stream ])
         end
         render body:, content_type: "text/vnd.turbo-stream.html"
       end
@@ -52,7 +52,7 @@ class TopicsController < ApplicationController
       .preload(:attachments)
 
     @messages = messages_scope.order(created_at: :asc)
-    @message_numbers = @messages.each_with_index.to_h { |msg, idx| [msg.id, idx + 1] }
+    @message_numbers = @messages.each_with_index.to_h { |msg, idx| [ msg.id, idx + 1 ] }
     preload_read_state!
     auto_mark_aware!
 
@@ -93,7 +93,7 @@ class TopicsController < ApplicationController
 
   def aware_all
     timestamp = params[:before].present? ? Time.zone.parse(params[:before]) : Time.current
-    current_user.update!(aware_before: [current_user.aware_before, timestamp].compact.max)
+    current_user.update!(aware_before: [ current_user.aware_before, timestamp ].compact.max)
 
     render json: { status: "ok", aware_before: current_user.aware_before }
   end
@@ -155,8 +155,8 @@ class TopicsController < ApplicationController
                                       .order(created_at: :asc)
     attachment_number = messages_with_attachments.index { |msg| msg.id == latest_message.id }.to_i + 1
 
-    require 'zlib'
-    require 'rubygems/package'
+    require "zlib"
+    require "rubygems/package"
 
     first_message = @topic.messages.order(:created_at).first
     first_message_id = first_message&.message_id
@@ -172,7 +172,7 @@ class TopicsController < ApplicationController
           hackorum_url: topic_url(@topic),
           upstream_url: first_message_id ? "https://www.postgresql.org/message-id/flat/#{ERB::Util.url_encode(first_message_id)}" : nil
         }.compact.to_json
-        tar.add_file_simple('hackorum.json', 0644, metadata.bytesize) do |io|
+        tar.add_file_simple("hackorum.json", 0644, metadata.bytesize) do |io|
           io.write(metadata)
         end
 
@@ -310,13 +310,13 @@ class TopicsController < ApplicationController
 
     if @topic.merged?
       redirect_to topic_path(@topic.final_topic), status: :moved_permanently
-      return
+      nil
     end
   end
 
   def build_participants_sidebar_data(_messages_scope)
     participants = @topic.topic_participants
-                         .includes(person: [:default_alias, :contributor_memberships])
+                         .includes(person: [ :default_alias, :contributor_memberships ])
                          .order(message_count: :desc, first_message_at: :asc)
 
     @participants = participants.map do |tp|
@@ -431,19 +431,19 @@ class TopicsController < ApplicationController
 
     windowed_query = base_query.joins(:messages)
                                .where(messages: { created_at: ..@viewing_since })
-                               .group('topics.id')
-                               .having('MAX(messages.created_at) <= ?', @viewing_since)
-                               .select('topics.*, MAX(messages.created_at) as last_activity')
+                               .group("topics.id")
+                               .having("MAX(messages.created_at) <= ?", @viewing_since)
+                               .select("topics.*, MAX(messages.created_at) as last_activity")
 
     if params[:cursor].present?
-      cursor_time, cursor_id = params[:cursor].split('_')
-      @topics = windowed_query.having('(MAX(messages.created_at), topics.id) < (?, ?)',
+      cursor_time, cursor_id = params[:cursor].split("_")
+      @topics = windowed_query.having("(MAX(messages.created_at), topics.id) < (?, ?)",
                                           Time.zone.parse(cursor_time), cursor_id.to_i)
     else
       @topics = windowed_query
     end
 
-    @topics = @topics.order('MAX(messages.created_at) DESC, topics.id DESC')
+    @topics = @topics.order("MAX(messages.created_at) DESC, topics.id DESC")
                      .limit(25)
                      .load
   end
@@ -552,13 +552,13 @@ class TopicsController < ApplicationController
     # Load top 5 participants per topic, plus contributor participants
     all_participants = TopicParticipant
       .where(topic_id: topic_ids)
-      .includes(person: [:default_alias, :contributor_memberships])
+      .includes(person: [ :default_alias, :contributor_memberships ])
 
     @topic_participants_map = Hash.new { |h, k| h[k] = { top: [], contributors: [] } }
 
     # Group by topic and separate into top participants and contributors
     all_participants.group_by(&:topic_id).each do |topic_id, participants|
-      sorted = participants.sort_by { |p| [-p.message_count, p.first_message_at] }
+      sorted = participants.sort_by { |p| [ -p.message_count, p.first_message_at ] }
       @topic_participants_map[topic_id][:top] = sorted.first(5)
       @topic_participants_map[topic_id][:contributors] = sorted.select(&:is_contributor)
       @topic_participants_map[topic_id][:all] = sorted
@@ -575,11 +575,11 @@ class TopicsController < ApplicationController
     teammate_user_ids = TeamMember.where(team_id: my_team_ids).pluck(:user_id).uniq
 
     if teammate_user_ids.empty?
-      teammate_user_ids = [current_user.id]
+      teammate_user_ids = [ current_user.id ]
     end
 
-    other_user_ids = teammate_user_ids - [current_user.id]
-    teammate_person_ids = [my_person_id]
+    other_user_ids = teammate_user_ids - [ current_user.id ]
+    teammate_person_ids = [ my_person_id ]
     teammate_person_ids += User.where(id: other_user_ids).pluck(:person_id) if other_user_ids.any?
 
     # Use topic_participants instead of messages for efficiency
@@ -627,7 +627,7 @@ class TopicsController < ApplicationController
     return 1.0 if read_count >= total
 
     ratio = read_count.to_f / total.to_f
-    [[ratio, 0].max, 1].min
+    [ [ ratio, 0 ].max, 1 ].min
   end
 
   def preload_team_reader_states(topic_ids, last_ids)
@@ -638,7 +638,7 @@ class TopicsController < ApplicationController
     return {} if memberships.empty?
 
     member_user_ids = memberships.map(&:first).uniq
-    team_users = User.includes(:aliases, person: [:default_alias, :contributor_memberships])
+    team_users = User.includes(:aliases, person: [ :default_alias, :contributor_memberships ])
                      .where(id: member_user_ids)
                      .index_by(&:id)
 
@@ -654,9 +654,9 @@ class TopicsController < ApplicationController
       max_end = row.read_attribute(:max_end).to_i
       status = if max_end >= last_id
                  :read
-               elsif max_end.positive?
+      elsif max_end.positive?
                  :reading
-               end
+      end
       next unless status
       user = team_users[row.user_id]
       next unless user
@@ -686,18 +686,18 @@ class TopicsController < ApplicationController
     when "no_contrib_replies"
       base_query = base_query.joins(:messages)
                              .left_joins(messages: { sender: { person: :contributor_memberships } })
-                             .group('topics.id')
+                             .group("topics.id")
                              .having("COUNT(DISTINCT contributor_memberships.person_id) = 0")
     when "patch_no_replies"
       base_query = base_query.joins(messages: :attachments)
-                             .group('topics.id')
-                             .having('COUNT(messages.id) = 1')
+                             .group("topics.id")
+                             .having("COUNT(messages.id) = 1")
                              .where("attachments.file_name ILIKE ? OR attachments.file_name ILIKE ?", "%.patch", "%.diff")
     when "reading_incomplete"
       if current_user_id
         base_query = base_query.joins(:messages)
                                .joins("LEFT JOIN message_read_ranges mrr ON mrr.topic_id = topics.id AND mrr.user_id = #{current_user_id}")
-                               .group('topics.id')
+                               .group("topics.id")
                                .having("COALESCE(MAX(mrr.range_end_message_id), 0) > 0")
                                .having("COALESCE(MAX(mrr.range_end_message_id), 0) < MAX(messages.id)")
       end
@@ -706,7 +706,7 @@ class TopicsController < ApplicationController
         aware_before = current_user&.aware_before || Time.at(0)
         base_query = base_query.joins(:messages)
                                .joins("LEFT JOIN message_read_ranges mrr ON mrr.topic_id = topics.id AND mrr.user_id = #{current_user_id}")
-                               .group('topics.id')
+                               .group("topics.id")
                                .having("MAX(messages.created_at) > ?", aware_before)
                                .having("COALESCE(MAX(mrr.range_end_message_id), 0) < MAX(messages.id)")
       end
@@ -715,7 +715,7 @@ class TopicsController < ApplicationController
         member_ids = TeamMember.where(team_id: team_id).select(:user_id)
         base_query = base_query.joins(:messages)
                                .where.not(id: MessageReadRange.where(user_id: member_ids).select(:topic_id))
-                               .group('topics.id')
+                               .group("topics.id")
       end
     when "team_reading_others"
       if team_id && current_user_id
@@ -723,7 +723,7 @@ class TopicsController < ApplicationController
         base_query = base_query.joins(:messages)
                                .joins("LEFT JOIN message_read_ranges mrr_self ON mrr_self.topic_id = topics.id AND mrr_self.user_id = #{current_user_id}")
                                .joins("INNER JOIN message_read_ranges mrr_team ON mrr_team.topic_id = topics.id AND mrr_team.user_id IN (#{teammate_ids.to_sql})")
-                               .group('topics.id')
+                               .group("topics.id")
                                .having("COALESCE(MAX(mrr_self.range_end_message_id), 0) < MAX(messages.id)")
       end
     when "team_reading_any"
@@ -731,7 +731,7 @@ class TopicsController < ApplicationController
         member_ids = TeamMember.where(team_id: team_id).select(:user_id)
         base_query = base_query.joins(:messages)
                                .joins("INNER JOIN message_read_ranges mrr_team ON mrr_team.topic_id = topics.id AND mrr_team.user_id IN (#{member_ids.to_sql})")
-                               .group('topics.id')
+                               .group("topics.id")
       end
     when "started_by_me"
       if current_user_id
@@ -853,8 +853,8 @@ class TopicsController < ApplicationController
   def count_new_topics(base_query, viewing_since)
     base_query.joins(:messages)
               .where(messages: { created_at: viewing_since.. })
-              .group('topics.id')
-              .having('MAX(messages.created_at) > ?', viewing_since)
+              .group("topics.id")
+              .having("MAX(messages.created_at) > ?", viewing_since)
               .count
               .size
   end
@@ -971,7 +971,7 @@ class TopicsController < ApplicationController
   def slice_cached_entries(entries, cursor_param)
     return { entries: entries.first(25) } unless cursor_param.present?
 
-    cursor_time_str, cursor_id_str = cursor_param.split('_')
+    cursor_time_str, cursor_id_str = cursor_param.split("_")
     cursor_time = Time.zone.parse(cursor_time_str)
     cursor_id = cursor_id_str.to_i
 
@@ -1006,7 +1006,7 @@ class TopicsController < ApplicationController
 
     latest_topic = @topics.first
     watermark = "#{latest_topic.last_activity.to_i}_#{latest_topic.id}"
-    ["topics-index", watermark]
+    [ "topics-index", watermark ]
   end
 
   def topics_turbo_stream_cache_key

@@ -68,7 +68,7 @@ RSpec.describe Search::QueryValidator, type: :service do
       end
 
       it 'accepts valid count operators' do
-        ['messages:10', 'messages:>10', 'messages:<10', 'messages:>=10', 'messages:<=10'].each do |query|
+        [ 'messages:10', 'messages:>10', 'messages:<10', 'messages:>=10', 'messages:<=10' ].each do |query|
           ast = parser.parse(query)
           result = described_class.new(ast).validate
           expect(result.warnings).to be_empty

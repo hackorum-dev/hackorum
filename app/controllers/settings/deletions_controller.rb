@@ -12,7 +12,7 @@ module Settings
 
       perform_deletion!(current_user)
       reset_session
-      redirect_to root_path, notice: 'Your account has been deleted.'
+      redirect_to root_path, notice: "Your account has been deleted."
     end
 
     private

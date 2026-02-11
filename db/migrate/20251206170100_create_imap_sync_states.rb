@@ -14,4 +14,3 @@ class CreateImapSyncStates < ActiveRecord::Migration[7.1]
     add_index :imap_sync_states, :mailbox_label, unique: true
   end
 end
-

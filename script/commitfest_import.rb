@@ -91,10 +91,10 @@ class CommitfestImporter
   def parse_history_text(text)
     normalized = text.tr("–", "-").tr("—", "-").gsub("â", "-").gsub("â€“", "-").gsub(/\s+/, " ")
     match = normalized.match(/\(?\s*([A-Za-z ]+)\s*-\s*(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})\s*\)?/)
-    return [nil, nil, nil] unless match
+    return [ nil, nil, nil ] unless match
 
     status = match[1].strip
-    [status, Date.parse(match[2]), Date.parse(match[3])]
+    [ status, Date.parse(match[2]), Date.parse(match[3]) ]
   end
 
   def select_commitfests(history)
@@ -148,26 +148,26 @@ class CommitfestImporter
   end
 
   def parse_ci(ci_td)
-    return [nil, nil] unless ci_td
+    return [ nil, nil ] unless ci_td
 
     text = ci_td.text.strip
     if text.include?("Not processed")
-      return ["not_processed", nil]
+      return [ "not_processed", nil ]
     end
 
     if text.include?("Needs rebase")
-      return ["needs_rebase", nil]
+      return [ "needs_rebase", nil ]
     end
 
     counters = ci_td.at_css("span.run-counters")&.text&.strip
-    return [nil, nil] if counters.nil? || counters.empty?
+    return [ nil, nil ] if counters.nil? || counters.empty?
 
     completed, total = counters.split("/").map(&:to_i)
-    return ["score", nil] if total <= 0
+    return [ "score", nil ] if total <= 0
 
     score = ((completed.to_f / total) * 10).round
-    score = [[score, 0].max, 10].min
-    ["score", score]
+    score = [ [ score, 0 ].max, 10 ].min
+    [ "score", score ]
   end
 
   def sync_patch(patch_id)
@@ -214,7 +214,7 @@ class CommitfestImporter
     cell = doc.at_xpath("//th[normalize-space(text())='Links']/following-sibling::td[1]")
     return { wiki: nil, git: nil } unless cell
 
-    links = cell.css("a").map { |a| [a.text.strip.downcase, a["href"]] }.to_h
+    links = cell.css("a").map { |a| [ a.text.strip.downcase, a["href"] ] }.to_h
     { wiki: links["wiki"], git: links["git"] }
   end
 

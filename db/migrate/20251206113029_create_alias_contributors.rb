@@ -7,7 +7,7 @@ class CreateAliasContributors < ActiveRecord::Migration[8.0]
       t.timestamps
     end
 
-    add_index :aliases_contributors, [:alias_id, :contributor_id], unique: true, name: 'index_alias_contributors_unique'
+    add_index :aliases_contributors, [ :alias_id, :contributor_id ], unique: true, name: 'index_alias_contributors_unique'
     add_index :aliases_contributors, :contributor_id
   end
 end

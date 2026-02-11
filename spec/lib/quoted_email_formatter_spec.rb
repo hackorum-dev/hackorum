@@ -57,8 +57,8 @@ RSpec.describe QuotedEmailFormatter do
       html = described_class.new(body).to_html
 
       expect(html.scan(/inline-reference/).size).to eq(2)
-      expect(html).to include(%q{href="https://example.com/ref2"})
-      expect(html).to include(%q{explanation line continues here})
+      expect(html).to include(%q(href="https://example.com/ref2"))
+      expect(html).to include(%q(explanation line continues here))
     end
 
     it "does not link inline references inside quoted text" do
@@ -73,8 +73,8 @@ RSpec.describe QuotedEmailFormatter do
 
       html = described_class.new(body).to_html
 
-      expect(html).to include(%q{inline-reference">[1]})
-      expect(html).not_to include(%q{inline-reference">[2]})
+      expect(html).to include(%q(inline-reference">[1]))
+      expect(html).not_to include(%q(inline-reference">[2]))
     end
 
     it "rewrites known message-id links to local resolver" do

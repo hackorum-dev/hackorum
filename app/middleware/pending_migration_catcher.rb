@@ -92,7 +92,7 @@ class PendingMigrationCatcher
         "Content-Type" => "text/html; charset=utf-8",
         "Retry-After" => "30"
       },
-      [html]
+      [ html ]
     ]
   end
 end

@@ -215,7 +215,7 @@ RSpec.describe "Admin::Users", type: :request do
 
       aliases = Alias.by_email("multi@example.com")
       expect(aliases.count).to eq(2)
-      expect(aliases.pluck(:user_id).uniq).to eq([regular_user.id])
+      expect(aliases.pluck(:user_id).uniq).to eq([ regular_user.id ])
       expect(aliases.where(verified_at: nil)).to be_empty
     end
 

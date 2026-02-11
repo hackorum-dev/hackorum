@@ -24,10 +24,10 @@ class BackfillTopicParticipantsJob < ApplicationJob
     stats = topic.messages
                  .group(:sender_person_id)
                  .pluck(
-                   Arel.sql('sender_person_id'),
-                   Arel.sql('COUNT(*)'),
-                   Arel.sql('MIN(messages.created_at)'),
-                   Arel.sql('MAX(messages.created_at)')
+                   Arel.sql("sender_person_id"),
+                   Arel.sql("COUNT(*)"),
+                   Arel.sql("MIN(messages.created_at)"),
+                   Arel.sql("MAX(messages.created_at)")
                  )
 
     return if stats.empty?
@@ -47,7 +47,7 @@ class BackfillTopicParticipantsJob < ApplicationJob
 
     TopicParticipant.upsert_all(
       participants_data,
-      unique_by: [:topic_id, :person_id]
+      unique_by: [ :topic_id, :person_id ]
     )
 
     last_stat = stats.max_by { |_, _, _, last_at| last_at }

@@ -9,7 +9,7 @@ RSpec.describe Topic, type: :model do
 
   describe "validations" do
     subject { build(:topic) }
-    
+
     it "is valid with valid attributes" do
       expect(subject).to be_valid
     end

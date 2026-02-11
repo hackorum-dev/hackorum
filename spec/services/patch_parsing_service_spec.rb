@@ -21,7 +21,7 @@ RSpec.describe PatchParsingService, type: :service do
           +
                more_existing_code();
            }
-          
+
           diff --git a/contrib/pg_stat_statements/pg_stat_statements.c b/contrib/pg_stat_statements/pg_stat_statements.c
           index 2345678..bcdefgh 100644
           --- a/contrib/pg_stat_statements/pg_stat_statements.c
@@ -40,22 +40,22 @@ RSpec.describe PatchParsingService, type: :service do
 
       it "creates patch file records for each modified file" do
         expect { service.parse! }.to change(PatchFile, :count).by(2)
-        
+
         patch_files = attachment.patch_files.order(:filename)
-        
+
         expect(patch_files.first.filename).to eq("contrib/pg_stat_statements/pg_stat_statements.c")
         expect(patch_files.first.status).to eq("modified")
-        
+
         expect(patch_files.second.filename).to eq("src/backend/optimizer/path/allpaths.c")
         expect(patch_files.second.status).to eq("modified")
       end
 
       it "counts line changes correctly" do
         service.parse!
-        
+
         backend_file = attachment.patch_files.find_by(filename: "src/backend/optimizer/path/allpaths.c")
         contrib_file = attachment.patch_files.find_by(filename: "contrib/pg_stat_statements/pg_stat_statements.c")
-        
+
         expect(backend_file.line_changes).to eq(4) # 4 added lines (3 code + 1 blank)
         expect(contrib_file.line_changes).to eq(2) # 1 removed, 1 added
       end
@@ -77,7 +77,7 @@ RSpec.describe PatchParsingService, type: :service do
           +{
           +    /* Implementation */
           +}
-          
+
           diff --git a/src/backend/old_feature.c b/src/backend/old_feature.c
           deleted file mode 100644
           index abcdefg..0000000
@@ -98,12 +98,12 @@ RSpec.describe PatchParsingService, type: :service do
 
       it "correctly identifies added and deleted files" do
         service.parse!
-        
+
         patch_files = attachment.patch_files.order(:filename)
-        
+
         new_file = patch_files.find_by(filename: "src/backend/new_feature.c")
         old_file = patch_files.find_by(filename: "src/backend/old_feature.c")
-        
+
         expect(new_file.status).to eq("added")
         expect(old_file.status).to eq("deleted")
       end
@@ -121,41 +121,41 @@ RSpec.describe PatchParsingService, type: :service do
             static bool rtree_internal_consistent(BOX *key, BOX *query,
                               StrategyNumber strategy);
           + static BOX *empty_box(void);
-          + 
+          +#{' '}
           + /* Minimal possible ratio of split */
           + #define LIMIT_RATIO 0.3
-          
-          
+
+
           ***************
           *** 49,78 **** rt_box_union(PG_FUNCTION_ARGS)
           --- 53,58 ----
             	PG_RETURN_BOX_P(n);
             }
-            
+          #{'  '}
           - static Datum
           - rt_box_inter(PG_FUNCTION_ARGS)
           - {
           - 	BOX		   *a = PG_GETARG_BOX_P(0);
           - 	BOX		   *b = PG_GETARG_BOX_P(1);
           - 	BOX		   *n;
-          - 
+          -#{' '}
           - 	n = (BOX *) palloc(sizeof(BOX));
-          - 
+          -#{' '}
           - 	n->high.x = Min(a->high.x, b->high.x);
           - 	n->high.y = Min(a->high.y, b->high.y);
           - 	n->low.x = Max(a->low.x, b->low.x);
           - 	n->low.y = Max(a->low.y, b->low.y);
-          - 
+          -#{' '}
           - 	if (n->high.x < n->low.x || n->high.y < n->low.y)
           - 	{
           - 		pfree(n);
           - 		/* Indicate "no intersection" by returning NULL pointer */
           - 		n = NULL;
           - 	}
-          - 
+          -#{' '}
           - 	PG_RETURN_BOX_P(n);
           - }
-          - 
+          -#{' '}
             /*
              * The GiST Consistent method for boxes
              *
@@ -168,7 +168,7 @@ RSpec.describe PatchParsingService, type: :service do
 
       it "creates patch file record for context diff format" do
         expect { service.parse! }.to change(PatchFile, :count).by(1)
-        
+
         patch_file = attachment.patch_files.first
         expect(patch_file.filename).to eq("src/backend/access/gist/gistproc.c")
         expect(patch_file.status).to eq("modified")
@@ -176,7 +176,7 @@ RSpec.describe PatchParsingService, type: :service do
 
       it "counts line changes correctly in context diff" do
         service.parse!
-        
+
         patch_file = attachment.patch_files.first
         expect(patch_file.line_changes).to eq(28) # 4 added + 24 removed
       end
@@ -193,7 +193,7 @@ RSpec.describe PatchParsingService, type: :service do
             static double size_box(Datum dbox);
           + static BOX *empty_box(void);
           + #define LIMIT_RATIO 0.3
-          
+
           *** a/contrib/cube/cube.c
           --- b/contrib/cube/cube.c
           ***************
@@ -201,7 +201,7 @@ RSpec.describe PatchParsingService, type: :service do
           --- 45,55 ----
             #include "postgres.h"
           + #include "utils/array.h"
-          + 
+          +#{' '}
           + /* New cube function */
           + static void cube_init(void);
         PATCH
@@ -213,12 +213,12 @@ RSpec.describe PatchParsingService, type: :service do
 
       it "creates patch file records for multiple files" do
         expect { service.parse! }.to change(PatchFile, :count).by(2)
-        
+
         patch_files = attachment.patch_files.order(:filename)
-        
+
         expect(patch_files.first.filename).to eq("contrib/cube/cube.c")
         expect(patch_files.first.status).to eq("modified")
-        
+
         expect(patch_files.second.filename).to eq("src/backend/access/gist/gistproc.c")
         expect(patch_files.second.status).to eq("modified")
       end
@@ -233,7 +233,7 @@ RSpec.describe PatchParsingService, type: :service do
           *** 1,5 ****
           --- 1,10 ----
             #include "postgres.h"
-          + 
+          +#{' '}
           + /* Renamed file with changes */
           + static void new_function(void);
           + static int new_variable = 0;
@@ -246,7 +246,7 @@ RSpec.describe PatchParsingService, type: :service do
 
       it "correctly identifies renamed files" do
         service.parse!
-        
+
         patch_file = attachment.patch_files.first
         expect(patch_file.filename).to eq("src/backend/new_name.c")
         expect(patch_file.old_filename).to eq("src/backend/old_name.c")
@@ -308,19 +308,19 @@ RSpec.describe PatchParsingService, type: :service do
 
       it "creates patch file records for CVS format" do
         expect { service.parse! }.to change(PatchFile, :count).by(2)
-        
+
         patch_files = attachment.patch_files.order(:filename)
-        
+
         expect(patch_files.first.filename).to eq("src/backend/tsearch/wparser_def.c")
         expect(patch_files.first.status).to eq("modified")
-        
+
         expect(patch_files.second.filename).to eq("src/include/tsearch/ts_public.h")
         expect(patch_files.second.status).to eq("modified")
       end
 
       it "extracts filenames correctly from CVS timestamps" do
         service.parse!
-        
+
         filenames = attachment.patch_files.pluck(:filename).sort
         expect(filenames).to eq([
           "src/backend/tsearch/wparser_def.c",
@@ -330,10 +330,10 @@ RSpec.describe PatchParsingService, type: :service do
 
       it "counts line changes correctly in CVS format" do
         service.parse!
-        
+
         header_file = attachment.patch_files.find_by(filename: "src/include/tsearch/ts_public.h")
         backend_file = attachment.patch_files.find_by(filename: "src/backend/tsearch/wparser_def.c")
-        
+
         expect(header_file.line_changes).to eq(2) # 2 added lines
         expect(backend_file.line_changes).to eq(10) # 6 removed + 4 added
       end
@@ -348,10 +348,10 @@ RSpec.describe PatchParsingService, type: :service do
           @@ -6,7 +6,7 @@
            #
            #-------------------------------------------------------------------------
-           
+          #{' '}
           -SRCS		= pgstattuple.c
           +SRCS		= pgstattuple.c pgstatindex.c
-           
+          #{' '}
            MODULE_big	= pgstattuple
            OBJS		= $(SRCS:.c=.o)
           diff -ruN pgstattuple.orig/pgstatindex.c pgstattuple/pgstatindex.c
@@ -372,29 +372,29 @@ RSpec.describe PatchParsingService, type: :service do
 
       it "creates patch file records for traditional unified diff" do
         expect { service.parse! }.to change(PatchFile, :count).by(2)
-        
+
         patch_files = attachment.patch_files.order(:filename)
-        
+
         expect(patch_files.first.filename).to eq("Makefile")
         expect(patch_files.first.status).to eq("modified")
-        
+
         expect(patch_files.second.filename).to eq("pgstatindex.c")
         expect(patch_files.second.status).to eq("modified")
       end
 
       it "extracts clean filenames from version paths" do
         service.parse!
-        
+
         filenames = attachment.patch_files.pluck(:filename).sort
-        expect(filenames).to eq(["Makefile", "pgstatindex.c"])
+        expect(filenames).to eq([ "Makefile", "pgstatindex.c" ])
       end
 
       it "counts line changes correctly" do
         service.parse!
-        
+
         makefile = attachment.patch_files.find_by(filename: "Makefile")
         new_file = attachment.patch_files.find_by(filename: "pgstatindex.c")
-        
+
         expect(makefile.line_changes).to eq(2) # 1 removed + 1 added
         expect(new_file.line_changes).to eq(5) # 5 added lines
       end
@@ -408,7 +408,7 @@ RSpec.describe PatchParsingService, type: :service do
           @@ -60,11 +60,11 @@
            PGICOSTR = $(subst /,\\/,IDI_ICON ICON \"$(top_builddir)/src/port/$(PGAPPICON).ico\")
            endif
-           
+          #{' '}
           -win32ver.rc: $(top_srcdir)/src/port/win32ver.rc
           -	sed -e 's;FILEDESC;$(PGFILEDESC);' $< >$@
           -
@@ -419,7 +419,7 @@ RSpec.describe PatchParsingService, type: :service do
           +#
           +#win32ver.o: win32ver.rc
           +#	$(WINDRES) -i $< -o $@
-           
+          #{' '}
            # Rule for building a shared library
         PATCH
       end
@@ -430,7 +430,7 @@ RSpec.describe PatchParsingService, type: :service do
 
       it "creates patch file record from --- +++ headers only" do
         expect { service.parse! }.to change(PatchFile, :count).by(1)
-        
+
         patch_file = attachment.patch_files.first
         expect(patch_file.filename).to eq("Makefile.port")
         expect(patch_file.status).to eq("modified")
@@ -438,7 +438,7 @@ RSpec.describe PatchParsingService, type: :service do
 
       it "treats filename differences as modifications not renames" do
         service.parse!
-        
+
         patch_file = attachment.patch_files.first
         expect(patch_file.filename).to eq("Makefile.port")
         expect(patch_file.old_filename).to be_nil # Traditional diff differences aren't renames
@@ -447,7 +447,7 @@ RSpec.describe PatchParsingService, type: :service do
 
       it "counts line changes correctly" do
         service.parse!
-        
+
         patch_file = attachment.patch_files.first
         expect(patch_file.line_changes).to eq(10) # 5 removed + 5 added
       end
@@ -492,31 +492,31 @@ RSpec.describe PatchParsingService, type: :service do
 
       it "creates patch file records for CVS traditional format" do
         expect { service.parse! }.to change(PatchFile, :count).by(2)
-        
+
         patch_files = attachment.patch_files.order(:filename)
-        
+
         expect(patch_files.first.filename).to eq("postmaster.c")
         expect(patch_files.first.status).to eq("modified")
-        
+
         expect(patch_files.second.filename).to eq("src/backend/utils/init/globals.c")
         expect(patch_files.second.status).to eq("modified")
       end
 
       it "counts line changes correctly in CVS traditional format" do
         service.parse!
-        
+
         postmaster_file = attachment.patch_files.find_by(filename: "postmaster.c")
         globals_file = attachment.patch_files.find_by(filename: "src/backend/utils/init/globals.c")
-        
+
         expect(postmaster_file.line_changes).to eq(10) # 1 removed + 9 added
         expect(globals_file.line_changes).to eq(3) # 2 added + 1 removed
       end
 
       it "extracts filenames from Index lines" do
         service.parse!
-        
+
         filenames = attachment.patch_files.pluck(:filename).sort
-        expect(filenames).to eq(["postmaster.c", "src/backend/utils/init/globals.c"])
+        expect(filenames).to eq([ "postmaster.c", "src/backend/utils/init/globals.c" ])
       end
     end
 
@@ -524,7 +524,7 @@ RSpec.describe PatchParsingService, type: :service do
       let(:patch_content) do
         <<~PATCH
           88a89,93
-          >                 struct 
+          >                 struct#{' '}
           > 		{
           > 	    		int sqlcode_varno;
           > 			int sqlerrm_varno;
@@ -553,10 +553,10 @@ RSpec.describe PatchParsingService, type: :service do
           >                                                 plpgsql_ns_setlocal(false);
           > 						PLpgSQL_variable	*var;
           >                                                 var = plpgsql_build_variable(strdup("sqlcode"), 0,
-          > 									     plpgsql_build_datatype(TEXTOID, -1), true);  
+          > 									     plpgsql_build_datatype(TEXTOID, -1), true);#{'  '}
           > 						$$.sqlcode_varno = var->dno;
           >                                                 var = plpgsql_build_variable(strdup("sqlerrm"), 0,
-          > 									     plpgsql_build_datatype(TEXTOID, -1), true);  
+          > 									     plpgsql_build_datatype(TEXTOID, -1), true);#{'  '}
           > 					        $$.sqlerrm_varno = var->dno;
           > 						plpgsql_add_initdatums(NULL);
           > 					}
@@ -572,7 +572,7 @@ RSpec.describe PatchParsingService, type: :service do
 
       it "creates patch file record for ed diff format" do
         expect { service.parse! }.to change(PatchFile, :count).by(1)
-        
+
         patch_file = attachment.patch_files.first
         expect(patch_file.filename).to eq("gram.y")
         expect(patch_file.status).to eq("modified")
@@ -580,14 +580,14 @@ RSpec.describe PatchParsingService, type: :service do
 
       it "counts line changes correctly in ed diff format" do
         service.parse!
-        
+
         patch_file = attachment.patch_files.first
         expect(patch_file.line_changes).to eq(29) # Count of added and removed lines
       end
 
       it "infers filename from attachment name" do
         service.parse!
-        
+
         patch_file = attachment.patch_files.first
         expect(patch_file.filename).to eq("gram.y")
         expect(patch_file.old_filename).to be_nil
@@ -608,12 +608,12 @@ RSpec.describe PatchParsingService, type: :service do
           +  version 2
           +  7th April 2007
           +  Stuart Langridge, http://www.kryogenix.org/code/browser/sorttable/
-          +  
+          +#{'  '}
           +  ****************************************************************** */
           +function sortTable() {
           +    // Implementation here
           +}
-          
+
           diff --git a/template/header.tt2 b/template/header.tt2
           index abc1234..def5678 100644
           --- a/template/header.tt2
@@ -634,7 +634,7 @@ RSpec.describe PatchParsingService, type: :service do
 
       it "correctly identifies as unified diff despite *** in content" do
         expect { service.parse! }.to change(PatchFile, :count).by(2)
-        
+
         patch_files = attachment.patch_files.order(:filename)
         expect(patch_files.first.filename).to eq("html/layout/js/sorttable.js")
         expect(patch_files.first.status).to eq("added")
@@ -644,10 +644,10 @@ RSpec.describe PatchParsingService, type: :service do
 
       it "does not confuse *** in content with context diff headers" do
         service.parse!
-        
+
         # Should create files, proving it was parsed as unified diff not context diff
         expect(attachment.patch_files.count).to eq(2)
-        
+
         js_file = attachment.patch_files.find_by(filename: "html/layout/js/sorttable.js")
         expect(js_file.line_changes).to eq(10) # 10 added lines
       end
@@ -684,7 +684,7 @@ RSpec.describe PatchParsingService, type: :service do
 
     it "returns unique contrib module names" do
       modules = service.extract_contrib_modules
-      expect(modules).to match_array(["pg_stat_statements", "hstore"])
+      expect(modules).to match_array([ "pg_stat_statements", "hstore" ])
     end
   end
 
@@ -697,7 +697,7 @@ RSpec.describe PatchParsingService, type: :service do
 
     it "returns unique backend area paths" do
       areas = service.extract_backend_areas
-      expect(areas).to match_array(["optimizer/path", "executor", "optimizer/plan"])
+      expect(areas).to match_array([ "optimizer/path", "executor", "optimizer/plan" ])
     end
   end
 end

@@ -443,7 +443,7 @@ RSpec.describe Search::QueryBuilder, type: :service do
       let!(:topic3) { create(:topic, title: 'Oracle DBA Handbook') }
 
       before do
-        [topic1, topic2, topic3].each do |t|
+        [ topic1, topic2, topic3 ].each do |t|
           create(:message, topic: t, body: 'Some content')
           t.update_denormalized_counts!
         end

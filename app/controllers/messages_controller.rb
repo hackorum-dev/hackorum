@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
 class MessagesController < ApplicationController
-  before_action :require_authentication, only: [:read]
+  before_action :require_authentication, only: [ :read ]
 
   def by_message_id
     raw = params[:message_id].to_s
-    decoded = CGI.unescape(raw.gsub('+', '%2B'))
+    decoded = CGI.unescape(raw.gsub("+", "%2B"))
     message = Message.find_by(message_id: decoded)
 
     if message

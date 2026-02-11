@@ -114,7 +114,7 @@ RSpec.describe MessageActivityBuilder do
         }.to change { Activity.count }.by(2) # 2 starring users, sender is excluded
 
         activities = Activity.where(activity_type: "topic_message_received")
-        expect(activities.pluck(:user_id)).to match_array([starring_user1.id, starring_user2.id])
+        expect(activities.pluck(:user_id)).to match_array([ starring_user1.id, starring_user2.id ])
       end
 
       it "does not create an activity for the sender even if they starred the topic" do
@@ -130,7 +130,7 @@ RSpec.describe MessageActivityBuilder do
       it "does not mark other users' activities as read" do
         builder.process!
 
-        other_activities = Activity.where(user_id: [starring_user1.id, starring_user2.id])
+        other_activities = Activity.where(user_id: [ starring_user1.id, starring_user2.id ])
         expect(other_activities.all? { |a| a.read_at.nil? }).to be true
       end
 
@@ -148,7 +148,7 @@ RSpec.describe MessageActivityBuilder do
         builder.process!
 
         activities = Activity.where(subject: message)
-        expect(activities.pluck(:activity_type).uniq).to eq(["topic_message_received"])
+        expect(activities.pluck(:activity_type).uniq).to eq([ "topic_message_received" ])
       end
 
       it "sets subject polymorphically to Message" do
@@ -196,7 +196,7 @@ RSpec.describe MessageActivityBuilder do
         expect(activity).to be_present
         expect(activity.read_at).to be_nil
 
-        expect(TopicStar.where(topic: topic).pluck(:user_id)).to eq([starring_user.id])
+        expect(TopicStar.where(topic: topic).pluck(:user_id)).to eq([ starring_user.id ])
       end
 
       it "handles sender who has already starred the topic" do

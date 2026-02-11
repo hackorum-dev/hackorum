@@ -15,7 +15,7 @@ RSpec.describe NoteBuilder do
     note = described_class.new(author: author).create!(topic:, message:, body: "Ping @bob and @team-two #Foo #bar")
 
     expect(note.note_tags.pluck(:tag)).to match_array(%w[foo bar])
-    expect(note.note_mentions.map(&:mentionable)).to match_array([mentioned_user, team])
+    expect(note.note_mentions.map(&:mentionable)).to match_array([ mentioned_user, team ])
 
     activity_users = Activity.where(subject: note).pluck(:user_id)
     expect(activity_users).to include(author.id, mentioned_user.id, team_member.id)

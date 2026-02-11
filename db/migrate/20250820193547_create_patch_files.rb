@@ -9,8 +9,8 @@ class CreatePatchFiles < ActiveRecord::Migration[8.0]
 
       t.timestamps
     end
-    
+
     add_index :patch_files, :filename
-    add_index :patch_files, [:attachment_id, :filename], unique: true
+    add_index :patch_files, [ :attachment_id, :filename ], unique: true
   end
 end

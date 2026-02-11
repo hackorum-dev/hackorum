@@ -15,7 +15,7 @@ module TopicsHelper
     tooltip_parts << role_label if role_label
     tooltip = tooltip || (tooltip_parts.any? ? tooltip_parts.join(", ") : alias_record.name)
 
-    avatar_classes = ["participant-avatar"]
+    avatar_classes = [ "participant-avatar" ]
 
     membership_icons = []
     membership_types = person&.contributor_membership_types || []
@@ -27,7 +27,7 @@ module TopicsHelper
       membership_icons << { icon: "fa-solid fa-clock-rotate-left", label: "Past Contributor" }
     end
 
-    name_classes = ["participant-name-link"]
+    name_classes = [ "participant-name-link" ]
     name_classes << "is-committer" if membership_types.include?("committer")
 
     left = tag.div(class: "participant-left") do
@@ -52,7 +52,7 @@ module TopicsHelper
     end
 
     tag.div(class: "participant-row", title: tooltip) do
-      safe_join([left, memberships].compact)
+      safe_join([ left, memberships ].compact)
     end
   end
 
@@ -67,14 +67,14 @@ module TopicsHelper
         message_count = participant[:message_count]
         last_at = participant[:last_at]
 
-        tooltip_parts = [alias_record.name]
+        tooltip_parts = [ alias_record.name ]
         tooltip_parts << pluralize(message_count, "message") if message_count
         tooltip_parts << "last #{smart_time_display(last_at)}" if last_at
         role_label = person&.contributor_badge
         tooltip_parts << role_label if role_label
         badge_text = tooltip_parts.join(", ")
 
-        css_classes = ["participant-avatar"]
+        css_classes = [ "participant-avatar" ]
         css_classes << "is-core-team" if person&.core_team?
         css_classes << "is-committer" if !person&.core_team? && person&.committer?
         css_classes << "is-major-contributor" if !person&.core_team? && !person&.committer? && person&.major_contributor?
@@ -99,7 +99,7 @@ module TopicsHelper
   # Replaces app/views/topics/_note_icon.html.slim
   def note_icon_html(topic:, count:)
     count = count.to_i
-    classes = ["topic-icon", "activity-note"]
+    classes = [ "topic-icon", "activity-note" ]
     classes << "is-hidden" unless count.positive?
     tooltip_label = count.positive? ? "Notes: #{count}" : "Notes"
 
@@ -111,7 +111,7 @@ module TopicsHelper
     ) do
       icon = tag.i(class: "fa-solid fa-note-sticky")
       badge = count.positive? ? tag.span(count, class: "topic-icon-badge") : nil
-      safe_join([icon, badge].compact)
+      safe_join([ icon, badge ].compact)
     end
   end
 
@@ -122,7 +122,7 @@ module TopicsHelper
     team_starrers = star_data[:team_starrers] || []
     total_count = (starred_by_me ? 1 : 0) + team_starrers.size
 
-    classes = ["topic-icon", "activity-star"]
+    classes = [ "topic-icon", "activity-star" ]
     classes << "is-hidden" if total_count.zero?
     classes << "is-starred" if starred_by_me
     icon_class = starred_by_me ? "fa-solid fa-star" : "fa-regular fa-star"
@@ -132,7 +132,7 @@ module TopicsHelper
       id: dom_id(topic, "stars"),
       data: { controller: "hover-popover", hover_popover_delay_value: "200", action: "mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide" }
     ) do
-      parts = [tag.i(class: icon_class)]
+      parts = [ tag.i(class: icon_class) ]
       parts << tag.span(total_count, class: "topic-icon-badge") if total_count > 2
 
       if starred_by_me || team_starrers.any?
@@ -163,7 +163,7 @@ module TopicsHelper
   # Replaces app/views/topics/_participation_icon.html.slim
   def participation_icon_html(topic:, participation:)
     participation = participation || {}
-    classes = ["topic-icon", "activity-team"]
+    classes = [ "topic-icon", "activity-team" ]
     classes << "is-mine" if participation[:mine]
     classes << "is-hidden" unless participation[:mine] || participation[:team]
     aliases = participation[:aliases] || []
@@ -174,7 +174,7 @@ module TopicsHelper
       id: dom_id(topic, "participation"),
       data: { controller: "hover-popover", hover_popover_delay_value: "200", action: "mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide" }
     ) do
-      parts = [tag.i(class: "fa-solid fa-user-group")]
+      parts = [ tag.i(class: "fa-solid fa-user-group") ]
       parts << tag.span(count, class: "topic-icon-badge") if count > 1
 
       if aliases.any?
@@ -196,7 +196,7 @@ module TopicsHelper
   # Replaces app/views/topics/_team_readers_icon.html.slim
   def team_readers_icon_html(topic:, readers:)
     count = readers&.size.to_i
-    classes = ["topic-icon", "activity-team-read"]
+    classes = [ "topic-icon", "activity-team-read" ]
     classes << "is-hidden" if count.zero?
 
     tag.div(
@@ -204,7 +204,7 @@ module TopicsHelper
       id: dom_id(topic, "team_readers"),
       data: { controller: "hover-popover", hover_popover_delay_value: "200", action: "mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide" }
     ) do
-      parts = [tag.i(class: "fa-solid fa-users")]
+      parts = [ tag.i(class: "fa-solid fa-users") ]
 
       if count.positive?
         parts << tag.span(count, class: "topic-icon-badge")

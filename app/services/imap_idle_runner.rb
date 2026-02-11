@@ -3,7 +3,7 @@
 class ImapIdleRunner
   DEFAULT_IDLE_TIMEOUT = 1500 # 25 minutes (Gmail drops ~29m, we re-IDLE earlier)
 
-  def initialize(label: ENV['IMAP_MAILBOX_LABEL'],
+  def initialize(label: ENV["IMAP_MAILBOX_LABEL"],
                  client: nil,
                  ingestor: EmailIngestor.new,
                  logger: (defined?(Rails) ? Rails.logger : Logger.new($stdout)))
@@ -13,7 +13,7 @@ class ImapIdleRunner
     @logger = logger
     @backoff = 1
     @stop = false
-    if (@label.nil? || @label.to_s.strip.empty?)
+    if @label.nil? || @label.to_s.strip.empty?
       raise ArgumentError, "IMAP_MAILBOX_LABEL is required and must point to a dedicated Gmail label (not INBOX)"
     end
   end
@@ -50,10 +50,10 @@ class ImapIdleRunner
         cycle_started = Time.now
         update_state(last_cycle_started_at: cycle_started)
 
-        res = instrument('imap.idle', label: @label, timeout: idle_timeout) do
+        res = instrument("imap.idle", label: @label, timeout: idle_timeout) do
           @client.idle_once(timeout: idle_timeout) { |_resp| }
         end
-        log_info(event: 'idle', label: @label, result: res)
+        log_info(event: "idle", label: @label, result: res)
 
         metrics = incremental_sync!
         duration_ms = ((Time.now - cycle_started) * 1000).to_i
@@ -68,10 +68,10 @@ class ImapIdleRunner
           consecutive_error_count: 0,
           backoff_seconds: 0
         })
-        instrument('imap.incremental_sync', label: @label, **metrics.merge(duration_ms: duration_ms)) { nil }
+        instrument("imap.incremental_sync", label: @label, **metrics.merge(duration_ms: duration_ms)) { nil }
         @backoff = 1
       rescue => e
-        log_warn(event: 'error', where: 'idle_or_sync', error_class: e.class.to_s, message: e.message, backoff: @backoff)
+        log_warn(event: "error", where: "idle_or_sync", error_class: e.class.to_s, message: e.message, backoff: @backoff)
         update_state(last_error: short_error(e), last_error_class: e.class.to_s, consecutive_error_count: state.consecutive_error_count.to_i + 1, backoff_seconds: @backoff)
         break if @stop
         reconnect_with_backoff
@@ -93,9 +93,9 @@ class ImapIdleRunner
   end
 
   def reconnect_with_backoff
-    sleep_seconds = [@backoff, 60].min
+    sleep_seconds = [ @backoff, 60 ].min
     sleep sleep_seconds
-    @backoff = [@backoff * 2, 60].min
+    @backoff = [ @backoff * 2, 60 ].min
     connect!
   end
 
@@ -115,7 +115,7 @@ class ImapIdleRunner
   end
 
   def incremental_sync!
-    uids = instrument('imap.search', label: @label, last_uid: state.last_uid.to_i) do
+    uids = instrument("imap.search", label: @label, last_uid: state.last_uid.to_i) do
       @client.uids_after(state.last_uid.to_i)
     end
     fetched = uids&.size || 0
@@ -141,14 +141,14 @@ class ImapIdleRunner
   end
 
   def process_uid(uid)
-    raw = instrument('imap.fetch', label: @label, uid: uid) do
+    raw = instrument("imap.fetch", label: @label, uid: uid) do
       @client.uid_fetch_rfc822(uid)
     end
     return unless raw
 
     msg = nil
     ActiveRecord::Base.transaction do
-      msg = instrument('ingestor.ingest', uid: uid) do
+      msg = instrument("ingestor.ingest", uid: uid) do
         @ingestor.ingest_raw(raw, trust_date: true)
       end
     end
@@ -156,10 +156,10 @@ class ImapIdleRunner
     # Only after commit and successful ingest do we mark seen and advance the cursor
     @client.mark_seen(uid)
     state.update!(last_uid: uid, last_checked_at: Time.now, last_error: nil)
-    log_info(event: 'ingest', uid: uid, message_id: msg&.message_id, duplicate: (msg.nil?), attachments: (msg ? msg.attachments.count : 0), patch_files: (msg ? msg.attachments.joins(:patch_files).count : 0))
+    log_info(event: "ingest", uid: uid, message_id: msg&.message_id, duplicate: (msg.nil?), attachments: (msg ? msg.attachments.count : 0), patch_files: (msg ? msg.attachments.joins(:patch_files).count : 0))
     { ingested: !msg.nil?, attachments: (msg ? msg.attachments.count : 0), patch_files: (msg ? msg.attachments.joins(:patch_files).count : 0) }
   rescue => e
-    log_error(event: 'ingest_error', uid: uid, error_class: e.class.to_s, message: e.message)
+    log_error(event: "ingest_error", uid: uid, error_class: e.class.to_s, message: e.message)
     update_state(last_error: short_error(e), last_checked_at: Time.now)
     # Do not advance last_uid on failure; idempotency ensures safe retry
     { ingested: false, attachments: 0, patch_files: 0 }
@@ -167,7 +167,7 @@ class ImapIdleRunner
 
   def short_error(e)
     msg = e.message.to_s
-    msg.length > 500 ? msg[0, 500] + '…' : msg
+    msg.length > 500 ? msg[0, 500] + "…" : msg
   end
 
   public

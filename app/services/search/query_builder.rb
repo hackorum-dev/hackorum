@@ -79,54 +79,54 @@ module Search
       conditions = node[:conditions]
 
       result = case key
-               when :from
+      when :from
                  apply_from_selector(value, relation, negated: negated, quoted: quoted, conditions: conditions)
-               when :starter
+      when :starter
                  apply_starter_selector(value, relation, negated: negated, quoted: quoted)
-               when :last_from
+      when :last_from
                  apply_last_from_selector(value, relation, negated: negated, quoted: quoted)
-               when :title
+      when :title
                  apply_title_selector(value, relation, negated: negated, quoted: quoted)
-               when :body
+      when :body
                  apply_body_selector(value, relation, negated: negated, quoted: quoted)
-               when :unread
+      when :unread
                  apply_unread_selector(value, relation, negated: negated)
-               when :read
+      when :read
                  apply_read_selector(value, relation, negated: negated)
-               when :reading
+      when :reading
                  apply_reading_selector(value, relation, negated: negated)
-               when :new
+      when :new
                  apply_new_selector(value, relation, negated: negated)
-               when :starred
+      when :starred
                  apply_starred_selector(value, relation, negated: negated)
-               when :notes
+      when :notes
                  apply_notes_selector(value, relation, negated: negated)
-               when :tag
+      when :tag
                  apply_tag_selector(value, relation, negated: negated, conditions: conditions)
-               when :has
+      when :has
                  apply_has_selector(value, relation, negated: negated, conditions: conditions)
-               when :messages
+      when :messages
                  apply_count_selector(:message_count, value, relation, negated: negated)
-               when :participants
+      when :participants
                  apply_count_selector(:participant_count, value, relation, negated: negated)
-               when :contributors
+      when :contributors
                  apply_count_selector(:contributor_participant_count, value, relation, negated: negated)
-               when :first_after
+      when :first_after
                  apply_date_selector(:created_at, :>=, value, relation, negated: negated)
-               when :first_before
+      when :first_before
                  apply_date_selector(:created_at, :<, value, relation, negated: negated)
-               when :messages_after
+      when :messages_after
                  apply_messages_date_selector(:>=, value, relation, negated: negated)
-               when :messages_before
+      when :messages_before
                  apply_messages_date_selector(:<, value, relation, negated: negated)
-               when :last_after
+      when :last_after
                  apply_last_date_selector(:>=, value, relation, negated: negated)
-               when :last_before
+      when :last_before
                  apply_last_date_selector(:<, value, relation, negated: negated)
-               else
+      else
                  @warnings << "Unknown selector: #{key}"
                  relation
-               end
+      end
 
       result || relation
     end
@@ -153,14 +153,14 @@ module Search
     def build_text_search_condition(value, phrase: false)
       # Try to use FTS first, with ILIKE fallback
       # Check if title_tsv column exists
-      if Topic.column_names.include?('title_tsv')
+      if Topic.column_names.include?("title_tsv")
         # Use FTS - phraseto_tsquery for phrase matching, plainto_tsquery otherwise
         sanitized = sanitize_fts_query(value)
         tsquery_func = phrase ? "phraseto_tsquery" : "plainto_tsquery"
         title_fts = "topics.title_tsv @@ #{tsquery_func}('english', #{ActiveRecord::Base.connection.quote(sanitized)})"
 
         # Check if messages have body_tsv
-        if Message.column_names.include?('body_tsv')
+        if Message.column_names.include?("body_tsv")
           body_topic_ids = Message.where(
             "body_tsv @@ #{tsquery_func}('english', ?)", sanitized
           ).select(:topic_id)
@@ -270,7 +270,7 @@ module Search
 
     def build_body_condition_subquery(person_ids, body_value, quoted)
       # Find topics where any of the persons posted a message matching body
-      if Message.column_names.include?('body_tsv')
+      if Message.column_names.include?("body_tsv")
         sanitized = sanitize_fts_query(body_value)
         tsquery_func = quoted ? "phraseto_tsquery" : "plainto_tsquery"
         Message.where(sender_person_id: person_ids)
@@ -317,14 +317,14 @@ module Search
     def apply_title_selector(value, relation, negated:, quoted: false)
       return relation if value.blank?
 
-      condition = if Topic.column_names.include?('title_tsv')
+      condition = if Topic.column_names.include?("title_tsv")
         sanitized = sanitize_fts_query(value)
         # Use phraseto_tsquery for quoted values (phrase matching), plainto_tsquery otherwise
         tsquery_func = quoted ? "phraseto_tsquery" : "plainto_tsquery"
-        ["topics.title_tsv @@ #{tsquery_func}('english', ?)", sanitized]
+        [ "topics.title_tsv @@ #{tsquery_func}('english', ?)", sanitized ]
       else
         pattern = "%#{sanitize_like(value)}%"
-        ["topics.title ILIKE ?", pattern]
+        [ "topics.title ILIKE ?", pattern ]
       end
 
       if negated
@@ -337,7 +337,7 @@ module Search
     def apply_body_selector(value, relation, negated:, quoted: false)
       return relation if value.blank?
 
-      message_topic_ids = if Message.column_names.include?('body_tsv')
+      message_topic_ids = if Message.column_names.include?("body_tsv")
         sanitized = sanitize_fts_query(value)
         # Use phraseto_tsquery for quoted values (phrase matching), plainto_tsquery otherwise
         tsquery_func = quoted ? "phraseto_tsquery" : "plainto_tsquery"
@@ -392,7 +392,7 @@ module Search
 
     def apply_unread_for_users(user_ids, relation, negated:)
       # For team: topic is unread if NO team member has fully read
-      sanitized_ids = user_ids.map(&:to_i).join(',')
+      sanitized_ids = user_ids.map(&:to_i).join(",")
       fully_read_sql = <<~SQL.squish
         SELECT DISTINCT mrr.topic_id FROM message_read_ranges mrr
         JOIN topics t ON t.id = mrr.topic_id
@@ -443,7 +443,7 @@ module Search
     end
 
     def apply_read_for_users(user_ids, relation, negated:)
-      sanitized_ids = user_ids.map(&:to_i).join(',')
+      sanitized_ids = user_ids.map(&:to_i).join(",")
       sql = <<~SQL.squish
         topics.id IN (
           SELECT mrr.topic_id FROM message_read_ranges mrr
@@ -469,7 +469,7 @@ module Search
       return relation if user_ids.empty?
 
       # Topics partially read (some read, but not all)
-      sanitized_ids = user_ids.map(&:to_i).join(',')
+      sanitized_ids = user_ids.map(&:to_i).join(",")
       sql = <<~SQL.squish
         topics.id IN (
           SELECT mrr.topic_id FROM message_read_ranges mrr
@@ -542,7 +542,7 @@ module Search
     end
 
     def apply_new_for_users(user_ids, relation, negated:)
-      sanitized_ids = user_ids.map(&:to_i).join(',')
+      sanitized_ids = user_ids.map(&:to_i).join(",")
       # For team: topic is new if NO team member has any awareness or reads
       seen_sql = <<~SQL.squish
         SELECT DISTINCT topic_id FROM thread_awareness WHERE user_id IN (#{sanitized_ids})
@@ -618,7 +618,7 @@ module Search
       # Apply from: condition
       if from_cond
         from_value = from_cond[:value]
-        if from_value == 'me'
+        if from_value == "me"
           notes = notes.where(author_id: @user.id)
         else
           # Try to resolve as team or username
@@ -673,27 +673,27 @@ module Search
       end
 
       case normalized
-      when 'attachment'
-        topic_ids_subquery = Attachment.joins(:message).select('messages.topic_id').distinct
+      when "attachment"
+        topic_ids_subquery = Attachment.joins(:message).select("messages.topic_id").distinct
         negated ? relation.where.not(id: topic_ids_subquery) : relation.where(id: topic_ids_subquery)
-      when 'patch'
+      when "patch"
         topic_ids_subquery = Attachment.joins(:message)
           .where("attachments.file_name ILIKE ? OR attachments.file_name ILIKE ?", "%.patch", "%.diff")
-          .select('messages.topic_id').distinct
+          .select("messages.topic_id").distinct
         negated ? relation.where.not(id: topic_ids_subquery) : relation.where(id: topic_ids_subquery)
-      when 'contributor'
+      when "contributor"
         # Use denormalized count
         if negated
           relation.where("topics.contributor_participant_count = 0")
         else
           relation.where("topics.contributor_participant_count > 0")
         end
-      when 'committer'
-        committer_person_ids = ContributorMembership.where(contributor_type: 'committer').select(:person_id)
+      when "committer"
+        committer_person_ids = ContributorMembership.where(contributor_type: "committer").select(:person_id)
         topic_ids_subquery = TopicParticipant.where(person_id: committer_person_ids).select(:topic_id).distinct
         negated ? relation.where.not(id: topic_ids_subquery) : relation.where(id: topic_ids_subquery)
-      when 'core_team'
-        core_person_ids = ContributorMembership.where(contributor_type: 'core_team').select(:person_id)
+      when "core_team"
+        core_person_ids = ContributorMembership.where(contributor_type: "core_team").select(:person_id)
         topic_ids_subquery = TopicParticipant.where(person_id: core_person_ids).select(:topic_id).distinct
         negated ? relation.where.not(id: topic_ids_subquery) : relation.where(id: topic_ids_subquery)
       else
@@ -707,7 +707,7 @@ module Search
       base = Attachment.joins(:message)
 
       # For patches, filter by file extension
-      if has_type == 'patch'
+      if has_type == "patch"
         base = base.where("attachments.file_name ILIKE ? OR attachments.file_name ILIKE ?", "%.patch", "%.diff")
       end
 
@@ -735,14 +735,14 @@ module Search
       if count_cond
         op, num = parse_count_value(count_cond[:value])
         if num
-          base.group('messages.topic_id')
+          base.group("messages.topic_id")
               .having("COUNT(*) #{op} ?", num)
-              .select('messages.topic_id')
+              .select("messages.topic_id")
         else
-          base.select('messages.topic_id').distinct
+          base.select("messages.topic_id").distinct
         end
       else
-        base.select('messages.topic_id').distinct
+        base.select("messages.topic_id").distinct
       end
     end
 
@@ -758,12 +758,12 @@ module Search
       return relation unless number
 
       condition = case operator
-                  when '>' then ["topics.#{column} > ?", number]
-                  when '<' then ["topics.#{column} < ?", number]
-                  when '>=' then ["topics.#{column} >= ?", number]
-                  when '<=' then ["topics.#{column} <= ?", number]
-                  else ["topics.#{column} = ?", number]
-                  end
+      when ">" then [ "topics.#{column} > ?", number ]
+      when "<" then [ "topics.#{column} < ?", number ]
+      when ">=" then [ "topics.#{column} >= ?", number ]
+      when "<=" then [ "topics.#{column} <= ?", number ]
+      else [ "topics.#{column} = ?", number ]
+      end
 
       if negated
         relation.where.not(*condition)
@@ -774,9 +774,9 @@ module Search
 
     def parse_count_value(value)
       match = value.to_s.match(/\A(>=|<=|>|<)?(\d+)\z/)
-      return [nil, nil] unless match
+      return [ nil, nil ] unless match
 
-      [match[1] || '=', match[2].to_i]
+      [ match[1] || "=", match[2].to_i ]
     end
 
     # === Date Selectors ===

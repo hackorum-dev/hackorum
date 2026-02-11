@@ -1,4 +1,4 @@
-require_relative '../../lib/patch_parser'
+require_relative "../../lib/patch_parser"
 
 class PatchParsingService
   def initialize(attachment)
@@ -13,26 +13,26 @@ class PatchParsingService
     return unless patch_content.present?
 
     parser = PatchParser.new(
-      patch_content, 
+      patch_content,
       filename: @attachment.file_name
     ) do |file_info|
       save_file_to_database(file_info)
     end
-    
+
     parser.parse!
   end
 
   def extract_contrib_modules
     @attachment.patch_files.contrib_files.pluck(:filename).map do |filename|
-      filename.split('/')[1] # contrib/module_name/file.c -> module_name
+      filename.split("/")[1] # contrib/module_name/file.c -> module_name
     end.uniq.compact
   end
 
   def extract_backend_areas
     @attachment.patch_files.backend_files.pluck(:filename).map do |filename|
-      path_parts = filename.split('/')
+      path_parts = filename.split("/")
       # src/backend/area/subarea/file.c -> area/subarea
-      path_parts[2..-2]&.join('/') if path_parts.length > 3
+      path_parts[2..-2]&.join("/") if path_parts.length > 3
     end.uniq.compact
   end
 

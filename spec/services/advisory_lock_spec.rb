@@ -8,4 +8,3 @@ RSpec.describe AdvisoryLock, type: :service do
     expect(result).to eq(42)
   end
 end
-

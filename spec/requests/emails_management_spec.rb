@@ -81,7 +81,7 @@ RSpec.describe 'Emails management', type: :request do
 
     aliases = Alias.by_email('multi@example.com')
     expect(aliases.count).to eq(2)
-    expect(aliases.pluck(:user_id).uniq).to eq([user.id])
+    expect(aliases.pluck(:user_id).uniq).to eq([ user.id ])
     expect(aliases.where(verified_at: nil)).to be_empty
   end
 
@@ -101,7 +101,7 @@ RSpec.describe 'Emails management', type: :request do
 
     expect(response).to redirect_to(settings_account_path)
     expect(flash[:alert]).to match(/different user/)
-    expect(Alias.by_email('token-user@example.com').pluck(:user_id).uniq).to eq([token_user.id])
+    expect(Alias.by_email('token-user@example.com').pluck(:user_id).uniq).to eq([ token_user.id ])
   ensure
     token&.destroy
   end

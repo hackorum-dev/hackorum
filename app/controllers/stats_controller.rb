@@ -48,10 +48,10 @@ class StatsController < ApplicationController
       range: range_param,
       from: start_date,
       to: end_date,
-      intervals: intervals.as_json(except: [:id, :created_at, :updated_at]),
-      longevity_histogram: histogram.as_json(except: [:id, :created_at, :updated_at]),
-      retention_heatmap: retention.as_json(except: [:id, :created_at, :updated_at]),
-      retention_milestones: retention_milestones.as_json(except: [:id, :created_at, :updated_at])
+      intervals: intervals.as_json(except: [ :id, :created_at, :updated_at ]),
+      longevity_histogram: histogram.as_json(except: [ :id, :created_at, :updated_at ]),
+      retention_heatmap: retention.as_json(except: [ :id, :created_at, :updated_at ]),
+      retention_milestones: retention_milestones.as_json(except: [ :id, :created_at, :updated_at ])
     }
   end
 
@@ -60,13 +60,13 @@ class StatsController < ApplicationController
   def models_for(granularity)
     case granularity
     when "day"
-      [StatsDaily, StatsLongevityDaily]
+      [ StatsDaily, StatsLongevityDaily ]
     when "week"
-      [StatsWeekly, StatsLongevityWeekly]
+      [ StatsWeekly, StatsLongevityWeekly ]
     when "month"
-      [StatsMonthly, StatsLongevityMonthly]
+      [ StatsMonthly, StatsLongevityMonthly ]
     else
-      [StatsWeekly, StatsLongevityWeekly]
+      [ StatsWeekly, StatsLongevityWeekly ]
     end
   end
 

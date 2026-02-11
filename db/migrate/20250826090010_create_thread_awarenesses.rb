@@ -11,6 +11,6 @@ class CreateThreadAwarenesses < ActiveRecord::Migration[7.1]
       t.timestamps
     end
 
-    add_index :thread_awarenesses, [:user_id, :topic_id], unique: true
+    add_index :thread_awarenesses, [ :user_id, :topic_id ], unique: true
   end
 end

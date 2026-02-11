@@ -19,18 +19,18 @@ class EmailIngestor
       return existing_message
     end
 
-    import_log = ''
+    import_log = ""
 
     from = build_from_aliases(m, sent_at)
     to = create_users(m[:to], sent_at)
     cc = create_users(m[:cc], sent_at)
 
-    subject = m.subject || 'No title'
+    subject = m.subject || "No title"
 
     reply_to_msg, import_log = resolve_threading(m, reply_to_message_id, import_log)
     if fallback_threading && reply_to_msg.nil? && subject.present? && subject.match?(/\A\s*(re|aw|fwd):/i)
       reply_to_msg = fallback_thread_lookup(subject, message_id: message_id, references: m.references, sent_at: sent_at)
-      import_log = [import_log, "Resolved by subject fallback"].reject(&:blank?).join(" | ") if reply_to_msg
+      import_log = [ import_log, "Resolved by subject fallback" ].reject(&:blank?).join(" | ") if reply_to_msg
     end
 
     topic = reply_to_msg ? reply_to_msg.topic : Topic.create!(
@@ -39,7 +39,7 @@ class EmailIngestor
       title: subject,
       created_at: sent_at
     )
-    import_log = nil if import_log == ''
+    import_log = nil if import_log == ""
 
     msg = Message.create!(
       topic: topic,
@@ -94,17 +94,17 @@ class EmailIngestor
   def build_from_aliases(m, sent_at)
     if m.from.nil? || m.from[0].nil?
       name = m[:from].to_s.strip
-      name = 'Unknown User' if name.empty?
+      name = "Unknown User" if name.empty?
       email = "#{name.downcase.gsub(/[^a-z0-9]/, '_')}@unknown.user"
       person = Person.find_or_create_by_email(email)
-      [Alias.find_or_create_by(email: email, name: name) do |a|
+      [ Alias.find_or_create_by(email: email, name: name) do |a|
         a.created_at = sent_at
         a.person_id = person.id
-      end]
+      end ]
     else
       from = create_users(m[:from], sent_at, 1)
       if from.empty?
-        [Alias.find_or_create_by(email: 'unknown@unknown.user', name: 'Unknown User') { |a| a.created_at = sent_at }]
+        [ Alias.find_or_create_by(email: "unknown@unknown.user", name: "Unknown User") { |a| a.created_at = sent_at } ]
       else
         from
       end
@@ -146,7 +146,7 @@ class EmailIngestor
     if m.references && reply_to_msg.nil?
       references = m.references
       references = [] unless references
-      references = [references] if references.is_a?(String)
+      references = [ references ] if references.is_a?(String)
       references.each do |ref|
         reply_to_msg = Message.find_by_message_id(clean_reference(ref))
         break if reply_to_msg
@@ -154,7 +154,7 @@ class EmailIngestor
       end
     end
 
-    [reply_to_msg, import_log]
+    [ reply_to_msg, import_log ]
   end
 
   def extract_body(m)
@@ -168,7 +168,7 @@ class EmailIngestor
       end
     end
     normalized = body.to_s.dup
-    normalized.encode!('UTF-8', invalid: :replace, undef: :replace, replace: '?')
+    normalized.encode!("UTF-8", invalid: :replace, undef: :replace, replace: "?")
     normalized
   end
 
@@ -195,7 +195,7 @@ class EmailIngestor
       count += 1
       display_names = fields.respond_to?(:display_names) ? (fields.display_names || []) : []
       name_or_alias = display_names[idx]
-      name_or_alias = 'Noname' if name_or_alias.nil? || name_or_alias.empty?
+      name_or_alias = "Noname" if name_or_alias.nil? || name_or_alias.empty?
       email = addresses[idx]
       next if email.nil? || email.empty?
       person = Person.find_or_create_by_email(email)
@@ -212,7 +212,7 @@ class EmailIngestor
   end
 
   def lookup_main_part(parts, concat = false)
-    body = ''
+    body = ""
     parts.each do |p|
       if p.parts.size > 0
         body += lookup_main_part(p.parts)
@@ -237,8 +237,8 @@ class EmailIngestor
 
     # For persons with users, only fix if current default is Noname
     if person.user.present?
-      return unless person.default_alias&.name == 'Noname'
-      return if alias_record.name == 'Noname'
+      return unless person.default_alias&.name == "Noname"
+      return if alias_record.name == "Noname"
       person.update_columns(default_alias_id: alias_record.id)
       return
     end
@@ -253,7 +253,7 @@ class EmailIngestor
     end
 
     # If current is Noname and new one isn't, switch
-    if current.name == 'Noname' && alias_record.name != 'Noname'
+    if current.name == "Noname" && alias_record.name != "Noname"
       person.update_columns(default_alias_id: alias_record.id)
       return
     end
@@ -261,7 +261,7 @@ class EmailIngestor
     # If both are non-Noname, prefer higher sender_count
     # Note: sender_count may not be updated yet (counter_cache happens after commit)
     # So we compare by checking if current has any messages
-    if alias_record.name != 'Noname' && current.name != 'Noname'
+    if alias_record.name != "Noname" && current.name != "Noname"
       # Keep the one with more messages - current wins ties
       # Since counter isn't updated yet, reload to get accurate count
       current_count = current.sender_count
@@ -294,7 +294,7 @@ class EmailIngestor
 
     return nil if matched.empty?
 
-    target_ids = [message_id, *(references || [])].compact.map { |ref| clean_reference(ref) }.reject(&:blank?)
+    target_ids = [ message_id, *(references || []) ].compact.map { |ref| clean_reference(ref) }.reject(&:blank?)
     return matched.first if target_ids.empty?
 
     matched.find do |msg|
@@ -305,15 +305,15 @@ class EmailIngestor
 
   def normalize_subject_for_threading(subject)
     s = subject.to_s.downcase.strip
-    s = s.gsub(/\[[^\]]+\]\s*/, ' ')          # drop list tags like [HACKERS]
-    s = s.gsub(/(\s*(re|aw|fwd):\s*)+/i, ' ') # drop any re/aw/fwd prefixes wherever they appear
-    s = s.gsub(/\(fwd\)/i, ' ')               # drop inline fwd markers
-    s.squeeze(' ').strip
+    s = s.gsub(/\[[^\]]+\]\s*/, " ")          # drop list tags like [HACKERS]
+    s = s.gsub(/(\s*(re|aw|fwd):\s*)+/i, " ") # drop any re/aw/fwd prefixes wherever they appear
+    s = s.gsub(/\(fwd\)/i, " ")               # drop inline fwd markers
+    s.squeeze(" ").strip
   end
 
   def similarity(a, b)
     return 0.0 if a.blank? || b.blank?
-    max_len = [a.length, b.length].max
+    max_len = [ a.length, b.length ].max
     return 1.0 if max_len.zero?
     dist = a.levenshtein_distance(b)
     1.0 - (dist.to_f / max_len)
@@ -323,7 +323,7 @@ class EmailIngestor
 
   def add_mentions(msg, users)
     users.each do |usr|
-      next if usr.email.end_with?('postgresql.org')
+      next if usr.email.end_with?("postgresql.org")
       Mention.create!(message: msg, alias: usr, person_id: usr.person_id)
     end
   end
@@ -333,7 +333,7 @@ class EmailIngestor
 
     current_time_utc = Time.now.utc
     mail_date_utc = mail_date.utc
-    min_valid_date = Time.parse('1996-01-01 00:00:00 UTC')
+    min_valid_date = Time.parse("1996-01-01 00:00:00 UTC")
     future_tolerance = 24 * 3600
 
     if mail_date_utc >= min_valid_date && mail_date_utc <= current_time_utc + future_tolerance
@@ -355,7 +355,7 @@ class EmailIngestor
     end
 
     if sanitized_date.utc > current_time_utc + future_tolerance || sanitized_date.year < 1996
-      sanitized_date = Time.parse('2000-01-01 00:00:00 UTC')
+      sanitized_date = Time.parse("2000-01-01 00:00:00 UTC")
     end
 
     sanitized_date

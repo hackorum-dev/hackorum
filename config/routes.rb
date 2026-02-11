@@ -1,7 +1,7 @@
 Rails.application.routes.draw do
   namespace :admin do
     root "dashboard#show"
-    resources :users, only: [:index] do
+    resources :users, only: [ :index ] do
       member do
         post :toggle_admin
         get :new_email
@@ -9,15 +9,15 @@ Rails.application.routes.draw do
         post :add_email
       end
     end
-    resources :email_changes, only: [:index]
-    resources :imap_sync_states, only: [:index]
-    resources :topic_merges, only: [:index]
+    resources :email_changes, only: [ :index ]
+    resources :imap_sync_states, only: [ :index ]
+    resources :topic_merges, only: [ :index ]
     resources :topics, only: [] do
-      resource :merge, controller: 'topic_merges', only: [:new, :create] do
+      resource :merge, controller: "topic_merges", only: [ :new, :create ] do
         post :preview
       end
     end
-    resources :page_load_stats, only: [:index]
+    resources :page_load_stats, only: [ :index ]
     mount PgHero::Engine, at: "/pghero" if defined?(PgHero)
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
@@ -40,24 +40,24 @@ Rails.application.routes.draw do
   # Settings namespace
   namespace :settings do
     root "accounts#show"
-    resource :account, only: [:show]
-    resource :profile, only: [:show]
-    resource :password, only: [:show]
-    resource :import, only: [:show, :create]
-    resource :deletion, only: [:show, :create]
+    resource :account, only: [ :show ]
+    resource :profile, only: [ :show ]
+    resource :password, only: [ :show ]
+    resource :import, only: [ :show, :create ]
+    resource :deletion, only: [ :show, :create ]
 
-    resources :teams, only: [:index, :show, :create, :update, :destroy] do
-      resources :team_members, only: [:create, :update, :destroy]
+    resources :teams, only: [ :index, :show, :create, :update, :destroy ] do
+      resources :team_members, only: [ :create, :update, :destroy ]
     end
 
-    resource :username, only: [:update]
-    resource :preferences, only: [:update]
+    resource :username, only: [ :update ]
+    resource :preferences, only: [ :update ]
     patch "password/current", to: "passwords#update_current", as: :update_current_password
-    resources :emails, only: [:create, :destroy] do
+    resources :emails, only: [ :create, :destroy ] do
       post :primary, on: :member
     end
   end
-  resources :topics, only: [:index, :show] do
+  resources :topics, only: [ :index, :show ] do
     collection do
       get :search
       get :user_state_frame
@@ -74,11 +74,11 @@ Rails.application.routes.draw do
       get :latest_patchset
     end
   end
-  resources :activities, only: [:index] do
+  resources :activities, only: [ :index ] do
     post :mark_all_read, on: :collection
   end
-  resources :notes, only: [:create, :update, :destroy]
-  resources :note_mentions, only: [:destroy]
+  resources :notes, only: [ :create, :update, :destroy ]
+  resources :note_mentions, only: [ :destroy ]
   get "stats", to: "stats#show", as: :stats
   get "stats/data", to: "stats#data", as: :stats_data
 
@@ -88,7 +88,7 @@ Rails.application.routes.draw do
   get "reports/monthly/:year/:month", to: "reports#show", defaults: { period_type: "monthly" }, as: :monthly_report
 
   # Help pages
-  resources :help, only: [:index, :show], param: :slug
+  resources :help, only: [ :index, :show ], param: :slug
 
   # Script version endpoint
   get "scripts/:name/version", to: "scripts#version", as: :script_version
@@ -106,16 +106,16 @@ Rails.application.routes.draw do
   get "team/:name", to: "teams_profile#show", as: :team_profile
 
   # Authentication
-  resource :session, only: [:new, :create, :destroy]
-  resource :registration, only: [:new, :create]
-  get '/verify', to: 'verifications#show', as: :verification
-  resource :password, only: [:new, :create, :edit, :update]
+  resource :session, only: [ :new, :create, :destroy ]
+  resource :registration, only: [ :new, :create ]
+  get "/verify", to: "verifications#show", as: :verification
+  resource :password, only: [ :new, :create, :edit, :update ]
 
   # OmniAuth callbacks
-  get '/auth/:provider/callback', to: 'omniauth_callbacks#google_oauth2'
+  get "/auth/:provider/callback", to: "omniauth_callbacks#google_oauth2"
 
   post "messages/:id/read", to: "messages#read", as: :read_message
-  resources :attachments, only: [:show]
+  resources :attachments, only: [ :show ]
 
   if Rails.env.development?
     mount LetterOpenerWeb::Engine, at: "/letter_opener"

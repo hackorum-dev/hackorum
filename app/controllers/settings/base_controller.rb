@@ -3,7 +3,7 @@
 module Settings
   class BaseController < ApplicationController
     before_action :require_authentication
-    layout 'settings'
+    layout "settings"
 
     helper_method :active_settings_section
 

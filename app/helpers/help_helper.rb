@@ -2,7 +2,7 @@
 
 module HelpHelper
   def help_nav_link_class(slug)
-    classes = ["help-nav-link"]
+    classes = [ "help-nav-link" ]
     classes << "active" if active_help_section == slug
     classes.join(" ")
   end

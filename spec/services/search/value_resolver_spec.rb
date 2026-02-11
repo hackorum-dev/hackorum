@@ -12,7 +12,7 @@ RSpec.describe Search::ValueResolver, type: :service do
       it 'resolves to current user person_id' do
         result = resolver.resolve_author('me')
         expect(result.type).to eq(:persons)
-        expect(result.person_ids).to eq([person.id])
+        expect(result.person_ids).to eq([ person.id ])
         expect(result.warnings).to be_empty
       end
 
@@ -107,7 +107,7 @@ RSpec.describe Search::ValueResolver, type: :service do
       it 'resolves to current user_id' do
         result = resolver.resolve_state_subject('me')
         expect(result.type).to eq(:users)
-        expect(result.user_ids).to eq([user.id])
+        expect(result.user_ids).to eq([ user.id ])
       end
 
       it 'returns empty with warning when not signed in' do

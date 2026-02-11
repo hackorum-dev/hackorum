@@ -13,6 +13,6 @@ class AddUsernameAndNameReservations < ActiveRecord::Migration[7.1]
     end
 
     add_index :name_reservations, :name, unique: true
-    add_index :name_reservations, [:owner_type, :owner_id]
+    add_index :name_reservations, [ :owner_type, :owner_id ]
   end
 end

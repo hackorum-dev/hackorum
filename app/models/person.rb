@@ -2,24 +2,24 @@ class Person < ApplicationRecord
   has_one :user
   has_many :aliases
   has_many :contributor_memberships, dependent: :destroy
-  has_many :created_topics, class_name: 'Topic', foreign_key: 'creator_person_id'
-  has_many :sent_messages, class_name: 'Message', foreign_key: 'sender_person_id'
+  has_many :created_topics, class_name: "Topic", foreign_key: "creator_person_id"
+  has_many :sent_messages, class_name: "Message", foreign_key: "sender_person_id"
   has_many :mentions
   has_many :topic_participants
 
-  belongs_to :default_alias, class_name: 'Alias', optional: true
+  belongs_to :default_alias, class_name: "Alias", optional: true
 
   def display_name
     default_alias&.name || aliases.order(:created_at).first&.name || "Unknown"
   end
 
   CONTRIBUTOR_RANK = {
-    'core_team' => 1,
-    'committer' => 2,
-    'major_contributor' => 3,
-    'significant_contributor' => 4,
-    'past_major_contributor' => 5,
-    'past_significant_contributor' => 6
+    "core_team" => 1,
+    "committer" => 2,
+    "major_contributor" => 3,
+    "significant_contributor" => 4,
+    "past_major_contributor" => 5,
+    "past_significant_contributor" => 6
   }.freeze
 
   def contributor_membership_types
@@ -38,34 +38,34 @@ class Person < ApplicationRecord
 
   def contributor_badge
     case contributor_type
-    when 'core_team' then 'Core Team'
-    when 'committer' then 'Committer'
-    when 'major_contributor' then 'Major Contributor'
-    when 'significant_contributor' then 'Contributor'
-    when 'past_major_contributor' then 'Past Contributor'
-    when 'past_significant_contributor' then 'Past Contributor'
+    when "core_team" then "Core Team"
+    when "committer" then "Committer"
+    when "major_contributor" then "Major Contributor"
+    when "significant_contributor" then "Contributor"
+    when "past_major_contributor" then "Past Contributor"
+    when "past_significant_contributor" then "Past Contributor"
     end
   end
 
   def core_team?
-    contributor_membership_types.include?('core_team')
+    contributor_membership_types.include?("core_team")
   end
 
   def committer?
-    contributor_membership_types.include?('committer')
+    contributor_membership_types.include?("committer")
   end
 
   def major_contributor?
-    contributor_membership_types.include?('major_contributor')
+    contributor_membership_types.include?("major_contributor")
   end
 
   def significant_contributor?
-    contributor_membership_types.include?('significant_contributor')
+    contributor_membership_types.include?("significant_contributor")
   end
 
   def past_contributor?
     types = contributor_membership_types
-    types.include?('past_major_contributor') || types.include?('past_significant_contributor')
+    types.include?("past_major_contributor") || types.include?("past_significant_contributor")
   end
 
   def display_name
@@ -82,7 +82,7 @@ class Person < ApplicationRecord
 
   def self.attach_alias_group!(email, person:, user: nil)
     scope = Alias.by_email(email)
-    scope = scope.where(user_id: [nil, user.id]) if user
+    scope = scope.where(user_id: [ nil, user.id ]) if user
     scope.update_all(person_id: person.id)
   end
 
@@ -129,13 +129,13 @@ class Person < ApplicationRecord
 
     # First: non-Noname aliases that have sent messages, ordered by sender_count
     best_sender = candidates.with_sent_messages
-                            .where.not(name: 'Noname')
+                            .where.not(name: "Noname")
                             .order(sender_count: :desc)
                             .first
     return best_sender if best_sender
 
     # Second: any non-Noname alias (even mention-only)
-    non_noname = candidates.where.not(name: 'Noname').order(sender_count: :desc, created_at: :asc).first
+    non_noname = candidates.where.not(name: "Noname").order(sender_count: :desc, created_at: :asc).first
     return non_noname if non_noname
 
     # Third: Noname alias with highest sender_count (if they actually sent messages)

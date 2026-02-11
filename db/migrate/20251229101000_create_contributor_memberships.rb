@@ -7,7 +7,7 @@ class CreateContributorMemberships < ActiveRecord::Migration[8.0]
       t.timestamps
     end
 
-    add_index :contributor_memberships, [:person_id, :contributor_type], unique: true, name: 'index_contributor_memberships_unique'
+    add_index :contributor_memberships, [ :person_id, :contributor_type ], unique: true, name: 'index_contributor_memberships_unique'
     add_index :contributor_memberships, :contributor_type
   end
 end

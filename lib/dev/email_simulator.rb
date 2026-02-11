@@ -59,9 +59,9 @@ module Dev
     def pick_topic
       use_existing = rand < @existing_topic_prob
       existing_topic = Topic.joins(:messages).order("RANDOM()").first if use_existing
-      return [existing_topic, existing_topic&.messages&.order("RANDOM()")&.first] if existing_topic
+      return [ existing_topic, existing_topic&.messages&.order("RANDOM()")&.first ] if existing_topic
 
-      [nil, nil]
+      [ nil, nil ]
     end
 
     def subject_for(topic, reply_to)

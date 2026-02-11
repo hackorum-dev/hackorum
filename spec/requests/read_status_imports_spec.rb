@@ -17,7 +17,7 @@ RSpec.describe "Read status imports", type: :request do
   end
 
   def upload_csv(content)
-    file = Tempfile.new(["read-status", ".csv"])
+    file = Tempfile.new([ "read-status", ".csv" ])
     file.write(content)
     file.rewind
     Rack::Test::UploadedFile.new(file.path, "text/csv")

@@ -1,22 +1,22 @@
 # frozen_string_literal: true
 
-require 'net/imap'
+require "net/imap"
 
 module Imap
   # Thin wrapper around Net::IMAP for Gmail usage.
   # Provides connect/login/select, UID search/fetch, IDLE, and mark-seen helpers.
   class GmailClient
-    DEFAULT_HOST = 'imap.gmail.com'
+    DEFAULT_HOST = "imap.gmail.com"
     DEFAULT_PORT = 993
 
     attr_reader :host, :port, :ssl, :username, :password, :mailbox
 
-    def initialize(host: ENV['IMAP_HOST'] || DEFAULT_HOST,
-                   port: (ENV['IMAP_PORT'] || DEFAULT_PORT).to_i,
-                   ssl:  ENV.key?('IMAP_SSL') ? truthy?(ENV['IMAP_SSL']) : true,
-                   username: ENV['IMAP_USERNAME'],
-                   password: ENV['IMAP_PASSWORD'],
-                   mailbox:  ENV['IMAP_MAILBOX_LABEL'])
+    def initialize(host: ENV["IMAP_HOST"] || DEFAULT_HOST,
+                   port: (ENV["IMAP_PORT"] || DEFAULT_PORT).to_i,
+                   ssl:  ENV.key?("IMAP_SSL") ? truthy?(ENV["IMAP_SSL"]) : true,
+                   username: ENV["IMAP_USERNAME"],
+                   password: ENV["IMAP_PASSWORD"],
+                   mailbox:  ENV["IMAP_MAILBOX_LABEL"])
       @host = host
       @port = port
       @ssl = ssl
@@ -25,7 +25,7 @@ module Imap
       @mailbox = mailbox
       @imap = nil
       @selected = nil
-      if (@mailbox.nil? || @mailbox.to_s.strip.empty?)
+      if @mailbox.nil? || @mailbox.to_s.strip.empty?
         raise ArgumentError, "IMAP_MAILBOX_LABEL is required and must not be INBOX; configure a dedicated Gmail label for list mail"
       end
     end
@@ -73,44 +73,44 @@ module Imap
     def uid_search_greater_than(uid)
       ensure_imap!
       criteria = if uid.to_i > 0
-                   ["UID", "#{uid.to_i + 1}:*"]
-                 else
-                   ["ALL"]
-                 end
+                   [ "UID", "#{uid.to_i + 1}:*" ]
+      else
+                   [ "ALL" ]
+      end
       @imap.uid_search(criteria)
     end
 
     def uid_fetch_rfc822(uid)
       ensure_imap!
-      data = @imap.uid_fetch(uid, 'RFC822')
+      data = @imap.uid_fetch(uid, "RFC822")
       return nil if data.nil? || data.empty?
-      data.first.attr['RFC822']
+      data.first.attr["RFC822"]
     end
 
   def mark_seen(uid)
     ensure_imap!
-    @imap.uid_store(uid, '+FLAGS.SILENT', [:Seen])
+    @imap.uid_store(uid, "+FLAGS.SILENT", [ :Seen ])
     true
   end
 
   # Returns a sorted list of UIDs greater than the given UID, limited to a batch size.
   # Uses UID FETCH to avoid SEARCH parsing quirks and to keep requests bounded.
-  def uids_after(uid, batch_size: (ENV['IMAP_BATCH_SIZE'] || 200).to_i)
+  def uids_after(uid, batch_size: (ENV["IMAP_BATCH_SIZE"] || 200).to_i)
     ensure_imap!
     start = uid.to_i + 1
     last = max_uid
     return [] if last.nil? || last < start
-    finish = [last, start + batch_size - 1].min
-    data = @imap.uid_fetch("#{start}:#{finish}", ['UID'])
-    (data || []).map { |d| d.attr['UID'] }.compact.sort
+    finish = [ last, start + batch_size - 1 ].min
+    data = @imap.uid_fetch("#{start}:#{finish}", [ "UID" ])
+    (data || []).map { |d| d.attr["UID"] }.compact.sort
   end
 
   # Returns the highest UID in the selected mailbox/label, or 0 if empty
   def max_uid
     ensure_imap!
-    data = @imap.uid_fetch('*', ['UID'])
+    data = @imap.uid_fetch("*", [ "UID" ])
     return 0 if data.nil? || data.empty?
-    data.first.attr['UID']
+    data.first.attr["UID"]
   end
 
     # Performs a single IDLE cycle up to timeout seconds.
@@ -133,7 +133,7 @@ module Imap
           end
         else
           # Fallback: manual IDLE
-          @imap.send_command('IDLE')
+          @imap.send_command("IDLE")
           start_time = Time.now
           while (Time.now - start_time) < timeout
             resp = @imap.get_response
@@ -158,7 +158,7 @@ module Imap
     private
 
     def ensure_imap!
-      raise 'Not connected' unless @imap
+      raise "Not connected" unless @imap
     end
 
     def self.truthy?(v)

@@ -9,6 +9,6 @@ class CreateMessageMoves < ActiveRecord::Migration[8.0]
       t.timestamps
     end
 
-    add_index :message_moves, [:topic_merge_id, :message_id], unique: true
+    add_index :message_moves, [ :topic_merge_id, :message_id ], unique: true
   end
 end

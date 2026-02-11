@@ -17,7 +17,7 @@ puts "Found #{total} potential patch attachments to process..."
 
 patch_attachments.find_each(batch_size: 100) do |attachment|
   processed += 1
-  
+
   begin
     # Skip empty/blank attachments
     content = attachment.decoded_body
@@ -25,7 +25,7 @@ patch_attachments.find_each(batch_size: 100) do |attachment|
       puts "  [#{processed}/#{total}] Skipped #{attachment.file_name} (empty file)"
       next
     end
-    
+
     service = PatchParsingService.new(attachment)
     if attachment.patch?
       service.parse!

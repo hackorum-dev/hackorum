@@ -69,27 +69,27 @@ end
 
 def resolve_person_for(name)
   aliases = find_aliases_by_name(name)
-  return [nil, aliases] if aliases.empty?
+  return [ nil, aliases ] if aliases.empty?
 
   people = aliases.map(&:person).compact.uniq
-  return [people.first, aliases] if people.size == 1
+  return [ people.first, aliases ] if people.size == 1
 
   with_users, without_users = people.partition { |person| person.user.present? }
 
   if with_users.size > 1
     puts "  ⚠ #{name}: multiple user-owned people (#{with_users.map(&:id).join(', ')}), skipping"
-    return [nil, aliases]
+    return [ nil, aliases ]
   end
 
   if with_users.size == 1
     puts "  ⚠ #{name}: multiple people found, keeping user-owned person #{with_users.first.id}"
-    return [with_users.first, aliases]
+    return [ with_users.first, aliases ]
   end
 
   target = people.min_by(&:id)
-  merge_people!(target, people - [target])
+  merge_people!(target, people - [ target ])
   puts "  ↺ #{name}: merged #{people.size} people into #{target.id}"
-  [target, aliases]
+  [ target, aliases ]
 end
 
 def add_membership(person, contributor_type, name:, email: nil, company: nil, description: nil)
@@ -124,7 +124,7 @@ def parse_committers(doc)
   heading = doc.css('h2, h3').find { |node| normalize_whitespace(node.text) == 'Committers' }
   list = if heading
            heading.xpath('following-sibling::*').find { |node| node.name == 'ul' }
-         end
+  end
   list ||= doc.css('ul').find { |node| node['class'].to_s.include?('committers') }
 
   return [] unless list
@@ -143,7 +143,7 @@ def parse_contributor_cell(cell)
   end
   company = cell.css('a').first&.text&.strip
 
-  [name, email, company]
+  [ name, email, company ]
 end
 
 def parse_contributor_sections(doc)

@@ -12,6 +12,6 @@ class CreateMessageReadRanges < ActiveRecord::Migration[7.1]
       t.timestamps
     end
 
-    add_index :message_read_ranges, [:user_id, :topic_id, :range_start_message_id, :range_end_message_id], name: "index_message_read_ranges_on_user_topic_range"
+    add_index :message_read_ranges, [ :user_id, :topic_id, :range_start_message_id, :range_end_message_id ], name: "index_message_read_ranges_on_user_topic_range"
   end
 end

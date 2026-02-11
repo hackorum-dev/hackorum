@@ -4,7 +4,7 @@ require_relative "../lib/import_options"
 
 options = ImportOptions.parse!
 
-def create_users fields, created_at, limit = 0
+def create_users(fields, created_at, limit = 0)
   return [] unless fields
 
   # Some old mboxes have header fields without parsed addresses
@@ -39,7 +39,7 @@ def create_users fields, created_at, limit = 0
   users
 end
 
-def lookup_main_part parts, concat = false
+def lookup_main_part(parts, concat = false)
   body = ''
   parts.each do |p|
     if p.parts.size > 0
@@ -52,12 +52,12 @@ def lookup_main_part parts, concat = false
       body += p.decoded
     end
   end
-  return body
+  body
 end
 
 def clean_reference(ref)
-  return ref[/.*<([^>]*)/,1] if ref[0] == '<'
-  return ref
+  return ref[/.*<([^>]*)/, 1] if ref[0] == '<'
+  ref
 end
 
 def add_mentions(msg, users)
@@ -118,13 +118,12 @@ ARGV.each do |fn|
   puts "Processing #{fn}..."
   File.open(fn, "r") do |f|
     f.each_line do |line|
-
       # Some old lines contain illegal characters
-      line = line.encode("utf-8", :invalid => :replace)
+      line = line.encode("utf-8", invalid: :replace)
 
       # all new messages refer to lists.postgresql.org, but not old emails
       # And we can't simply check for From, as it also matches inline attachments containing git diffs
-      if (line.match(/^From [^@]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+/i))
+      if line.match(/^From [^@]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+/i)
         parse_message(message, update_existing: update_existing) unless message.empty?
         message = ""
       else
