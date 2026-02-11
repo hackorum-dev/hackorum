@@ -14,7 +14,7 @@
         .activity-time title=absolute_time_display(topic.last_message_at) = smart_time_display(topic.last_message_at)
     td.topic-participants data-label="Participants"
       - participants = top_participants.map { |tp| { alias: tp.person.default_alias, person: tp.person, message_count: tp.message_count, last_at: tp.last_message_at } }
-      = render partial: "avatar_list", locals: { participants: participants, total_participants: topic.participant_count }
+      = avatar_list_html(participants: participants, total_participants: topic.participant_count)
       - if topic.contributor_participant_count.positive?
         - contributor_data = contributor_participants.map { |tp| { alias: tp.person.default_alias, person: tp.person, message_count: tp.message_count, last_at: tp.last_message_at } }
         div class="topic-icon activity-#{topic.highest_contributor_type || 'contributor'}" data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
@@ -23,5 +23,5 @@
           - if contributor_data.any?
             .topic-icon-hover data-hover-popover-target="popover" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
               - contributor_data.each do |participant|
-                = render partial: "participant_row", locals: { participant: participant, avatar_size: 32 }
-      = render partial: "topics/participation_icon", locals: { topic: topic, participation: {} }
+                = participant_row_html(participant: participant, avatar_size: 32)
+      = participation_icon_html(topic: topic, participation: {})

@@ -64,7 +64,7 @@
           .participants-list
             - max_participants = 12
             - @participants.first(max_participants).each do |participant|
-              = render partial: "participant_row", locals: { participant: participant, avatar_size: 40 }
+              = participant_row_html(participant: participant, avatar_size: 40)
             - if @participants.size > max_participants
               .participant-more "+ #{(@participants.size - max_participants)} more"
         - else
