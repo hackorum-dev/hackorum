@@ -13,12 +13,14 @@ export default class extends Controller {
   show() {
     this._clearTimeout()
     this.element.classList.add("is-open")
+    this._updateRowOpenState()
   }
 
   scheduleHide() {
     this._clearTimeout()
     this.hideTimeout = setTimeout(() => {
       this.element.classList.remove("is-open")
+      this._updateRowOpenState()
     }, this.delay)
   }
 
@@ -27,5 +29,13 @@ export default class extends Controller {
       clearTimeout(this.hideTimeout)
       this.hideTimeout = null
     }
+  }
+
+  _updateRowOpenState() {
+    const row = this.element.closest(".topic-row")
+    if (!row) return
+
+    const hasOpenPopover = row.querySelector(".topic-icon.is-open")
+    row.classList.toggle("is-popover-open", Boolean(hasOpenPopover))
   }
 }

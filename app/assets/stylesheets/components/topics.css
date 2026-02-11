@@ -293,6 +293,11 @@ a.topic-icon {
   }
 }
 
+.topic-row.is-popover-open {
+  position: relative;
+  z-index: 5;
+}
+
 .topic-row.topic-new,
 .topic-row.topic-reading {
   background: var(--color-bg-unread);
