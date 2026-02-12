@@ -194,6 +194,8 @@ class TopicsController < ApplicationController
 
   def search
     @search_query = params[:q].to_s.strip
+    @viewing_since = viewing_since_param
+    @new_topics_count = 0
 
     if @search_query.blank?
       respond_to do |format|

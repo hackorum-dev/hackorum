@@ -14,6 +14,15 @@ RSpec.describe Search::QueryParser, type: :service do
         expect(result[:negated]).to be false
       end
 
+      it 'parses bracketed text as plain text' do
+        result = parser.parse('[proposal] plan')
+        expect(result[:type]).to eq(:and)
+        expect(result[:children].size).to eq(2)
+        expect(result[:children][0][:type]).to eq(:text)
+        expect(result[:children][0][:value]).to eq('[proposal]')
+        expect(result[:children][1][:value]).to eq('plan')
+      end
+
       it 'parses multiple words as implicit AND' do
         result = parser.parse('postgresql vacuum')
         expect(result[:type]).to eq(:and)

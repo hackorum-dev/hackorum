@@ -27,6 +27,11 @@ module Search
         (word_char >> (word_char | str(':') >> word_char.present?).repeat).as(:word)
       end
 
+      # Bracketed text (treated as plain text, not dependent conditions)
+      rule(:bracketed_text) do
+        str('[') >> (str(']').absent? >> any).repeat.as(:bracketed_content) >> str(']')
+      end
+
       # Selector keywords - IMPORTANT: longer strings must come before shorter prefixes
       # e.g., "reading" before "read", "messages_after" before "messages"
       rule(:selector_key) do
@@ -99,6 +104,7 @@ module Search
       rule(:atom) do
         selector.as(:selector) |
         grouped |
+        bracketed_text.as(:bracketed_text) |
         double_quoted.as(:quoted_text) |
         word.as(:plain_text)
       end
@@ -153,6 +159,14 @@ module Search
       # Quoted text node
       rule(quoted_text: { quoted_content: simple(:c) }) do
         { type: :text, value: c.to_s, negated: false, quoted: true }
+      end
+
+      # Bracketed text node
+      rule(bracketed_text: { bracketed_content: simple(:c) }) do
+        { type: :text, value: "[#{c}]", negated: false, quoted: false }
+      end
+      rule(bracketed_text: { bracketed_content: sequence(:c) }) do
+        { type: :text, value: "[#{c.map(&:to_s).join}]", negated: false, quoted: false }
       end
 
       # Selector with value and optional conditions
