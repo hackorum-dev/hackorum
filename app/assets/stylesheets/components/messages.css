@@ -252,6 +252,35 @@
     color: var(--color-text-secondary);
     font-weight: var(--font-weight-semibold);
   }
+
+  & code.diff-highlighted {
+    display: block;
+  }
+
+  & .diff-line {
+    display: block;
+    padding: 0 var(--spacing-2);
+    margin: 0 calc(-1 * var(--spacing-2));
+  }
+
+  & .diff-line-add {
+    background: var(--color-success-soft);
+    color: var(--color-success);
+  }
+
+  & .diff-line-del {
+    background: var(--color-danger-soft);
+    color: var(--color-danger);
+  }
+
+  & .diff-line-hunk {
+    background: var(--color-info-soft);
+    color: var(--color-info);
+  }
+
+  & .diff-line-header {
+    color: var(--color-text-muted);
+  }
 }
 
 .attachment {
@@ -284,6 +313,24 @@ summary.attachment-info {
   font-size: var(--font-size-xs);
   color: var(--color-text-link);
   text-decoration: none;
+}
+
+.patchset-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin-left: var(--spacing-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.patchset-added {
+  color: var(--color-success);
+}
+
+.patchset-removed {
+  color: var(--color-danger);
 }
 
 .attachment-download:hover {

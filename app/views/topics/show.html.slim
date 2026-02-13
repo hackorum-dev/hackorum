@@ -75,10 +75,14 @@
       summary.sidebar-heading Attachments
       .sidebar-section
         - if @has_patches
-          .download-patchset style="margin-bottom: 1rem;"
+          .download-patchset
             = link_to latest_patchset_topic_path(@topic), class: "button download-button", download: "topic-#{@topic.id}-patchset.tar.gz", data: { turbo: false } do
               i.fas.fa-download
               span Download Latest Patchset
+            - if @latest_patchset_stats
+              .patchset-stats aria-label="Patchset line changes" title="Lines added and removed by this patchset"
+                span.patchset-added +#{@latest_patchset_stats[:added]}
+                span.patchset-removed -#{@latest_patchset_stats[:removed]}
 
         - if attachment_messages.any?
           ul.attachments-list

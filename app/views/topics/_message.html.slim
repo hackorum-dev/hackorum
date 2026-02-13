@@ -72,8 +72,13 @@
                   span.filename = attachment.file_name
                   span.content-type = attachment.content_type if attachment.content_type
                   = link_to "Download", attachment_path(attachment), class: "attachment-download", download: attachment.file_name, data: { turbo: false }
+                  - stats = attachment.diff_line_stats
+                  - if stats[:added].positive? || stats[:removed].positive?
+                    span.patchset-stats aria-label="Patch line changes" title="Lines added and removed by this patch"
+                      span.patchset-added +#{stats[:added]}
+                      span.patchset-removed -#{stats[:removed]}
               pre.attachment-content
-                code.language-diff
+                code.language-diff data-controller="diff-highlight"
                   = attachment.decoded_body_utf8
           - else
             .attachment

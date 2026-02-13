@@ -65,6 +65,19 @@ class TopicsController < ApplicationController
     end
 
     @has_patches = @messages.any? { |msg| msg.attachments.any?(&:patch_extension?) }
+    if @has_patches
+      latest_message = latest_patchset_message
+      if latest_message
+        patch_attachments = latest_message.attachments.select(&:patch?)
+        totals = patch_attachments.reduce({ added: 0, removed: 0 }) do |acc, attachment|
+          stats = attachment.diff_line_stats
+          acc[:added] += stats[:added]
+          acc[:removed] += stats[:removed]
+          acc
+        end
+        @latest_patchset_stats = totals
+      end
+    end
   end
 
   def aware
@@ -137,11 +150,7 @@ class TopicsController < ApplicationController
   end
 
   def latest_patchset
-    latest_message = @topic.messages
-                           .where(id: Attachment.where(message_id: @topic.messages.select(:id))
-                                                .select(:message_id))
-                           .order(created_at: :desc)
-                           .find { |msg| msg.attachments.any?(&:patch_extension?) }
+    latest_message = latest_patchset_message
 
     return head :not_found unless latest_message
 
@@ -302,6 +311,14 @@ class TopicsController < ApplicationController
   end
 
   private
+
+  def latest_patchset_message
+    @latest_patchset_message ||= @topic.messages
+      .where(id: Attachment.where(message_id: @topic.messages.select(:id))
+                           .select(:message_id))
+      .order(created_at: :desc)
+      .find { |msg| msg.attachments.any?(&:patch_extension?) }
+  end
 
   def set_topic
     @topic = Topic.includes(

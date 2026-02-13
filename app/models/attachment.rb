@@ -28,6 +28,34 @@ class Attachment < ApplicationRecord
     raw.encode("UTF-8", invalid: :replace, undef: :replace, replace: "\uFFFD")
   end
 
+  def diff_line_stats
+    return { added: 0, removed: 0 } unless patch?
+    return @diff_line_stats if defined?(@diff_line_stats)
+
+    text = decoded_body_utf8
+    return @diff_line_stats = { added: 0, removed: 0 } unless text.present?
+
+    added = 0
+    removed = 0
+
+    text.each_line do |line|
+      if line.start_with?("+") && !line.start_with?("+++")
+        added += 1
+      elsif line.start_with?("-") && !line.start_with?("---")
+        removed += 1
+      elsif line.start_with?("> ")
+        added += 1
+      elsif line.start_with?("< ")
+        removed += 1
+      elsif line.start_with?("! ")
+        added += 1
+        removed += 1
+      end
+    end
+
+    @diff_line_stats = { added: added, removed: removed }
+  end
+
   private
 
   def patch_content?

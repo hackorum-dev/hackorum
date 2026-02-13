@@ -176,6 +176,31 @@
   margin: var(--spacing-3) 0;
 }
 
+.sidebar .download-patchset {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-4);
+}
+
+.sidebar .patchset-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.sidebar .patchset-added {
+  color: var(--color-success);
+}
+
+.sidebar .patchset-removed {
+  color: var(--color-danger);
+}
+
 .sidebar .attachments-list li + li {
   margin-top: var(--spacing-2);
 }
