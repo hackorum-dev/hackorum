@@ -8,6 +8,9 @@
   border-radius: var(--border-radius-lg);
   padding: var(--spacing-6);
   margin-bottom: var(--spacing-6);
+  margin-left: var(--spacing-4);
+  margin-right: var(--spacing-4);
+  margin-top: var(--spacing-4);
 }
 
 .topic-title-section {

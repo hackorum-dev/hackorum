@@ -1,4 +1,5 @@
 .sidebar {
+  margin-left: var(--spacing-3);
   position: sticky;
   top: calc(var(--nav-height) + var(--spacing-5));
   align-self: start;
