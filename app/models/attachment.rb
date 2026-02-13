@@ -5,6 +5,25 @@ class Attachment < ApplicationRecord
   after_create :mark_topic_has_attachments
   after_destroy :update_topic_has_attachments
 
+  # This list is in no way comprehensive. It can be extended as needed.
+  TEXT_APPLICATION_TYPES = %w[
+    application/json
+    application/sql
+    application/x-perl
+    application/x-python
+    application/x-ruby
+    application/x-sh
+    application/x-shellscript
+    application/xml
+    application/yaml
+  ].freeze
+
+  def text?
+    return true if content_type&.start_with?("text/")
+    return true if content_type&.end_with?("+xml", "+json")
+    TEXT_APPLICATION_TYPES.include?(content_type)
+  end
+
   def patch?
     patch_extension? || patch_content?
   end
