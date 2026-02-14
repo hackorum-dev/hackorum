@@ -275,7 +275,7 @@
   background: var(--color-bg-icon);
 }
 
-.reports-ranking-entry.is-top-three {
+.reports-ranking-entry:not(.is-top-three) {
   background: var(--color-primary-50);
 }
 
@@ -297,8 +297,7 @@
 }
 
 .reports-ranking-entry.is-top-three .reports-ranking-rank {
-  background: var(--color-primary);
-  color: white;
+  background: var(--color-primary-1);
 }
 
 .reports-ranking-person {
