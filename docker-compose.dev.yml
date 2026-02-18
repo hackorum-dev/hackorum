@@ -31,7 +31,7 @@ services:
       RAILS_ENV: ${RAILS_ENV:-development}
       NODE_ENV: ${NODE_ENV:-development}
       HOST: 0.0.0.0
-      PORT: 3000
+      PORT: ${PORT:-3000}
       DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-hackorum}:${POSTGRES_PASSWORD:-hackorum}@db:5432/${POSTGRES_DB:-hackorum_development}}
       PGHOST: db
       PGPORT: 5432
@@ -45,7 +45,7 @@ services:
       - bundle:/usr/local/bundle
       - node_modules:/app/node_modules
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:${PORT:-3000}"
     depends_on:
       db:
         condition: service_healthy
