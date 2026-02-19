@@ -234,4 +234,22 @@ module TopicsHelper
       topic_path(topic)
     end
   end
+
+  def topic_filter_labels
+    {
+      "no_contrib_replies"   => "No contributor/committer replies",
+      "patch_no_replies"     => "Patch, no replies",
+      "reading_incomplete"   => "Reading in progress",
+      "new_for_me"           => "New for me",
+      "started_by_me"        => "Started by me",
+      "messaged_by_me"       => "I posted here",
+      "starred_by_me"        => "Starred by me",
+      "starred_by_team"      => "Starred by team",
+      "team_unread"          => "Not yet read by team",
+      "team_reading_others"  => "Teammates reading",
+      "team_reading_any"     => "Team reading",
+      "team_started"         => "Started by team",
+      "team_messaged"        => "Team messages"
+    }
+  end
 end

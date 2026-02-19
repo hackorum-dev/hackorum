@@ -1,5 +1,14 @@
 - topic_participants_map ||= @topic_participants_map || {}
 
+- if topics.empty?
+  tr.topic-empty-row
+    td colspan=3
+      .topics-empty-state
+        i.fa-regular.fa-folder-open aria-hidden="true"
+        p No topics match this filter.
+        - if params[:filter].present? || params[:note_tag].present?
+          = link_to "Clear filters", topics_path, class: "topics-empty-clear"
+
 - topics.each do |topic|
   - tp_data = topic_participants_map[topic.id] || {}
   - top_participants = tp_data[:top] || []

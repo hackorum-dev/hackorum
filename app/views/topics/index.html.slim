@@ -1,11 +1,17 @@
 - cache_block = lambda do
+  - if params[:filter].present?
+    = link_to topics_path(note_tag: params[:note_tag]), class: "topics-filter-chip" do
+      i.fa-solid.fa-filter aria-hidden="true"
+      span = topic_filter_labels[params[:filter]] || params[:filter].humanize
+      i.fa-solid.fa-xmark.topics-filter-chip-close aria-hidden="true"
+  - elsif params[:note_tag].present?
+    = link_to topics_path, class: "topics-filter-chip" do
+      i.fa-solid.fa-tag aria-hidden="true"
+      span = "##{params[:note_tag]}"
+      i.fa-solid.fa-xmark.topics-filter-chip-close aria-hidden="true"
+
   #new-topics-banner data-controller="new-topics-banner" data-new-topics-banner-url-value=new_topics_count_topics_path(viewing_since: @viewing_since.iso8601, filter: params[:filter], team_id: params[:team_id]) data-new-topics-banner-interval-ms-value="180000"
     = render partial: "new_topics_banner", locals: { count: @new_topics_count, viewing_since: @viewing_since }
-
-  - if @active_note_tag.present?
-    .tag-filter-banner
-      span Filtering by ##{@active_note_tag}
-      = link_to "Clear", topics_path, class: "clear-tag-filter"
 
   .topics-table
     table
