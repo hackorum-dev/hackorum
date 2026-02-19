@@ -92,6 +92,7 @@ html data-theme="light"
               span.nav-badge = unread
         .nav-menu
           .nav-links
+            = link_to "Topics", topics_path, class: "nav-link"
             - search_link = content_for?(:search_sidebar) ? "#search" : topics_path(anchor: "search")
             = link_to "Search", search_link, class: "nav-link"
             = link_to "Reports", reports_path, class: "nav-link"
