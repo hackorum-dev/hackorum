@@ -139,8 +139,6 @@
   padding: var(--spacing-4);
   border: none;
   border-radius: 999px;
-  background: #d9480f;
-  color: #ffffff;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
@@ -149,6 +147,7 @@
 
 .session-submit:hover {
   background: #bf3f0c;
+  color: #ffffff;
   box-shadow: var(--shadow-sm);
   transform: translateY(-1px);
 }
