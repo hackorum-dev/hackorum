@@ -134,11 +134,13 @@ html data-theme="light"
         main.container
           - flash.each do |type, message|
             .flash class=type
+              = flash_icon(type)
               = message
           = yield
     - else
       main.container
         - flash.each do |type, message|
           .flash class=type
+            = flash_icon(type)
             = message
         = yield

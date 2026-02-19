@@ -116,4 +116,16 @@ module ApplicationHelper
       false
     end
   end
+
+  def flash_icon(type)
+    icon_class = case type.to_s
+    when "alert"   then "fa-solid fa-triangle-exclamation"
+    when "notice"  then "fa-solid fa-check"
+    when "warning" then "fa-solid fa-circle-exclamation"
+    when "info"    then "fa-solid fa-circle-info"
+    end
+    return unless icon_class
+
+    content_tag(:i, "", class: icon_class, aria: { hidden: "true" })
+  end
 end
