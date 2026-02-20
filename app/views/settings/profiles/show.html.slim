@@ -25,6 +25,23 @@
           span Dark
 
   .settings-section
+    h2 Text Density
+    p.settings-hint Choose your preferred text size and spacing.
+    .density-choice data-controller="density"
+      span.density-choice-label Density
+      .density-choice-buttons
+        button.density-choice-button type="button" data-density-value="tiny" data-density-target="button" data-action="click->density#select"
+          span Tiny
+        button.density-choice-button type="button" data-density-value="compact" data-density-target="button" data-action="click->density#select"
+          span Compact
+        button.density-choice-button type="button" data-density-value="default" data-density-target="button" data-action="click->density#select"
+          span Default
+        button.density-choice-button type="button" data-density-value="comfortable" data-density-target="button" data-action="click->density#select"
+          span Comfortable
+        button.density-choice-button type="button" data-density-value="spacious" data-density-target="button" data-action="click->density#select"
+          span Spacious
+
+  .settings-section
     h2 Mention Settings
     p.settings-hint Control who can @mention you in notes.
     = form_with model: current_user, url: settings_preferences_path, method: :patch, local: true do |f|

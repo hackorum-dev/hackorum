@@ -124,7 +124,8 @@
   border-color: var(--color-border);
 }
 
-.theme-choice {
+.theme-choice,
+.density-choice {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -135,18 +136,21 @@
   border: var(--border-width) solid var(--color-border);
 }
 
-.theme-choice-label {
+.theme-choice-label,
+.density-choice-label {
   font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
 }
 
-.theme-choice-buttons {
+.theme-choice-buttons,
+.density-choice-buttons {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-2);
 }
 
-.theme-choice-button {
+.theme-choice-button,
+.density-choice-button {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-2);
@@ -159,19 +163,22 @@
   transition: background-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
 
-.theme-choice-button:hover {
+.theme-choice-button:hover,
+.density-choice-button:hover {
   background: var(--color-bg-hover);
   box-shadow: var(--shadow-sm);
   transform: translateY(-1px);
 }
 
-.theme-choice-button.is-active {
+.theme-choice-button.is-active,
+.density-choice-button.is-active {
   background: var(--color-bg-button);
   color: var(--color-text-button);
   border-color: transparent;
 }
 
-.theme-choice-button.is-active i {
+.theme-choice-button.is-active i,
+.density-choice-button.is-active i {
   color: currentColor;
 }
 

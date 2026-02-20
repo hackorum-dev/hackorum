@@ -1,5 +1,5 @@
 doctype html
-html data-theme="light"
+html data-theme="light" data-density="default"
   head
     title = meta_title
     meta[name="description" content=meta_description]
@@ -30,6 +30,10 @@ html data-theme="light"
           var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
           var theme = stored || (prefersDark ? 'dark' : 'light');
           document.documentElement.dataset.theme = theme;
+          var densityKey = 'hackorum-density';
+          var validDensities = ['tiny', 'compact', 'default', 'comfortable', 'spacious'];
+          var storedDensity = window.localStorage.getItem(densityKey);
+          document.documentElement.dataset.density = validDensities.includes(storedDensity) ? storedDensity : 'default';
         })();
     = stylesheet_link_tag "application", "data-turbo-track": "reload"
     = javascript_importmap_tags
@@ -37,7 +41,7 @@ html data-theme="light"
     - if ENV["UMAMI_WEBSITE_ID"].present?
       - umami_host = ENV["UMAMI_HOST"].presence || "https://umami.hackorum.dev"
       script[async defer data-website-id=ENV["UMAMI_WEBSITE_ID"] src="#{umami_host}/script.js"]
-  body class=(content_for?(:sidebar) ? "has-sidebar" : nil) data-controller="sidebar swipe-nav"
+  body class=(content_for?(:sidebar) ? "has-sidebar" : nil) data-controller="sidebar swipe-nav density"
     - if user_signed_in? && current_user.username.blank?
       .global-warning
         span Please set a username in Settings.
