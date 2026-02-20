@@ -67,3 +67,9 @@ sim-email-once: ## Send a single simulated email (env: SENT_OFFSET_SECONDS, EXIS
 
 sim-email-stream: ## Start a continuous simulated email stream (env: MIN_INTERVAL_SECONDS, MAX_INTERVAL_SECONDS, EXISTING_ALIAS_PROB, EXISTING_TOPIC_PROB)
 	$(COMPOSE) exec web ruby script/simulate_email_stream.rb
+
+rubocop: ## Run rubocop
+	$(COMPOSE) exec web bundle exec rubocop
+
+brakeman: ## Run brakeman
+	$(COMPOSE) exec web bin/brakeman
