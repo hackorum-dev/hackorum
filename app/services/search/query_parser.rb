@@ -44,7 +44,7 @@ module Search
           str("contributors") | str("participants") | str("messages") |
           str("unread") | str("reading") | str("read") | str("new") |
           str("starred") | str("notes") | str("tag") |
-          str("has")
+          str("has") | str("commitfest")
         ).as(:selector_key)
       end
 
@@ -60,7 +60,7 @@ module Search
           str("first_after") | str("first_before") |
           str("added_after") | str("added_before") |
           str("messages") | str("count") | str("from") |
-          str("body") | str("name")
+          str("body") | str("name") | str("status") | str("tag")
         ).as(:condition_key)
       end
 

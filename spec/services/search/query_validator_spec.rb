@@ -145,6 +145,42 @@ RSpec.describe Search::QueryValidator, type: :service do
       end
     end
 
+    context 'with valid commitfest: selector' do
+      it 'passes valid commitfest name' do
+        ast = parser.parse('commitfest:PG19-Final')
+        result = described_class.new(ast).validate
+        expect(result.warnings).to be_empty
+        expect(result.ast[:key]).to eq(:commitfest)
+      end
+
+      it 'passes commitfest name with status: condition' do
+        ast = parser.parse('commitfest:PG19-Final[status:commited]')
+        result = described_class.new(ast).validate
+        expect(result.warnings).to be_empty
+        expect(result.ast[:conditions].size).to eq(1)
+      end
+
+      it 'passes commitfest name with tag: condition' do
+        ast = parser.parse('commitfest:PG19-Final[tag:commited]')
+        result = described_class.new(ast).validate
+        expect(result.warnings).to be_empty
+        expect(result.ast[:conditions].size).to eq(1)
+      end
+
+      it 'passes commitfest with multiple conditions' do
+        ast = parser.parse('commitfest:PG19-Draft[status:in_progress, tag:bugfix]')
+        result = described_class.new(ast).validate
+        expect(result.warnings).to be_empty
+        expect(result.ast[:conditions].size).to eq(2)
+      end
+
+      it 'warns on invalid condition for commitfest selector' do
+        ast = parser.parse('commitfest:[messages:>=10]')
+        result = described_class.new(ast).validate
+        expect(result.warnings).to include(/not valid for 'commitfest:'/i)
+      end
+    end
+
     context 'with compound expressions' do
       it 'validates children of AND expressions' do
         ast = parser.parse('from:john first_after:invalid')

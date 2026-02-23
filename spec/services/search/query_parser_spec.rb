@@ -113,6 +113,31 @@ RSpec.describe Search::QueryParser, type: :service do
         expect(result[:value]).to eq('')
         expect(result[:conditions].size).to eq(1)
       end
+
+      it 'parses commitfest: selector' do
+        result = parser.parse('commitfest:PG19-Final')
+        expect(result[:type]).to eq(:selector)
+        expect(result[:key]).to eq(:commitfest)
+        expect(result[:value]).to eq('PG19-Final')
+      end
+
+      it 'parses commitfest: selector with status: condition' do
+        result = parser.parse('commitfest:PG19-Draft[status:commited]')
+        expect(result[:type]).to eq(:selector)
+        expect(result[:key]).to eq(:commitfest)
+        expect(result[:value]).to eq('PG19-Draft')
+        expect(result[:conditions].size).to eq(1)
+        expect(result[:conditions][0][:key]).to eq(:status)
+        expect(result[:conditions][0][:value]).to eq('commited')
+      end
+
+      it 'parses commitfest: selector with empty value and from: condition' do
+        result = parser.parse('commitfest:[tag:bugfix]')
+        expect(result[:type]).to eq(:selector)
+        expect(result[:key]).to eq(:commitfest)
+        expect(result[:value]).to eq('')
+        expect(result[:conditions].size).to eq(1)
+      end
     end
 
     context 'with negation' do

@@ -22,10 +22,13 @@ module Search
 
     TAG_SELECTORS = %i[tag].freeze
 
-    ALL_SELECTORS = (DATE_SELECTORS + COUNT_SELECTORS + AUTHOR_SELECTORS +
-                     STATE_SELECTORS + CONTENT_SELECTORS + TAG_SELECTORS + [ :has ]).freeze
+    COMMITFEST_SELECTORS = %i[commitfest]
 
-    HAS_VALUES = %w[attachment patch contributor committer core_team].freeze
+    ALL_SELECTORS = (DATE_SELECTORS + COUNT_SELECTORS + AUTHOR_SELECTORS +
+                     STATE_SELECTORS + CONTENT_SELECTORS + TAG_SELECTORS +
+                     COMMITFEST_SELECTORS + [ :has ]).freeze
+
+    HAS_VALUES = %w[attachment patch contributor committer core_team commitfest].freeze
 
     # Valid sub-conditions for each parent selector
     VALID_SUB_CONDITIONS = {
@@ -34,7 +37,8 @@ module Search
         attachment: %i[from count name],
         patch: %i[from count]
       },
-      tag: %i[from added_before added_after]
+      tag: %i[from added_before added_after],
+      commitfest: %i[name status tag]
     }.freeze
 
     # Sub-condition keywords that require date values
@@ -104,6 +108,8 @@ module Search
                     validate_content_selector(node)
       when *TAG_SELECTORS
                     validate_tag_selector(node)
+      when *COMMITFEST_SELECTORS
+                    validate_commitfest_selector(node)
       when :has
                     validate_has_selector(node)
       else
@@ -123,8 +129,8 @@ module Search
     end
 
     def supports_empty_value_with_conditions?(key, conditions)
-      # tag: can have empty value with conditions (e.g., tag:[from:me])
-      key == :tag && conditions.present?
+      # tag: and commitfest: can have empty value with conditions (e.g., tag:[from:me], commitfest:[tag:bugfix])
+      key.in?([ :tag, :commitfest ]) && conditions.present?
     end
 
     def validate_conditions(parent_key, parent_value, conditions)
@@ -182,6 +188,8 @@ module Search
         has_conditions[normalized_value] || []
       when :tag
         VALID_SUB_CONDITIONS[:tag] || []
+      when :commitfest
+        VALID_SUB_CONDITIONS[:commitfest] || []
       else
         []
       end
@@ -249,6 +257,10 @@ module Search
         end
       end
 
+      node
+    end
+
+    def validate_commitfest_selector(node)
       node
     end
 

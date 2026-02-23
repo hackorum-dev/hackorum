@@ -105,6 +105,19 @@ last_after:1w              # Topics with activity in the last week
 messages_before:yesterday  # Messages sent before yesterday
 ```
 
+### Commitfest Selectors
+
+Search for topics by commitfest.
+
+
+| Selector | Description | Example |
+|----------|-------------|---------|
+| `commitfest:name` | Topics from commitfest with this name | `commitfest:PG19-Final` |
+| `commitfest:[name:name]` | Topics from commitfest with this name | `commitfest:[name:PG19-Draft]` |
+| `commitfest:[status:status]` | Topics from commitfest with this status | `commitfest:[status:commited]` |
+| `commitfest:[tag:tag]` | Topics from commitfest with this tag | `commitfest:[tag:bugfix]` |
+
+
 ### Count Selectors
 
 | Selector | Description | Example |

@@ -351,6 +351,45 @@ RSpec.describe Search::QueryBuilder, type: :service do
           end
         end
       end
+
+      describe 'commitfest: selector' do
+        let!(:tag) { create(:commitfest_tag) }
+        let!(:commitfest_first) { create(:commitfest, name: 'PGX-Final') }
+        let!(:commitfest_second) { create(:commitfest) }
+        let!(:topic_first) { create(:topic) }
+        let!(:topic_second) { create(:topic) }
+
+        let!(:patch_first) { create(:commitfest_patch, :with_topic, :with_commitfest, :with_tag, topic: topic_first, commitfest: commitfest_first, commitfest_tag: tag) }
+        let!(:patch_second) { create(:commitfest_patch, :with_topic, topic: topic_second) }
+
+        before do
+          create(:commitfest_patch_commitfest, commitfest: commitfest_second, commitfest_patch: patch_second, status: 'Commited')
+        end
+
+        it 'filters topics with specific commitfest name' do
+          result = build_query('commitfest:PGX-Final')
+          expect(result.relation).to include(topic_first)
+          expect(result.relation).not_to include(topic_second)
+        end
+
+        it 'filters topics with specific commitfest name from condition' do
+          result = build_query('commitfest:[name:PGX-Final]')
+          expect(result.relation).to include(topic_first)
+          expect(result.relation).not_to include(topic_second)
+        end
+
+        it 'filters topics with specific commitfest status' do
+          result = build_query('commitfest:[status:commited]')
+          expect(result.relation).to include(topic_second)
+          expect(result.relation).not_to include(topic_first)
+        end
+
+        it 'filters topics with specific commitfest tag' do
+          result = build_query('commitfest:[tag:bugfix]')
+          expect(result.relation).to include(topic_first)
+          expect(result.relation).not_to include(topic_second)
+        end
+      end
     end
 
     describe 'negation' do

@@ -123,6 +123,8 @@ module Search
                  apply_last_date_selector(:>=, value, relation, negated: negated)
       when :last_before
                  apply_last_date_selector(:<, value, relation, negated: negated)
+      when :commitfest
+                 apply_commitfest_selector(value, relation, negated: negated, conditions: conditions)
       else
                  @warnings << "Unknown selector: #{key}"
                  relation
@@ -840,6 +842,53 @@ module Search
 
       # Use the denormalized last_message_at column
       relation.where("topics.last_message_at #{actual_operator} ?", date)
+    end
+
+    def apply_commitfest_selector(value, relation, negated:, conditions:)
+      relation = relation.left_joins(
+        commitfest_patch_topics: {
+          commitfest_patch: [
+            :commitfest_tags,
+            { commitfest_patch_commitfests: :commitfest }
+          ]
+        }
+      )
+
+      if value.present?
+        if negated
+          relation = relation.where.not(commitfest: { name: value })
+        else
+          relation = relation.where(commitfest: { name: value })
+        end
+      end
+
+      apply_commitfest_with_conditions(relation, negated: negated, conditions: conditions || [])
+    end
+
+    def apply_commitfest_with_conditions(relation, negated:, conditions:)
+      conditions.each do |condition|
+        value = condition[:value]
+
+        relation = case condition[:key]
+        when :name
+          column = Commitfest.arel_table[:name]
+          apply_commitfest_filter(relation, column, value, negated:)
+        when :status
+          column = CommitfestPatchCommitfest.arel_table[:status]
+          apply_commitfest_filter(relation, column, value, negated:)
+        when :tag
+          column = CommitfestTag.arel_table[:name]
+          apply_commitfest_filter(relation, column, value, negated:)
+        end
+      end
+
+      relation
+    end
+
+    def apply_commitfest_filter(relation, column, value, negated:)
+      predicate = column.lower.eq(value.downcase)
+      predicate = predicate.not if negated
+      relation.where(predicate)
     end
 
     # === Helpers ===
