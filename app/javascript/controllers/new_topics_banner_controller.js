@@ -15,7 +15,6 @@ export default class extends Controller {
   }
 
   startPolling() {
-    this.fetchBanner()
     this.poller = setInterval(() => this.fetchBanner(), this.intervalMsValue)
   }
 
