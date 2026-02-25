@@ -51,7 +51,7 @@
         .message-archive-link
           = link_to "https://postgr.es/m/#{ERB::Util.url_encode(message.message_id)}", target: "_blank", rel: "noopener", data: { turbo: false }, title: "View on postgr.es", "aria-label": "View on postgr.es" do
             i.fa-solid.fa-building-columns
-          = link_to "http://www.postgresql.org/message-id/resend/#{ERB::Util.url_encode(message.message_id)}", target: "_blank", rel: "noopener", data: { turbo: false }, title: "Resend from postgresql.org archive", "aria-label": "Resend from postgresql.org archive" do
+          = link_to "https://www.postgresql.org/message-id/resend/#{ERB::Util.url_encode(message.message_id)}", target: "_blank", rel: "noopener", data: { turbo: false }, title: "Resend from postgresql.org archive", "aria-label": "Resend from postgresql.org archive" do
             i.fa-solid.fa-paper-plane
 
   .message-content class=read_classes.join(" ") data=read_data
