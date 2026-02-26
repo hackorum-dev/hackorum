@@ -133,7 +133,7 @@ RSpec.describe "Topics", type: :request do
 
         expect(response).to have_http_status(:success)
         expect(response.body).to include("Attachments:")
-        expect(response.body).to include('class="language-diff"')
+        expect(response.body).to include('data-controller="diff-highlight"')
         expect(response.body).to include("diff --git")
       end
     end
