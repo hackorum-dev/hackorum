@@ -791,7 +791,17 @@
           return Math.max(320, Math.floor(width));
         }
 
+        function getChartColors() {
+          const isDark = document.documentElement.dataset.theme === 'dark';
+          return {
+            textColor: isDark ? '#e2e8f0' : '#0f172a',
+            cardBg: isDark ? '#111827' : '#ffffff',
+            borderColor: isDark ? '#1f2937' : '#cdd5e7'
+          };
+        }
+
         function buildLineSpec(intervals, width, height, enabledSeries) {
+          const chartColors = getChartColors();
           const points = intervals.flatMap(row => (
             enabledSeries.map(series => ({
               interval_ts: row.interval_ts,
@@ -826,8 +836,8 @@
               { name: "color", type: "ordinal", domain: enabledSeries.map(series => series.key), range: enabledSeries.map(series => series.color || "#666") }
             ],
             axes: [
-              { orient: "bottom", scale: "x", format: "%Y-%m-%d", formatType: "utc", labelOverlap: true },
-              { orient: "left", scale: "y" }
+              { orient: "bottom", scale: "x", format: "%Y-%m-%d", formatType: "utc", labelOverlap: true, labelColor: chartColors.textColor, tickColor: chartColors.textColor, domainColor: chartColors.textColor },
+              { orient: "left", scale: "y", labelColor: chartColors.textColor, tickColor: chartColors.textColor, domainColor: chartColors.textColor }
             ],
             signals: [
               { name: "hoverTs", value: null, on: [
@@ -934,6 +944,7 @@
         }
 
         function buildStackedBarSpec(intervals, width, height, enabledSeries) {
+          const chartColors = getChartColors();
           const seriesOrder = new Map(enabledSeries.map((series, idx) => [series.key, idx]));
           const points = intervals.flatMap(row => (
             enabledSeries.map(series => ({
@@ -999,8 +1010,8 @@
               { name: "color", type: "ordinal", domain: enabledSeries.map(series => series.key), range: enabledSeries.map(series => series.color || "#666") }
             ],
             axes: [
-              { orient: "bottom", scale: "x", format: "%Y-%m-%d", formatType: "utc", labelOverlap: true },
-              { orient: "left", scale: "y" }
+              { orient: "bottom", scale: "x", format: "%Y-%m-%d", formatType: "utc", labelOverlap: true, labelColor: chartColors.textColor, tickColor: chartColors.textColor, domainColor: chartColors.textColor },
+              { orient: "left", scale: "y", labelColor: chartColors.textColor, tickColor: chartColors.textColor, domainColor: chartColors.textColor }
             ],
             marks: [
               {
@@ -1100,6 +1111,7 @@
         }
 
         function buildOverlayBarSpec(intervals, width, height, enabledSeries) {
+          const chartColors = getChartColors();
           if (!intervals.length) {
             return { spec: null, points: [] };
           }
@@ -1143,8 +1155,8 @@
               { name: "y", type: "linear", domain: [0, 1], nice: false, range: "height" }
             ],
             axes: [
-              { orient: "bottom", scale: "x", labelOverlap: true },
-              { orient: "left", scale: "y", format: ".0%" }
+              { orient: "bottom", scale: "x", labelOverlap: true, labelColor: chartColors.textColor, tickColor: chartColors.textColor, domainColor: chartColors.textColor },
+              { orient: "left", scale: "y", format: ".0%", labelColor: chartColors.textColor, tickColor: chartColors.textColor, domainColor: chartColors.textColor }
             ],
             marks: [
               {
@@ -1247,6 +1259,7 @@
         }
 
         function buildLongevityHeatmapSpec(histogram, width) {
+          const chartColors = getChartColors();
           const bucketOrder = ["0-1", "2-7", "8-30", "31-90", "91-180", "181-365", "365+"];
           const points = histogram.map(row => ({
             interval_ts: Date.parse(`${row.interval_start}T00:00:00Z`),
@@ -1266,8 +1279,8 @@
               { name: "color", type: "linear", domain: { data: "heat", field: "count" }, nice: true, range: ["#f2f0f7", "#54278f"] }
             ],
             axes: [
-              { orient: "bottom", scale: "x", format: "%Y-%m-%d", formatType: "utc", labelOverlap: true },
-              { orient: "left", scale: "y" }
+              { orient: "bottom", scale: "x", format: "%Y-%m-%d", formatType: "utc", labelOverlap: true, labelColor: chartColors.textColor, tickColor: chartColors.textColor, domainColor: chartColors.textColor },
+              { orient: "left", scale: "y", labelColor: chartColors.textColor, tickColor: chartColors.textColor, domainColor: chartColors.textColor }
             ],
             marks: [
               {
