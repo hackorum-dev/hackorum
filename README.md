@@ -1,39 +1,35 @@
 # Hackorum
 
-Rails 8 app backed by Postgres. Use the Docker-based development setup below for a quick start; production deploy lives under `deploy/` with its own `README`.
+Rails 8 app backed by Postgres. Use the containerised development setup below for a quick start; production deploy lives under `deploy/` with its own `README`.
 
 Live application is available at https://hackorum.dev
 
-## Development (Docker)
+## Development
+
+Both Docker and Podman (rootless) are supported. The Makefile auto-detects which runtime is available (preferring Podman). Override with `ENGINE=docker` or `ENGINE=podman`.
+
 1) Copy the sample env and adjust as needed:
 ```bash
 cp .env.development.example .env.development
 ```
 2) Build and start the stack (web + Postgres):
 ```bash
-docker compose -f docker-compose.dev.yml up --build
+make dev
 ```
 * App: http://localhost:3000
 * Postgres: localhost:15432 (user/password: hackorum/hackorum by default)
 * Emails sent by the application use `letter_opener`, will be opened by the browser automatically
-* If you run into a Postgres data-dir warning, clear the old volume: `docker volume rm hackorum_db-data`
+* If you run into a Postgres data-dir warning, clear the old volume: `docker volume rm hackorum_db-data` (or `podman volume rm hackorum_db-data`)
 
 Useful commands:
-* Shell: `docker compose -f docker-compose.dev.yml exec web bash`
-* Rails console: `docker compose -f docker-compose.dev.yml exec web bin/rails console`
-* Migrations/seeds: `docker compose -f docker-compose.dev.yml exec web bin/rails db:prepare`
-* Tests: `docker compose -f docker-compose.dev.yml exec web bundle exec rspec`
+* Shell: `make shell`
+* Rails console: `make console`
+* Migrations/seeds: `make db-migrate` (or run arbitrary commands via `make shell`)
+* Tests: `make test`
 * Import a public DB dump: `make db-import DUMP=/path/to/public-YYYY-MM.sql.gz`
 * If you need private table definitions too, apply `private-schema-YYYY-MM.sql.gz` after the import:
-  `gzip -cd /path/to/private-schema-YYYY-MM.sql.gz | docker compose -f docker-compose.dev.yml exec -T db psql`
-
-Makefile shortcuts:
-* `make dev` / `make dev-detach` / `make down`
-* `make shell` / `make console` / `make logs`
-* `make test`
-* `make db-migrate` / `make db-reset`
-* `make db-import`
-* `make psql`
+  `gzip -cd /path/to/private-schema-YYYY-MM.sql.gz | make psql`
+* Other targets: `make dev-detach` / `make down` / `make logs` / `make db-reset` / `make psql`
 
 Public database dumps (schema + public data) are published at https://dumps.hackorum.dev/
 
@@ -51,10 +47,9 @@ Makefile shortcuts:
 The "production" IMAP worker which pulls actual mailing list messages from an IMAP label can be also run locally.
 
 ```bash
-docker compose -f docker-compose.dev.yml --profile imap up --build
+make imap
 ```
 Configure IMAP via `.env.development` (`IMAP_USERNAME`, `IMAP_PASSWORD`, `IMAP_MAILBOX_LABEL`, `IMAP_HOST`, `IMAP_PORT`, `IMAP_SSL`).
-Shortcut: `make imap`
 
 Host, Port and ssl settings default to the gmail imap server.
 

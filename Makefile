@@ -1,4 +1,5 @@
-COMPOSE ?= docker compose --env-file .env.development -f docker-compose.dev.yml
+ENGINE  ?= $(shell command -v podman >/dev/null 2>&1 && echo podman || echo docker)
+COMPOSE ?= $(ENGINE) compose --env-file .env.development -f compose.dev.yml
 
 .PHONY: dev dev-detach down shell console test imap logs db-migrate db-reset db-import stats psql sim-email-once sim-email-stream
 

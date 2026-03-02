@@ -1,5 +1,5 @@
 ARG RUBY_VERSION=3.4
-FROM ruby:${RUBY_VERSION}
+FROM docker.io/library/ruby:${RUBY_VERSION}
 
 ENV RAILS_ENV=development \
     NODE_ENV=development \
@@ -21,5 +21,5 @@ RUN npm install
 
 EXPOSE 3000
 
-ENTRYPOINT ["./bin/docker-entrypoint"]
+ENTRYPOINT ["./bin/container-entrypoint"]
 CMD ["./bin/rails", "server", "-b", "0.0.0.0"]

@@ -1,11 +1,11 @@
 services:
   db:
-    image: postgres:18
+    image: docker.io/library/postgres:18
     env_file:
       - .env.development
     volumes:
       - db-data:/var/lib/postgresql
-      - ./deploy/postgres/init/01_pg_stat_statements.sql:/docker-entrypoint-initdb.d/01_pg_stat_statements.sql:ro
+      - ./deploy/postgres/init/01_pg_stat_statements.sql:/docker-entrypoint-initdb.d/01_pg_stat_statements.sql:ro,z
     ports:
       - "15432:5432"
     command:
@@ -16,7 +16,7 @@ services:
         "-c", "pg_stat_statements.track=all"
       ]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hackorum} -d ${POSTGRES_DB:-hackorum_development}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hackorum} -d ${POSTGRES_DB:-hackorum_development} -h /var/run/postgresql"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,7 +24,7 @@ services:
   web:
     build:
       context: .
-      dockerfile: Dockerfile.dev
+      dockerfile: Containerfile.dev
     env_file:
       - .env.development
     environment:
@@ -32,7 +32,7 @@ services:
       NODE_ENV: ${NODE_ENV:-development}
       HOST: 0.0.0.0
       PORT: ${PORT:-3000}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-hackorum}:${POSTGRES_PASSWORD:-hackorum}@db:5432/${POSTGRES_DB:-hackorum_development}}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hackorum}:${POSTGRES_PASSWORD:-hackorum}@db:5432/${POSTGRES_DB:-hackorum_development}
       PGHOST: db
       PGPORT: 5432
       PGUSER: ${POSTGRES_USER:-hackorum}
@@ -41,7 +41,7 @@ services:
       SOLID_QUEUE_IN_PUMA: "1"
       FORCE_SSL: ${FORCE_SSL:-false}
     volumes:
-      - .:/app
+      - .:/app:z
       - bundle:/usr/local/bundle
       - node_modules:/app/node_modules
     ports:
@@ -49,27 +49,27 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    entrypoint: ["./bin/docker-entrypoint"]
+    entrypoint: ["./bin/container-entrypoint"]
     command: ["./bin/dev"]
 
   imap_worker:
     profiles: ["imap"]
     build:
       context: .
-      dockerfile: Dockerfile.dev
+      dockerfile: Containerfile.dev
     env_file:
       - .env.development
     command: ["bundle", "exec", "ruby", "script/imap_idle.rb"]
     environment:
       RAILS_ENV: ${RAILS_ENV:-development}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-hackorum}:${POSTGRES_PASSWORD:-hackorum}@db:5432/${POSTGRES_DB:-hackorum_development}}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hackorum}:${POSTGRES_PASSWORD:-hackorum}@db:5432/${POSTGRES_DB:-hackorum_development}
       PGHOST: db
       PGPORT: 5432
       PGUSER: ${POSTGRES_USER:-hackorum}
       PGPASSWORD: ${POSTGRES_PASSWORD:-hackorum}
       PGDATABASE: ${POSTGRES_DB:-hackorum_development}
     volumes:
-      - .:/app
+      - .:/app:z
       - bundle:/usr/local/bundle
     depends_on:
       db:
@@ -77,7 +77,7 @@ services:
 
   psql:
     profiles: ["tools"]
-    image: postgres:18
+    image: docker.io/library/postgres:18
     entrypoint: ["psql", "postgresql://${POSTGRES_USER:-hackorum}:${POSTGRES_PASSWORD:-hackorum}@db:5432/${POSTGRES_DB:-hackorum_development}"]
     env_file:
       - .env.development
