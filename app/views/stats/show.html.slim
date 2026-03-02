@@ -337,98 +337,110 @@
         const toEl = document.getElementById("stats-to");
         const applyRangeEl = document.getElementById("stats-apply-range");
         const customRangeEls = Array.from(document.querySelectorAll(".stats-custom-range"));
+        function getCSSVar(name) {
+          return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        }
+
+        function getChartColors() {
+          return {
+            textColor: getCSSVar('--color-chart-text'),
+            cardBg: getCSSVar('--color-chart-bg'),
+            borderColor: getCSSVar('--color-chart-border')
+          };
+        }
+
         const chartSeries = {
           main: [
-            { key: "participants_active", label: "Active participants", color: "#1f77b4" },
-            { key: "participants_new", label: "New participants", color: "#17becf" },
-            { key: "retained_365_participants", label: "Retained participants (365d+)", color: "#2ca02c" },
-            { key: "new_users_replied_to_others", label: "New participants replying to others", color: "#ff9896" },
-            { key: "topics_new", label: "New topics", color: "#9467bd" },
-            { key: "topics_new_by_new_users", label: "New topics by new users", color: "#c5b0d5" },
-            { key: "topics_new_with_attachments_by_new_users", label: "New topics with attachments by new users", color: "#c49c94" },
-            { key: "topics_active", label: "Active topics", color: "#8c564b" },
-            { key: "topics_new_with_contributor_activity", label: "New topics with contributor activity", color: "#e377c2" },
-            { key: "topics_new_without_contributor_activity", label: "New topics without contributor activity", color: "#7f7f7f" },
-            { key: "messages_total", label: "Total messages", color: "#ff7f0e" },
-            { key: "messages_committers", label: "Messages by committers", color: "#d62728" },
-            { key: "messages_contributors", label: "Messages by contributors", color: "#bcbd22" },
-            { key: "messages_new_participants", label: "Messages by new participants", color: "#aec7e8" },
-            { key: "topics_messages_avg", label: "Active topic avg msgs", color: "#1f77b4" },
-            { key: "topics_messages_median", label: "Active topic median msgs", color: "#ff7f0e" },
-            { key: "topics_messages_max", label: "Active topic max msgs", color: "#2ca02c" },
-            { key: "topics_created_messages_avg", label: "New topic avg msgs", color: "#1f77b4" },
-            { key: "topics_created_messages_median", label: "New topic median msgs", color: "#ff7f0e" },
-            { key: "topics_created_messages_max", label: "New topic max msgs", color: "#2ca02c" },
-            { key: "topic_longevity_avg_days", label: "Topic longevity avg days", color: "#9467bd" },
-            { key: "topic_longevity_median_days", label: "Topic longevity median days", color: "#8c564b" },
-            { key: "topic_longevity_max_days", label: "Topic longevity max days", color: "#d62728" },
-            { key: "new_participants_lifetime_avg_days", label: "New participant lifetime avg days", color: "#1f77b4" },
-            { key: "new_participants_lifetime_median_days", label: "New participant lifetime median days", color: "#ff7f0e" },
-            { key: "new_participants_lifetime_max_days", label: "New participant lifetime max days", color: "#2ca02c" },
-            { key: "retained_365_lifetime_avg_days", label: "Retained lifetime avg days", color: "#9467bd" },
-            { key: "retained_365_lifetime_median_days", label: "Retained lifetime median days", color: "#8c564b" },
-            { key: "new_participants_daily_avg_messages", label: "New participant daily avg msgs", color: "#1f77b4" },
-            { key: "retained_365_daily_avg_messages", label: "Retained daily avg msgs", color: "#ff7f0e" }
+            { key: "participants_active", label: "Active participants", color: getCSSVar('--color-chart-blue') },
+            { key: "participants_new", label: "New participants", color: getCSSVar('--color-chart-cyan') },
+            { key: "retained_365_participants", label: "Retained participants (365d+)", color: getCSSVar('--color-chart-green') },
+            { key: "new_users_replied_to_others", label: "New participants replying to others", color: getCSSVar('--color-chart-light-red') },
+            { key: "topics_new", label: "New topics", color: getCSSVar('--color-chart-purple') },
+            { key: "topics_new_by_new_users", label: "New topics by new users", color: getCSSVar('--color-chart-light-purple') },
+            { key: "topics_new_with_attachments_by_new_users", label: "New topics with attachments by new users", color: getCSSVar('--color-chart-light-brown') },
+            { key: "topics_active", label: "Active topics", color: getCSSVar('--color-chart-brown') },
+            { key: "topics_new_with_contributor_activity", label: "New topics with contributor activity", color: getCSSVar('--color-chart-pink') },
+            { key: "topics_new_without_contributor_activity", label: "New topics without contributor activity", color: getCSSVar('--color-chart-gray') },
+            { key: "messages_total", label: "Total messages", color: getCSSVar('--color-chart-orange') },
+            { key: "messages_committers", label: "Messages by committers", color: getCSSVar('--color-chart-red') },
+            { key: "messages_contributors", label: "Messages by contributors", color: getCSSVar('--color-chart-yellow-green') },
+            { key: "messages_new_participants", label: "Messages by new participants", color: getCSSVar('--color-chart-light-blue') },
+            { key: "topics_messages_avg", label: "Active topic avg msgs", color: getCSSVar('--color-chart-blue') },
+            { key: "topics_messages_median", label: "Active topic median msgs", color: getCSSVar('--color-chart-orange') },
+            { key: "topics_messages_max", label: "Active topic max msgs", color: getCSSVar('--color-chart-green') },
+            { key: "topics_created_messages_avg", label: "New topic avg msgs", color: getCSSVar('--color-chart-blue') },
+            { key: "topics_created_messages_median", label: "New topic median msgs", color: getCSSVar('--color-chart-orange') },
+            { key: "topics_created_messages_max", label: "New topic max msgs", color: getCSSVar('--color-chart-green') },
+            { key: "topic_longevity_avg_days", label: "Topic longevity avg days", color: getCSSVar('--color-chart-purple') },
+            { key: "topic_longevity_median_days", label: "Topic longevity median days", color: getCSSVar('--color-chart-brown') },
+            { key: "topic_longevity_max_days", label: "Topic longevity max days", color: getCSSVar('--color-chart-red') },
+            { key: "new_participants_lifetime_avg_days", label: "New participant lifetime avg days", color: getCSSVar('--color-chart-blue') },
+            { key: "new_participants_lifetime_median_days", label: "New participant lifetime median days", color: getCSSVar('--color-chart-orange') },
+            { key: "new_participants_lifetime_max_days", label: "New participant lifetime max days", color: getCSSVar('--color-chart-green') },
+            { key: "retained_365_lifetime_avg_days", label: "Retained lifetime avg days", color: getCSSVar('--color-chart-purple') },
+            { key: "retained_365_lifetime_median_days", label: "Retained lifetime median days", color: getCSSVar('--color-chart-brown') },
+            { key: "new_participants_daily_avg_messages", label: "New participant daily avg msgs", color: getCSSVar('--color-chart-blue') },
+            { key: "retained_365_daily_avg_messages", label: "Retained daily avg msgs", color: getCSSVar('--color-chart-orange') }
           ],
           depth: [
-            { key: "topics_messages_avg", label: "Avg messages", color: "#1f77b4" },
-            { key: "topics_messages_median", label: "Median messages", color: "#ff7f0e" },
-            { key: "topics_messages_max", label: "Max messages", color: "#2ca02c" }
+            { key: "topics_messages_avg", label: "Avg messages", color: getCSSVar('--color-chart-blue') },
+            { key: "topics_messages_median", label: "Median messages", color: getCSSVar('--color-chart-orange') },
+            { key: "topics_messages_max", label: "Max messages", color: getCSSVar('--color-chart-green') }
           ],
           created_depth: [
-            { key: "topics_created_messages_avg", label: "Avg messages", color: "#1f77b4" },
-            { key: "topics_created_messages_median", label: "Median messages", color: "#ff7f0e" },
-            { key: "topics_created_messages_max", label: "Max messages", color: "#2ca02c" }
+            { key: "topics_created_messages_avg", label: "Avg messages", color: getCSSVar('--color-chart-blue') },
+            { key: "topics_created_messages_median", label: "Median messages", color: getCSSVar('--color-chart-orange') },
+            { key: "topics_created_messages_max", label: "Max messages", color: getCSSVar('--color-chart-green') }
           ],
           message_breakdown: [
-            { key: "messages_committers", label: "Committers", color: "#d62728" },
-            { key: "messages_contributors_non_committers", label: "Contributors (non-committers)", color: "#bcbd22" },
-            { key: "messages_new_participants", label: "New participants", color: "#aec7e8" },
-            { key: "messages_regular_participants", label: "Regular participants", color: "#7f7f7f" }
+            { key: "messages_committers", label: "Committers", color: getCSSVar('--color-chart-red') },
+            { key: "messages_contributors_non_committers", label: "Contributors (non-committers)", color: getCSSVar('--color-chart-yellow-green') },
+            { key: "messages_new_participants", label: "New participants", color: getCSSVar('--color-chart-light-blue') },
+            { key: "messages_regular_participants", label: "Regular participants", color: getCSSVar('--color-chart-gray') }
           ],
           attachments: [
-            { key: "topics_new_no_attachments", label: "No attachments", color: "#9e9e9e" },
-            { key: "topics_new_with_attachments_no_commitfest", label: "Attachment, not commitfest", color: "#1f77b4" },
-            { key: "topics_new_commitfest_in_progress", label: "Commitfest in progress", color: "#ff7f0e" },
-            { key: "topics_new_commitfest_abandoned", label: "Commitfest rejected", color: "#d62728" },
-            { key: "topics_new_commitfest_committed", label: "Commitfest committed", color: "#2ca02c" }
+            { key: "topics_new_no_attachments", label: "No attachments", color: getCSSVar('--color-chart-light-gray') },
+            { key: "topics_new_with_attachments_no_commitfest", label: "Attachment, not commitfest", color: getCSSVar('--color-chart-blue') },
+            { key: "topics_new_commitfest_in_progress", label: "Commitfest in progress", color: getCSSVar('--color-chart-orange') },
+            { key: "topics_new_commitfest_abandoned", label: "Commitfest rejected", color: getCSSVar('--color-chart-red') },
+            { key: "topics_new_commitfest_committed", label: "Commitfest committed", color: getCSSVar('--color-chart-green') }
           ],
           new_topic_attachments: [
-            { key: "topics_new_by_new_users_no_attachments", label: "New users, no attachments", color: "#bdbdbd" },
-            { key: "topics_new_by_new_users_with_attachments", label: "New users, attachments", color: "#9ecae1" },
-            { key: "topics_new_by_existing_users_no_attachments", label: "Existing users, no attachments", color: "#636363" },
-            { key: "topics_new_by_existing_users_with_attachments", label: "Existing users, attachments", color: "#3182bd" }
+            { key: "topics_new_by_new_users_no_attachments", label: "New users, no attachments", color: getCSSVar('--color-chart-silver') },
+            { key: "topics_new_by_new_users_with_attachments", label: "New users, attachments", color: getCSSVar('--color-chart-steel-blue') },
+            { key: "topics_new_by_existing_users_no_attachments", label: "Existing users, no attachments", color: getCSSVar('--color-chart-dark-gray') },
+            { key: "topics_new_by_existing_users_with_attachments", label: "Existing users, attachments", color: getCSSVar('--color-chart-medium-blue') }
           ],
           longevity: [
-            { key: "topic_longevity_avg_days", label: "Avg days", color: "#9467bd" },
-            { key: "topic_longevity_median_days", label: "Median days", color: "#8c564b" },
-            { key: "topic_longevity_max_days", label: "Max days", color: "#d62728" }
+            { key: "topic_longevity_avg_days", label: "Avg days", color: getCSSVar('--color-chart-purple') },
+            { key: "topic_longevity_median_days", label: "Median days", color: getCSSVar('--color-chart-brown') },
+            { key: "topic_longevity_max_days", label: "Max days", color: getCSSVar('--color-chart-red') }
           ],
           participant_lifetime: [
-            { key: "new_participants_lifetime_avg_days", label: "New avg days", color: "#1f77b4" },
-            { key: "new_participants_lifetime_median_days", label: "New median days", color: "#ff7f0e" },
-            { key: "new_participants_lifetime_max_days", label: "New max days", color: "#2ca02c" },
-            { key: "retained_365_lifetime_avg_days", label: "Retained avg days", color: "#9467bd" },
-            { key: "retained_365_lifetime_median_days", label: "Retained median days", color: "#8c564b" }
+            { key: "new_participants_lifetime_avg_days", label: "New avg days", color: getCSSVar('--color-chart-blue') },
+            { key: "new_participants_lifetime_median_days", label: "New median days", color: getCSSVar('--color-chart-orange') },
+            { key: "new_participants_lifetime_max_days", label: "New max days", color: getCSSVar('--color-chart-green') },
+            { key: "retained_365_lifetime_avg_days", label: "Retained avg days", color: getCSSVar('--color-chart-purple') },
+            { key: "retained_365_lifetime_median_days", label: "Retained median days", color: getCSSVar('--color-chart-brown') }
           ],
           new_participant_rate: [
-            { key: "new_participants_daily_avg_messages", label: "New participants", color: "#1f77b4" },
-            { key: "retained_365_daily_avg_messages", label: "Retained 365d+", color: "#ff7f0e" }
+            { key: "new_participants_daily_avg_messages", label: "New participants", color: getCSSVar('--color-chart-blue') },
+            { key: "retained_365_daily_avg_messages", label: "Retained 365d+", color: getCSSVar('--color-chart-orange') }
           ],
           participant_retention: [
-            { key: "retained_365_participants", label: "Retained 365d+", color: "#ff7f0e" },
-            { key: "participants_new_not_retained_365", label: "New (not retained)", color: "#1f77b4" }
+            { key: "retained_365_participants", label: "Retained 365d+", color: getCSSVar('--color-chart-orange') },
+            { key: "participants_new_not_retained_365", label: "New (not retained)", color: getCSSVar('--color-chart-blue') }
           ],
           retention_milestones: [
-            { key: "retention_q1", label: "3m+", color: "#1f77b4" },
-            { key: "retention_q2", label: "6m+", color: "#ff7f0e" },
-            { key: "retention_q4", label: "1y+", color: "#2ca02c" },
-            { key: "retention_q6", label: "1.5y+", color: "#d62728" },
-            { key: "retention_q8", label: "2y+", color: "#9467bd" },
-            { key: "retention_q10", label: "2.5y+", color: "#8c564b" },
-            { key: "retention_q12", label: "3y+", color: "#e377c2" },
-            { key: "retention_q16", label: "4y+", color: "#7f7f7f" },
-            { key: "retention_q20", label: "5y+", color: "#17becf" }
+            { key: "retention_q1", label: "3m+", color: getCSSVar('--color-chart-blue') },
+            { key: "retention_q2", label: "6m+", color: getCSSVar('--color-chart-orange') },
+            { key: "retention_q4", label: "1y+", color: getCSSVar('--color-chart-green') },
+            { key: "retention_q6", label: "1.5y+", color: getCSSVar('--color-chart-red') },
+            { key: "retention_q8", label: "2y+", color: getCSSVar('--color-chart-purple') },
+            { key: "retention_q10", label: "2.5y+", color: getCSSVar('--color-chart-brown') },
+            { key: "retention_q12", label: "3y+", color: getCSSVar('--color-chart-pink') },
+            { key: "retention_q16", label: "4y+", color: getCSSVar('--color-chart-gray') },
+            { key: "retention_q20", label: "5y+", color: getCSSVar('--color-chart-cyan') }
           ]
         };
 
@@ -789,15 +801,6 @@
             (parseFloat(style.borderRightWidth) || 0);
           const width = containerWidth - padding - border - 20;
           return Math.max(320, Math.floor(width));
-        }
-
-        function getChartColors() {
-          const isDark = document.documentElement.dataset.theme === 'dark';
-          return {
-            textColor: isDark ? '#e2e8f0' : '#0f172a',
-            cardBg: isDark ? '#111827' : '#ffffff',
-            borderColor: isDark ? '#1f2937' : '#cdd5e7'
-          };
         }
 
         function buildLineSpec(intervals, width, height, enabledSeries) {

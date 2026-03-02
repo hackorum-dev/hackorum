@@ -92,6 +92,32 @@
   --color-note-soft: #fef9c3;
 
   --shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.12);
+
+  /* Chart colors */
+  --color-chart-text: #0f172a;
+  --color-chart-bg: #ffffff;
+  --color-chart-border: #cdd5e7;
+
+  /* Chart series palette (Matplotlib/Tableau) */
+  --color-chart-blue: #1f77b4;
+  --color-chart-orange: #ff7f0e;
+  --color-chart-green: #2ca02c;
+  --color-chart-red: #d62728;
+  --color-chart-purple: #9467bd;
+  --color-chart-brown: #8c564b;
+  --color-chart-pink: #e377c2;
+  --color-chart-gray: #7f7f7f;
+  --color-chart-yellow-green: #bcbd22;
+  --color-chart-cyan: #17becf;
+  --color-chart-light-red: #ff9896;
+  --color-chart-light-purple: #c5b0d5;
+  --color-chart-light-brown: #c49c94;
+  --color-chart-light-blue: #aec7e8;
+  --color-chart-light-gray: #9e9e9e;
+  --color-chart-silver: #bdbdbd;
+  --color-chart-steel-blue: #9ecae1;
+  --color-chart-dark-gray: #636363;
+  --color-chart-medium-blue: #3182bd;
 }
 
 :root[data-theme="dark"] {
@@ -187,4 +213,9 @@
   --color-note-soft: #3a3216;
 
   --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.45);
+
+  /* Chart colors */
+  --color-chart-text: #e2e8f0;
+  --color-chart-bg: #111827;
+  --color-chart-border: #1f2937;
 }
