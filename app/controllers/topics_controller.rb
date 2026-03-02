@@ -14,6 +14,7 @@ class TopicsController < ApplicationController
     @page_cache_key = topics_page_cache_key
 
     load_visible_tags if user_signed_in?
+    load_saved_searches
 
     respond_to do |format|
       format.html
@@ -242,6 +243,7 @@ class TopicsController < ApplicationController
     preload_commitfest_summaries
     preload_participation_flags if user_signed_in?
     load_visible_tags if user_signed_in?
+    load_saved_searches
 
     respond_to do |format|
       format.html
@@ -562,6 +564,14 @@ class TopicsController < ApplicationController
                                   .order(Arel.sql("COUNT(*) DESC"))
                                   .limit(20)
                                   .count
+  end
+
+  def load_saved_searches
+    @saved_searches = if user_signed_in?
+      SavedSearch.visible_to_unhidden(current_user).order(:scope, :position, :name)
+    else
+      SavedSearch.scope_global.order(:position, :name)
+    end
   end
 
   def preload_topic_participants

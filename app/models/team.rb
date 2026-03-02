@@ -3,6 +3,7 @@
 class Team < ApplicationRecord
   has_many :team_members, dependent: :destroy
   has_many :users, through: :team_members
+  has_many :saved_searches
 
   # Visibility levels:
   # - private: only members can see/access the team, only members can mention

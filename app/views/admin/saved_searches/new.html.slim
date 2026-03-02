@@ -1,0 +1,6 @@
+- content_for :title, "Admin — New Saved Search"
+
+.settings-page
+  h1 New Saved Search
+
+  = render "form", saved_search: @saved_search, url: admin_saved_searches_path, method: :post

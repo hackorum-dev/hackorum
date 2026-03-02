@@ -13,6 +13,8 @@ class User < ApplicationRecord
   has_many :activities
   has_many :topic_stars, dependent: :destroy
   has_many :starred_topics, through: :topic_stars, source: :topic
+  has_many :saved_searches
+  has_many :saved_search_preferences
 
   enum :mention_restriction, { anyone: "anyone", teammates_only: "teammates_only" }, default: :anyone
 

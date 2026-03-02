@@ -23,6 +23,43 @@
             i.fas.fa-question-circle
             |  Search syntax help
 
+    - if @saved_searches.present?
+      .sidebar-section
+        h3.sidebar-heading Saved searches
+        .sidebar-content
+          - active_search = params[:q]
+
+          - global_searches = @saved_searches.select(&:scope_global?)
+          - if global_searches.any?
+            .filter-subsection
+              span.filter-subsection-label Global
+              ul.quick-filters
+                - global_searches.each do |ss|
+                  li = link_to ss.name, search_topics_path(q: ss.query), class: ("quick-filter-link is-active" if active_search == ss.query)
+
+          - if user_signed_in?
+            - user_searches = @saved_searches.select { |ss| ss.scope_user? && ss.user_id.present? }
+            - user_templates = @saved_searches.select { |ss| ss.scope_user? && ss.user_id.nil? }
+            - all_user = user_templates + user_searches
+            - if all_user.any?
+              .filter-subsection
+                span.filter-subsection-label My searches
+                ul.quick-filters
+                  - all_user.each do |ss|
+                    li = link_to ss.name, search_topics_path(q: ss.query), class: ("quick-filter-link is-active" if active_search == ss.query)
+
+            - team_templates = @saved_searches.select { |ss| ss.scope_team? && ss.team_id.nil? }
+            - team_specific = @saved_searches.select { |ss| ss.scope_team? && ss.team_id.present? }
+            - current_user.teams.each do |team|
+              - team_searches = team_specific.select { |ss| ss.team_id == team.id }
+              - all_team = team_searches + team_templates
+              - if all_team.any?
+                .filter-subsection
+                  span.filter-subsection-label = "#{team.name} searches"
+                  ul.quick-filters
+                    - all_team.each do |ss|
+                      li = link_to ss.name, search_topics_path(q: ss.resolve_query(team: team)), class: ("quick-filter-link is-active" if active_search == ss.resolve_query(team: team))
+
     .sidebar-section
       h3.sidebar-heading Quick filters
       .sidebar-content

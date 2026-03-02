@@ -1,0 +1,51 @@
+- content_for :title, "Settings — #{@team.name} Saved Searches"
+
+.settings-page
+  h1
+    = @team.name
+    |  — Saved Searches
+
+  = link_to "Back to team", settings_team_path(@team), class: "button-secondary"
+
+  - if @team.admin?(current_user)
+    = link_to "New saved search", new_settings_team_saved_search_path(@team), class: "button-primary"
+
+  - if @saved_searches.any?
+    h2 Team Searches
+    .email-table-wrap
+      table.email-table
+        thead
+          tr
+            th Name
+            th Query
+            th Actions
+        tbody
+          - @saved_searches.each do |ss|
+            tr
+              td = ss.name
+              td
+                code = ss.query
+              td
+                - if @team.admin?(current_user)
+                  = link_to "Edit", edit_settings_team_saved_search_path(@team, ss), class: "button-secondary button-small"
+                  = button_to "Delete", settings_team_saved_search_path(@team, ss), method: :delete, class: "button-danger-secondary button-small", data: { turbo_confirm: "Delete this saved search?" }
+
+  - if @system_searches.any?
+    h2 Default Team Searches
+    p.settings-hint These are provided by the site administrators. You can hide them from your sidebar.
+    .email-table-wrap
+      table.email-table
+        thead
+          tr
+            th Name
+            th Query
+            th Visible
+        tbody
+          - @system_searches.each do |ss|
+            tr
+              td = ss.name
+              td
+                code = ss.query
+              td
+                - hidden = @hidden_ids.include?(ss.id)
+                = button_to hidden ? "Show" : "Hide", settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: !hidden), method: :post, class: "button-secondary button-small"

@@ -1,0 +1,6 @@
+- content_for :title, "Settings — Edit Saved Search"
+
+.settings-page
+  h1 Edit Saved Search
+
+  = render "form", saved_search: @saved_search, url: settings_saved_search_path(@saved_search), method: :patch

@@ -1,0 +1,6 @@
+- content_for :title, "Admin — Edit Saved Search"
+
+.settings-page
+  h1 Edit Saved Search
+
+  = render "form", saved_search: @saved_search, url: admin_saved_search_path(@saved_search), method: :patch

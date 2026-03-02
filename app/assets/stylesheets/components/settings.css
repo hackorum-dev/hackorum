@@ -67,7 +67,8 @@
 
 .settings-page input[type="text"],
 .settings-page input[type="email"],
-.settings-page input[type="password"] {
+.settings-page input[type="password"],
+.settings-page input[type="number"] {
   width: 100%;
   padding: var(--spacing-4) var(--spacing-6);
   border-radius: 999px;
@@ -79,7 +80,28 @@
 
 .settings-page input[type="text"]:focus,
 .settings-page input[type="email"]:focus,
-.settings-page input[type="password"]:focus {
+.settings-page input[type="password"]:focus,
+.settings-page input[type="number"]:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.settings-page textarea {
+  width: 100%;
+  padding: var(--spacing-3) var(--spacing-4);
+  border-radius: var(--border-radius-md);
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-bg-input);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-base);
+  resize: vertical;
+  min-height: 60px;
+  margin: 0;
+}
+
+.settings-page textarea:focus {
   outline: none;
   border-color: var(--color-border-focus);
   box-shadow: var(--shadow-focus);

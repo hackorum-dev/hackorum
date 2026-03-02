@@ -1,0 +1,22 @@
+= form_with model: saved_search, url: url, method: method, local: true do |f|
+  - if saved_search.errors.any?
+    .flash-alert
+      ul
+        - saved_search.errors.full_messages.each do |msg|
+          li = msg
+
+  = f.hidden_field :scope
+
+  .form-group
+    = f.label :name
+    = f.text_field :name, required: true, placeholder: "Search name", class: "form-input"
+
+  .form-group
+    = f.label :query
+    = f.text_area :query, required: true, placeholder: "e.g. unread:true starred:true", rows: 3, class: "form-input"
+
+  .form-group
+    = f.label :position
+    = f.number_field :position, value: saved_search.position || 0, class: "form-input"
+
+  = f.submit "Save", class: "button-primary"

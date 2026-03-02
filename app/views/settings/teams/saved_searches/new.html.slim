@@ -1,0 +1,8 @@
+- content_for :title, "Settings — New Team Saved Search"
+
+.settings-page
+  h1
+    | New Saved Search for
+    =< @team.name
+
+  = render "form", saved_search: @saved_search, url: settings_team_saved_searches_path(@team), method: :post

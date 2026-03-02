@@ -1,0 +1,34 @@
+- content_for :title, "Admin — Saved Searches"
+
+.settings-page
+  h1 Saved Searches
+
+  .tab-bar
+    = link_to "Global", admin_saved_searches_path(tab: "global"), class: "tab #{@tab == 'global' ? 'is-active' : ''}"
+    = link_to "User Templates", admin_saved_searches_path(tab: "user_templates"), class: "tab #{@tab == 'user_templates' ? 'is-active' : ''}"
+    = link_to "Team Templates", admin_saved_searches_path(tab: "team_templates"), class: "tab #{@tab == 'team_templates' ? 'is-active' : ''}"
+
+  .saved-searches-actions
+    = link_to "New saved search", new_admin_saved_search_path(tab: @tab), class: "button-primary"
+
+  - if @saved_searches.any?
+    .email-table-wrap
+      table.email-table
+        thead
+          tr
+            th Name
+            th Query
+            th Position
+            th Actions
+        tbody
+          - @saved_searches.each do |ss|
+            tr
+              td = ss.name
+              td
+                code = ss.query
+              td = ss.position
+              td
+                = link_to "Edit", edit_admin_saved_search_path(ss), class: "button-secondary button-small"
+                = button_to "Delete", admin_saved_search_path(ss), method: :delete, class: "button-danger-secondary button-small", data: { turbo_confirm: "Delete this saved search?" }
+  - else
+    p No saved searches in this category yet.

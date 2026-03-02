@@ -1,0 +1,17 @@
+= form_with model: saved_search, url: url, method: method, local: true do |f|
+  - if saved_search.errors.any?
+    .flash-alert
+      ul
+        - saved_search.errors.full_messages.each do |msg|
+          li = msg
+
+  .form-group
+    = f.label :name
+    = f.text_field :name, required: true, placeholder: "Search name"
+
+  .form-group
+    = f.label :query
+    = f.text_area :query, required: true, placeholder: "e.g. from:{{team_name}} unread:true", rows: 3
+    p.settings-hint Use {{team_name}} as a placeholder for this team's name.
+
+  = f.submit "Save", class: "button-primary"

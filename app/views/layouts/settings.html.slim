@@ -15,6 +15,9 @@
       = link_to settings_teams_path, class: settings_nav_link_class(:teams) do
         i.fas.fa-users
         span Teams
+      = link_to settings_saved_searches_path, class: settings_nav_link_class(:saved_searches) do
+        i.fas.fa-search
+        span Saved Searches
       = link_to settings_import_path, class: settings_nav_link_class(:import) do
         i.fas.fa-download
         span Import

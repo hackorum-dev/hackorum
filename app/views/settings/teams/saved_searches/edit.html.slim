@@ -1,0 +1,8 @@
+- content_for :title, "Settings — Edit Team Saved Search"
+
+.settings-page
+  h1
+    | Edit Saved Search for
+    =< @team.name
+
+  = render "form", saved_search: @saved_search, url: settings_team_saved_search_path(@team, @saved_search), method: :patch

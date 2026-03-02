@@ -5,6 +5,8 @@
     .team-actions
       = button_to "Delete team", settings_team_path(@team), method: :delete, data: { turbo_confirm: "Delete this team?" }, class: "button-danger"
 
+  = link_to "Manage saved searches", settings_team_saved_searches_path(@team), class: "button-secondary"
+
   .team-settings
     h2 Team Settings
     .visibility-setting

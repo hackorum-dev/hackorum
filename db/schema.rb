@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_02_18_120000) do
+ActiveRecord::Schema[8.0].define(version: 2026_03_02_183723) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -19,6 +19,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_18_120000) do
   # Custom types defined in this database.
   # Note that some types may not work with other database engines. Be careful if changing database.
   create_enum "contributor_type", ["core_team", "committer", "major_contributor", "significant_contributor", "past_major_contributor", "past_significant_contributor"]
+  create_enum "saved_search_scope", ["global", "user", "team"]
   create_enum "team_member_role", ["member", "admin"]
   create_enum "team_visibility", ["private", "visible", "open"]
   create_enum "user_mention_restriction", ["anyone", "teammates_only"]
@@ -455,6 +456,32 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_18_120000) do
     t.index ["summarizable_type", "summarizable_id"], name: "index_rails_pulse_summaries_on_summarizable"
   end
 
+  create_table "saved_search_preferences", force: :cascade do |t|
+    t.bigint "saved_search_id", null: false
+    t.bigint "user_id", null: false
+    t.boolean "hidden", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["saved_search_id", "user_id"], name: "idx_saved_search_prefs_unique", unique: true
+    t.index ["saved_search_id"], name: "index_saved_search_preferences_on_saved_search_id"
+    t.index ["user_id"], name: "index_saved_search_preferences_on_user_id"
+  end
+
+  create_table "saved_searches", force: :cascade do |t|
+    t.string "name", null: false
+    t.text "query", null: false
+    t.enum "scope", default: "global", null: false, enum_type: "saved_search_scope"
+    t.bigint "user_id"
+    t.bigint "team_id"
+    t.integer "position", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["scope", "user_id", "team_id", "name"], name: "idx_saved_searches_unique_name", unique: true
+    t.index ["team_id"], name: "index_saved_searches_on_team_id"
+    t.index ["user_id"], name: "index_saved_searches_on_user_id"
+    t.check_constraint "NOT (user_id IS NOT NULL AND team_id IS NOT NULL)", name: "chk_saved_searches_single_owner"
+  end
+
   create_table "stats_daily", force: :cascade do |t|
     t.date "interval_start", null: false
     t.date "interval_end", null: false
@@ -815,6 +842,10 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_18_120000) do
   add_foreign_key "rails_pulse_operations", "rails_pulse_queries", column: "query_id"
   add_foreign_key "rails_pulse_operations", "rails_pulse_requests", column: "request_id"
   add_foreign_key "rails_pulse_requests", "rails_pulse_routes", column: "route_id"
+  add_foreign_key "saved_search_preferences", "saved_searches", name: "saved_search_preferences_saved_search_id_fkey"
+  add_foreign_key "saved_search_preferences", "users", name: "saved_search_preferences_user_id_fkey"
+  add_foreign_key "saved_searches", "teams", name: "saved_searches_team_id_fkey"
+  add_foreign_key "saved_searches", "users", name: "saved_searches_user_id_fkey"
   add_foreign_key "team_members", "teams"
   add_foreign_key "team_members", "users"
   add_foreign_key "thread_awarenesses", "topics"

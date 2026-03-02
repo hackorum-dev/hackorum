@@ -24,5 +24,8 @@
       = link_to admin_pg_hero.root_path, class: admin_nav_link_class(:pghero) do
         i.fas.fa-database
         span PgHero
+      = link_to admin_saved_searches_path, class: admin_nav_link_class(:saved_searches) do
+        i.fas.fa-search
+        span Saved Searches
 
 = render template: 'layouts/application'

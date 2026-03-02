@@ -18,6 +18,7 @@ Rails.application.routes.draw do
       end
     end
     resources :page_load_stats, only: [ :index ]
+    resources :saved_searches
     mount PgHero::Engine, at: "/pghero" if defined?(PgHero)
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
@@ -45,9 +46,12 @@ Rails.application.routes.draw do
     resource :password, only: [ :show ]
     resource :import, only: [ :show, :create ]
     resource :deletion, only: [ :show, :create ]
+    resources :saved_searches
+    resources :saved_search_preferences, only: [:create]
 
     resources :teams, only: [ :index, :show, :create, :update, :destroy ] do
       resources :team_members, only: [ :create, :update, :destroy ]
+      resources :saved_searches, module: :teams
     end
 
     resource :username, only: [ :update ]

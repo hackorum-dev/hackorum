@@ -1,0 +1,65 @@
+- content_for :title, "Settings — Saved Searches"
+
+.settings-page
+  h1 My Saved Searches
+
+  = link_to "New saved search", new_settings_saved_search_path, class: "button-primary"
+
+  - if @saved_searches.any?
+    h2 My Searches
+    .email-table-wrap
+      table.email-table
+        thead
+          tr
+            th Name
+            th Query
+            th Actions
+        tbody
+          - @saved_searches.each do |ss|
+            tr
+              td = ss.name
+              td
+                code = ss.query
+              td
+                = link_to "Edit", edit_settings_saved_search_path(ss), class: "button-secondary button-small"
+                = button_to "Delete", settings_saved_search_path(ss), method: :delete, class: "button-danger-secondary button-small", data: { turbo_confirm: "Delete this saved search?" }
+
+  - if @global_searches.any?
+    h2 Global Searches
+    p.settings-hint These are visible to everyone. You can hide them from your sidebar.
+    .email-table-wrap
+      table.email-table
+        thead
+          tr
+            th Name
+            th Query
+            th Visible
+        tbody
+          - @global_searches.each do |ss|
+            tr
+              td = ss.name
+              td
+                code = ss.query
+              td
+                - hidden = @hidden_ids.include?(ss.id)
+                = button_to hidden ? "Show" : "Hide", settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: !hidden), method: :post, class: "button-secondary button-small"
+
+  - if @system_searches.any?
+    h2 Default Searches
+    p.settings-hint These are provided by the site administrators. You can hide them from your sidebar.
+    .email-table-wrap
+      table.email-table
+        thead
+          tr
+            th Name
+            th Query
+            th Visible
+        tbody
+          - @system_searches.each do |ss|
+            tr
+              td = ss.name
+              td
+                code = ss.query
+              td
+                - hidden = @hidden_ids.include?(ss.id)
+                = button_to hidden ? "Show" : "Hide", settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: !hidden), method: :post, class: "button-secondary button-small"

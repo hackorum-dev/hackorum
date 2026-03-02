@@ -1,5 +1,61 @@
 /* Admin Styles */
 
+/* Tab Bar */
+.tab-bar {
+  display: flex;
+  gap: var(--spacing-1);
+  border-bottom: var(--border-width-thick) solid var(--color-border);
+  margin-bottom: var(--spacing-6);
+}
+
+.tab {
+  display: inline-block;
+  padding: var(--spacing-3) var(--spacing-5);
+  text-decoration: none;
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-sm);
+  border-bottom: var(--border-width-thick) solid transparent;
+  margin-bottom: calc(-1 * var(--border-width-thick));
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.tab:hover {
+  color: var(--color-text-primary);
+}
+
+.tab.is-active {
+  color: var(--color-primary-700);
+  border-bottom-color: var(--color-primary-600);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Saved Searches Actions */
+.saved-searches-actions {
+  margin-bottom: var(--spacing-6);
+}
+
+/* Flash Alert (inline form errors) */
+.flash-alert {
+  background-color: var(--color-danger-soft);
+  color: var(--color-danger);
+  border: var(--border-width) solid var(--color-danger);
+  padding: var(--spacing-3) var(--spacing-4);
+  border-radius: var(--border-radius-md);
+  margin-bottom: var(--spacing-4);
+  font-size: var(--font-size-sm);
+}
+
+.flash-alert ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.flash-alert li + li {
+  margin-top: var(--spacing-1);
+}
+
 /* Admin Users Table */
 .settings-page .email-table-wrap {
   overflow-x: auto;
@@ -363,6 +419,27 @@ textarea.form-input {
 .button-small {
   padding: var(--spacing-2) var(--spacing-3);
   font-size: var(--font-size-sm);
+}
+
+.button-danger-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3) var(--spacing-5);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  text-decoration: none;
+  transition: var(--transition-fast);
+  background: var(--color-bg-card);
+  color: var(--color-danger);
+  border: var(--border-width) solid var(--color-border);
+}
+
+.button-danger-secondary:hover {
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
 }
 
 /* Admin Actions in Topic Header */
