@@ -10,6 +10,7 @@ export default class extends Controller {
   connect() {
     this.marked = false
     this.timer = null
+    this.pollInterval = null
     this.observe()
   }
 
@@ -23,8 +24,12 @@ export default class extends Controller {
     this.observer = new IntersectionObserver(entries => {
       entries.forEach(entry => {
         if (entry.isIntersecting && this.visibleEnough(entry)) {
+          this.stopPoll()
           this.startTimer()
+        } else if (entry.isIntersecting && this.needsPollFallback()) {
+          this.startPoll()
         } else {
+          this.stopPoll()
           this.clearTimer()
         }
       })
@@ -50,6 +55,44 @@ export default class extends Controller {
     return ratio >= 0.25 && visiblePx >= 200
   }
 
+  needsPollFallback() {
+    return this.element.getBoundingClientRect().height > (window.innerHeight || 800)
+  }
+
+  startPoll() {
+    if (this.marked || this.pollInterval || this.timer) return
+    this.pollInterval = setInterval(() => this.checkVisibility(), 1000)
+  }
+
+  stopPoll() {
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval)
+      this.pollInterval = null
+    }
+  }
+
+  checkVisibility() {
+    if (this.marked) { this.stopPoll(); return }
+
+    const rect = this.element.getBoundingClientRect()
+    const viewportHeight = window.innerHeight || 800
+    const visibleTop = Math.max(0, rect.top)
+    const visibleBottom = Math.min(viewportHeight, rect.bottom)
+    const visiblePx = Math.max(0, visibleBottom - visibleTop)
+
+    if (visiblePx <= 0) {
+      this.stopPoll()
+      this.clearTimer()
+      return
+    }
+
+    const substantialPx = Math.min(viewportHeight * 0.8, 400)
+    if (visiblePx >= substantialPx) {
+      this.stopPoll()
+      this.startTimer()
+    }
+  }
+
   startTimer() {
     if (this.marked || this.timer) return
     const delay = (this.delaySecondsValue || 5) * 1000
@@ -65,6 +108,7 @@ export default class extends Controller {
 
   cleanup() {
     this.clearTimer()
+    this.stopPoll()
     if (this.observer) {
       this.observer.disconnect()
       this.observer = null
