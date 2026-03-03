@@ -1,0 +1,16 @@
+= turbo_frame_tag "attachments-sidebar-list" do
+  - if @attachment_messages.any?
+    ul.attachments-list
+      - @attachment_messages.sort_by(&:created_at).reverse_each do |msg|
+        - number = @message_numbers[msg.id]
+        li
+          = link_to "#message-#{msg.id}-attachments", class: "attachment-link" do
+            span.attachment-target = "##{number}"
+            span.attachment-date = smart_time_display(msg.created_at)
+          - names = msg.attachments.map(&:file_name)
+          - names.first(2).each do |name|
+            .attachment-name = name
+          - if names.size > 2
+            .attachment-more = "+ #{names.size - 2} more"
+  - else
+    p No attachments in this thread

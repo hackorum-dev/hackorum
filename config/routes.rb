@@ -78,6 +78,7 @@ Rails.application.routes.draw do
       delete :unstar
       get :latest_patchset
       get :message_batch
+      get :attachments_sidebar
     end
   end
   resources :activities, only: [ :index ] do

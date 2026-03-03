@@ -1,5 +1,5 @@
 class TopicsController < ApplicationController
-  before_action :set_topic, only: [ :show, :message_batch, :aware, :read_all, :unread_all, :star, :unstar, :latest_patchset ]
+  before_action :set_topic, only: [ :show, :message_batch, :attachments_sidebar, :aware, :read_all, :unread_all, :star, :unstar, :latest_patchset ]
   before_action :require_authentication, only: [ :aware, :aware_bulk, :aware_all, :read_all, :unread_all, :star, :unstar ]
 
   def index
@@ -57,8 +57,7 @@ class TopicsController < ApplicationController
       .preload(
         :sender,
         :sender_person,
-        { sender_person: :default_alias },
-        :attachments
+        { sender_person: :default_alias }
       )
 
     @messages = messages_scope.order(created_at: :asc)
@@ -76,7 +75,9 @@ class TopicsController < ApplicationController
       load_star_state
     end
 
-    @has_patches = @messages.any? { |msg| msg.attachments.any?(&:patch_extension?) }
+    @has_patches =
+      Attachment.joins(:message).where(messages: { topic_id: @topic.id })
+               .where("attachments.file_name LIKE '%.patch' OR attachments.file_name LIKE '%.diff'").exists?
     if @has_patches
       latest_message = latest_patchset_message
       if latest_message
@@ -103,6 +104,19 @@ class TopicsController < ApplicationController
       .order(:created_at)
 
     expires_in 1.year, public: true
+    render layout: false
+  end
+
+  def attachments_sidebar
+    message_columns = (Message.column_names - %w[body body_tsv]).map { |c| "messages.#{c}" }
+    messages = @topic.messages
+      .select(message_columns)
+      .preload(:attachments)
+      .order(created_at: :asc)
+
+    @attachment_messages = messages.select { |msg| msg.attachments.any? }
+    @message_numbers = messages.each_with_index.to_h { |msg, idx| [ msg.id, idx + 1 ] }
+
     render layout: false
   end
 
@@ -362,10 +376,13 @@ class TopicsController < ApplicationController
 
   def latest_patchset_message
     @latest_patchset_message ||= @topic.messages
-      .where(id: Attachment.where(message_id: @topic.messages.select(:id))
+      .where(id: Attachment.joins(:message)
+                           .where(messages: { topic_id: @topic.id })
+                           .where("attachments.file_name LIKE '%.patch' OR attachments.file_name LIKE '%.diff'")
                            .select(:message_id))
       .order(created_at: :desc)
-      .find { |msg| msg.attachments.any?(&:patch_extension?) }
+      .preload(:attachments)
+      .first
   end
 
   def set_topic

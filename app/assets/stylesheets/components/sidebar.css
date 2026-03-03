@@ -60,6 +60,42 @@
   margin-bottom: var(--spacing-8);
 }
 
+.sidebar-section-wrapper {
+  margin-bottom: var(--spacing-8);
+}
+
+.sidebar .attachments-details summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  color: var(--color-text-link);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--border-radius-sm);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.sidebar .attachments-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.sidebar .attachments-details summary::before {
+  content: "▸";
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.sidebar .attachments-details[open] summary::before {
+  content: "▾";
+}
+
+.sidebar .attachments-details summary:hover {
+  background: var(--color-bg-hover);
+}
+
 .sidebar-section.is-search-focus .sidebar-heading {
   background: linear-gradient(135deg, var(--color-bg-sidebar-header), var(--color-primary-2));
   border-radius: 999px;

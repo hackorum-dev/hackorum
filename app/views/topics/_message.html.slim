@@ -40,9 +40,6 @@
         - parent_number = (@message_numbers && @message_numbers[message.reply_to.id]) || "-"
         .reply-indicator
           span.reply-to In reply to: #{message.reply_to.sender_display_alias.name} (##{parent_number})
-      - if message.attachments.any?
-        .attachment-indicator
-          span.attachment-count #{message.attachments.size} attachment(s)
       - if message.message_id.present?
         .message-archive-link
           = link_to "https://postgr.es/m/#{ERB::Util.url_encode(message.message_id)}", target: "_blank", rel: "noopener", data: { turbo: false }, title: "View on postgr.es", "aria-label": "View on postgr.es" do
