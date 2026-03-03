@@ -637,7 +637,7 @@ long_messages.each_with_index do |msg, idx|
     +        WalSndKeepalive(false);
     +        MyWalSnd->sendKeepalive = false;
     +    }
-    +#{'    +    WalSndCheckTimeOut();\n' * [version, 3].min}         /* existing wal sender loop */
+    +#{'    +    WalSndCheckTimeOut();\n' * [ version, 3 ].min}         /* existing wal sender loop */
      }
   PATCH
 
