@@ -515,7 +515,7 @@ module Search
         <<~SQL.squish
           topics.id IN (
             SELECT t.id FROM topics t
-            LEFT JOIN thread_awareness ta ON ta.topic_id = t.id AND ta.user_id = #{user_id.to_i}
+            LEFT JOIN thread_awarenesses ta ON ta.topic_id = t.id AND ta.user_id = #{user_id.to_i}
             LEFT JOIN message_read_ranges mrr ON mrr.topic_id = t.id AND mrr.user_id = #{user_id.to_i}
             WHERE ta.aware_until_message_id IS NULL
             GROUP BY t.id
@@ -527,7 +527,7 @@ module Search
         <<~SQL.squish
           topics.id IN (
             SELECT t.id FROM topics t
-            LEFT JOIN thread_awareness ta ON ta.topic_id = t.id AND ta.user_id = #{user_id.to_i}
+            LEFT JOIN thread_awarenesses ta ON ta.topic_id = t.id AND ta.user_id = #{user_id.to_i}
             LEFT JOIN message_read_ranges mrr ON mrr.topic_id = t.id AND mrr.user_id = #{user_id.to_i}
             WHERE ta.aware_until_message_id IS NULL
             GROUP BY t.id
@@ -547,7 +547,7 @@ module Search
       sanitized_ids = user_ids.map(&:to_i).join(",")
       # For team: topic is new if NO team member has any awareness or reads
       seen_sql = <<~SQL.squish
-        SELECT DISTINCT topic_id FROM thread_awareness WHERE user_id IN (#{sanitized_ids})
+        SELECT DISTINCT topic_id FROM thread_awarenesses WHERE user_id IN (#{sanitized_ids})
         UNION
         SELECT DISTINCT topic_id FROM message_read_ranges WHERE user_id IN (#{sanitized_ids})
       SQL
