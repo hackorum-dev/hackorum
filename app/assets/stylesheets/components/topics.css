@@ -905,7 +905,7 @@ a.topic-icon {
   border: var(--border-width) solid var(--color-warning);
   border-radius: var(--border-radius-lg);
   padding: var(--spacing-4);
-  margin-bottom: var(--spacing-4);
+  margin: var(--spacing-2);
 }
 
 .search-warnings-header {
@@ -1039,4 +1039,9 @@ a.topic-icon {
   color: var(--color-danger);
   font-size: var(--font-size-sm);
   margin-top: var(--spacing-2);
+}
+
+.no-results {
+  margin: var(--spacing-8);
+  text-align: center;
 }
