@@ -127,10 +127,11 @@ html data-theme="light"
     - if content_for?(:sidebar)
       .page-layout.with-sidebar data-sidebar-target="layout"
         .layout-sidebar#layout-sidebar data-sidebar-target="sidebar" data-action="click->sidebar#closeOnNavigate"
+          .sidebar-toggle-bar
+            button.sidebar-burger-button type="button" aria-label="Toggle sidebar" data-action="click->sidebar#toggle"
+              i.fa-solid.fa-bars aria-hidden="true"
           = yield :sidebar
         .layout-sidebar-resizer data-sidebar-target="resizer" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" data-action="mousedown->sidebar#startResize touchstart->sidebar#startResize"
-          button.sidebar-collapse-button type="button" aria-label="Toggle sidebar" data-action="click->sidebar#toggle" data-sidebar-target="toggleButton"
-            span data-sidebar-target="toggleIcon" ◀
         .layout-sidebar-overlay data-sidebar-target="overlay" data-action="click->sidebar#closeMobile"
         main.container
           - flash.each do |type, message|

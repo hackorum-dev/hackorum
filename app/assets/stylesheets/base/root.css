@@ -62,7 +62,7 @@ body.sidebar-resizing {
 }
 
 body.sidebar-collapsed .page-layout.with-sidebar {
-  grid-template-columns: 0 var(--sidebar-resizer-width) minmax(0, 1fr);
+  grid-template-columns: 0 0 minmax(0, 1fr);
 }
 
 body.sidebar-collapsed .layout-sidebar {
@@ -71,8 +71,7 @@ body.sidebar-collapsed .layout-sidebar {
 }
 
 body.sidebar-collapsed .layout-sidebar-resizer {
-  border-left: var(--border-width) solid var(--color-border);
-  justify-self: start;
+  display: none;
 }
 
 body.sidebar-collapsed .page-layout.with-sidebar > main.container {
