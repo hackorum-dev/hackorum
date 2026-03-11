@@ -6,7 +6,10 @@
     table
       thead
         tr
-          th.topic-title Topic
+          th.topic-title
+            button.sidebar-burger-button type="button" aria-label="Expand sidebar" data-action="click->sidebar#toggle"
+              i.fa-solid.fa-bars aria-hidden="true"
+            | Topic
           th.activity-header Activity
           th.participants-header Participants
       tbody#topics

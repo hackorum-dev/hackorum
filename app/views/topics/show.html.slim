@@ -166,6 +166,8 @@
 .topic-header
   .topic-title-section
     .topic-title-with-star
+      button.sidebar-burger-button type="button" aria-label="Expand sidebar" data-action="click->sidebar#toggle"
+        i.fa-solid.fa-bars aria-hidden="true"
       - if user_signed_in?
         = render "star_button", topic: @topic, starred: @is_starred
       h1 = @topic.title
