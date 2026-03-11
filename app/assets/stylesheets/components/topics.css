@@ -764,35 +764,6 @@ a.topic-icon {
   border: 0;
 }
 
-.topics-actions {
-  display: flex;
-  justify-content: center;
-  gap: var(--spacing-3);
-  padding: var(--spacing-3) var(--spacing-4);
-  align-items: center;
-  border-bottom: var(--border-width) solid var(--color-border);
-}
-
-.mark-aware-button {
-  padding: var(--spacing-3) var(--spacing-4);
-  border: var(--border-width) solid var(--color-border);
-  background: var(--color-bg-card);
-  border-radius: 999px;
-  cursor: pointer;
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-primary);
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
-
-  &:hover {
-    border-color: var(--color-primary-300);
-    box-shadow: var(--shadow-sm);
-    transform: translateY(-1px);
-  }
-
-  &.secondary {
-    background: var(--color-bg-hover);
-  }
-}
 
 .global-warning {
   background: var(--color-warning-bg);
