@@ -15,6 +15,11 @@ export default class extends Controller {
     this.collapsedValue = !this.collapsedValue
   }
 
+  headerClick(event) {
+    if (event.target.closest("a, button")) return
+    this.toggle()
+  }
+
   applyState() {
     this.element.classList.toggle("is-collapsed", this.collapsedValue)
     const icon = this.element.querySelector(".message-collapse-toggle i")

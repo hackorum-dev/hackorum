@@ -410,6 +410,20 @@ summary.attachment-info {
 .message-branch-4 .message-header { border-left-color: #ef4444; }
 .message-branch-5 .message-header { border-left-color: #0ea5e9; }
 
+/* Clickable header for collapse */
+.message-header {
+  cursor: pointer;
+}
+
+.message-header a,
+.message-header button {
+  cursor: default;
+}
+
+.message-header a {
+  cursor: pointer;
+}
+
 /* Collapse toggle */
 .message-collapse-toggle {
   border: none;

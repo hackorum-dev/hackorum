@@ -9,7 +9,7 @@
   - if local_assigns[:is_first_unread]
     a.message-id-anchor id="first-unread" aria-hidden="true"
   - display_number = number || (@message_numbers && @message_numbers[message.id])
-  .message-header
+  .message-header data-action="click->message-collapse#headerClick"
     .message-author
       .author-row
         = link_to "##{display_number}", "#message-#{message.id}", class: "message-number"
