@@ -1,0 +1,50 @@
+- content_for :title, "Admin — Mailing Lists"
+
+.settings-page
+  h1
+    | Mailing Lists
+    span.settings-page-count = "(#{@mailing_lists.size})"
+
+  .saved-searches-actions
+    = link_to "New mailing list", new_admin_mailing_list_path, class: "button-primary"
+
+  - if @mailing_lists.any?
+    .email-table-wrap
+      table.email-table
+        thead
+          tr
+            th Identifier
+            th Display Name
+            th Email
+            th Messages
+            th Topics
+            th Actions
+        tbody
+          - @mailing_lists.each do |ml|
+            tr
+              td
+                code = ml.identifier
+              td = ml.display_name
+              td = ml.email || "—"
+              td = ml.messages_count
+              td = ml.topics_count
+              td
+                = link_to "Edit", edit_admin_mailing_list_path(ml), class: "button-secondary button-small"
+  - else
+    p No mailing lists yet.
+
+  h2 Topic List Distribution
+  - if @topic_list_distribution.any?
+    .email-table-wrap
+      table.email-table
+        thead
+          tr
+            th # of Lists
+            th Topics
+        tbody
+          - @topic_list_distribution.each do |lists_count, topic_count|
+            tr
+              td = lists_count
+              td = topic_count
+  - else
+    p No topics assigned to lists yet.

@@ -1,0 +1,24 @@
+= form_with model: mailing_list, url: url, method: method, local: true do |f|
+  - if mailing_list.errors.any?
+    .flash-alert
+      ul
+        - mailing_list.errors.full_messages.each do |msg|
+          li = msg
+
+  .form-group
+    = f.label :identifier
+    = f.text_field :identifier, required: true, placeholder: "e.g. pgsql-hackers", class: "form-input"
+
+  .form-group
+    = f.label :display_name
+    = f.text_field :display_name, required: true, placeholder: "e.g. pgsql-hackers", class: "form-input"
+
+  .form-group
+    = f.label :email
+    = f.text_field :email, placeholder: "e.g. pgsql-hackers@lists.postgresql.org", class: "form-input"
+
+  .form-group
+    = f.label :description
+    = f.text_area :description, placeholder: "Optional description", rows: 3, class: "form-input"
+
+  = f.submit "Save", class: "button-primary"

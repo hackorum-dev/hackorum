@@ -13,6 +13,9 @@ ApplicationRecord.transaction do
   NoteTag.delete_all
   NoteMention.delete_all
   Note.delete_all
+  TopicMailingList.delete_all
+  MessageMailingList.delete_all
+  MailingList.delete_all
   Mention.delete_all
   PatchFile.delete_all
   Attachment.delete_all
@@ -97,6 +100,23 @@ ci_bot_alias = Alias.create!(
   verified_at: now
 )
 ci_bot_alias.person.update!(default_alias_id: ci_bot_alias.id)
+
+hackers_list = MailingList.find_or_create_by!(identifier: "pgsql-hackers") do |ml|
+  ml.display_name = "hackers"
+  ml.email = "pgsql-hackers@lists.postgresql.org"
+end
+
+bugs_list = MailingList.find_or_create_by!(identifier: "pgsql-bugs") do |ml|
+  ml.display_name = "bugs"
+  ml.email = "pgsql-bugs@lists.postgresql.org"
+end
+
+committers_list = MailingList.find_or_create_by!(identifier: "pgsql-committers") do |ml|
+  ml.display_name = "committers"
+  ml.email = "pgsql-committers@lists.postgresql.org"
+end
+
+puts "Created mailing lists"
 
 # Contributor roles assigned to people
 ContributorMembership.create!(person: alice_user.person, contributor_type: :core_team, name: alice_alias.name)
@@ -1181,5 +1201,36 @@ Activity.create!(
   created_at: recent_reply.created_at,
   updated_at: recent_reply.created_at
 )
+
+Message.find_each do |msg|
+  MessageMailingList.find_or_create_by!(message: msg, mailing_list: hackers_list)
+end
+puts "Associated existing messages with hackers list"
+
+bug_topic = Topic.create!(
+  creator: dave_alias,
+  creator_person_id: dave_alias.person_id,
+  title: "Segfault in pg_dump with large schemas",
+  created_at: 3.days.ago
+)
+bug_msg = Message.create!(
+  topic: bug_topic, sender: dave_alias, sender_person_id: dave_alias.person_id,
+  subject: "Segfault in pg_dump with large schemas",
+  body: "I'm seeing a segfault when running pg_dump on a database with 500+ tables...",
+  message_id: "<bug-report-1@example.com>", created_at: 3.days.ago
+)
+MessageMailingList.create!(message: bug_msg, mailing_list: bugs_list)
+
+cross_msg = Message.create!(
+  topic: bug_topic, sender: alice_alias, sender_person_id: alice_alias.person_id,
+  subject: "Re: Segfault in pg_dump with large schemas",
+  body: "This looks like it might be related to the memory allocation changes...",
+  message_id: "<cross-post-1@example.com>", created_at: 2.days.ago,
+  reply_to: bug_msg
+)
+MessageMailingList.create!(message: cross_msg, mailing_list: bugs_list)
+MessageMailingList.create!(message: cross_msg, mailing_list: hackers_list)
+
+puts "Created bugs and cross-posted seed data"
 
 puts "Development seed data loaded."

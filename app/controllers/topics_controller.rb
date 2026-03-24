@@ -9,11 +9,13 @@ class TopicsController < ApplicationController
     apply_cursor_pagination(base_query)
     preload_topic_participants
     preload_commitfest_summaries
+    preload_topic_mailing_lists
     @new_topics_count = 0
     @page_cache_key = topics_page_cache_key
 
     load_visible_tags if user_signed_in?
     load_saved_searches
+    @all_mailing_lists = MailingList.order(:display_name)
 
     respond_to do |format|
       format.html
@@ -70,6 +72,17 @@ class TopicsController < ApplicationController
     build_participants_sidebar_data(messages_scope)
     build_thread_outline(@messages)
     load_commitfest_sidebar
+
+    @topic_mailing_lists = @topic.mailing_lists.to_a
+    @topic_is_multi_list = @topic_mailing_lists.size > 1
+
+    if @topic_is_multi_list
+      msg_ids = @messages.map(&:id)
+      mml_records = MessageMailingList.where(message_id: msg_ids).includes(:mailing_list)
+      @message_mailing_lists_map = mml_records.group_by(&:message_id)
+                                               .transform_values { |mmls| mmls.map(&:mailing_list) }
+    end
+
     if user_signed_in?
       load_notes
       load_star_state
@@ -301,9 +314,11 @@ class TopicsController < ApplicationController
 
     preload_topic_participants
     preload_commitfest_summaries
+    preload_topic_mailing_lists
     preload_participation_flags if user_signed_in?
     load_visible_tags if user_signed_in?
     load_saved_searches
+    @all_mailing_lists = MailingList.order(:display_name)
 
     respond_to do |format|
       format.html
@@ -365,6 +380,7 @@ class TopicsController < ApplicationController
     preload_commitfest_summaries
     preload_star_counts
     preload_topic_participants
+    preload_topic_mailing_lists
 
     respond_to do |format|
       format.turbo_stream
@@ -668,6 +684,17 @@ class TopicsController < ApplicationController
     else
       SavedSearch.scope_global.order(:position, :name)
     end
+  end
+
+  def preload_topic_mailing_lists
+    topic_ids = @topics.map(&:id)
+    return if topic_ids.empty?
+
+    @topic_mailing_lists_map = TopicMailingList
+      .where(topic_id: topic_ids)
+      .includes(:mailing_list)
+      .group_by(&:topic_id)
+      .transform_values { |tmls| tmls.map(&:mailing_list) }
   end
 
   def preload_topic_participants

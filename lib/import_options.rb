@@ -7,8 +7,11 @@ module ImportOptions
     options = { update_existing: [] }
 
     OptionParser.new do |opts|
-      opts.banner = "Usage: #{$PROGRAM_NAME} [options] /path/to/mbox [...]"
+      opts.banner = "Usage: #{$PROGRAM_NAME} [options] --list <list-identifier> /path/to/mbox [...]"
 
+      opts.on("--list IDENTIFIER", "Mailing list identifier (required)") do |v|
+        options[:list] = v
+      end
       opts.on("--update-body", "Update body of existing messages") do
         options[:update_existing] |= [ :body ]
       end
@@ -19,6 +22,10 @@ module ImportOptions
         options[:update_existing] |= [ :reply_to_message_id ]
       end
     end.parse!(argv)
+
+    unless options[:list]
+      abort "ERROR: --list is required. Usage: #{$PROGRAM_NAME} --list <list-identifier> /path/to/mbox"
+    end
 
     options
   end

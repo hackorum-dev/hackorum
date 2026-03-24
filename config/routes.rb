@@ -18,6 +18,7 @@ Rails.application.routes.draw do
       end
     end
     resources :page_load_stats, only: [ :index ]
+    resources :mailing_lists, only: [ :index, :new, :create, :edit, :update ]
     resources :saved_searches
     mount PgHero::Engine, at: "/pghero" if defined?(PgHero)
   end

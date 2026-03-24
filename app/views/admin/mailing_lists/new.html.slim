@@ -1,0 +1,6 @@
+- content_for :title, "Admin — New Mailing List"
+
+.settings-page
+  h1 New Mailing List
+
+  = render "form", mailing_list: @mailing_list, url: admin_mailing_lists_path, method: :post

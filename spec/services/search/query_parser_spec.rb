@@ -138,6 +138,13 @@ RSpec.describe Search::QueryParser, type: :service do
         expect(result[:value]).to eq('')
         expect(result[:conditions].size).to eq(1)
       end
+
+      it 'parses list: selector' do
+        result = parser.parse('list:hackers')
+        expect(result[:type]).to eq(:selector)
+        expect(result[:key]).to eq(:list)
+        expect(result[:value]).to eq('hackers')
+      end
     end
 
     context 'with negation' do

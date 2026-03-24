@@ -10,6 +10,8 @@ class Message < ApplicationRecord
   has_many :mentions
   has_many :mentioned_aliases, through: :mentions, source: :alias
   has_many :notes
+  has_many :message_mailing_lists, dependent: :destroy
+  has_many :mailing_lists, through: :message_mailing_lists
 
   validates :subject, presence: true
   # Body may be blank for some historical imports; allow blank but keep presence on subject.

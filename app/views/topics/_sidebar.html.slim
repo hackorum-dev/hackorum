@@ -12,6 +12,21 @@
             i.fas.fa-question-circle
             |  Search syntax help
 
+    - if @all_mailing_lists&.any?
+      .sidebar-section
+        h3.sidebar-heading Mailing Lists
+        .sidebar-content
+          - active_list = nil
+          - if search_query.present?
+            - list_match = search_query.to_s.match(/\blist:(\S+)/)
+            - active_list = list_match[1] if list_match
+          ul.quick-filters
+            li
+              = link_to "All lists", topics_path, class: ("quick-filter-link is-active" unless active_list)
+            - @all_mailing_lists.each do |ml|
+              li
+                = link_to ml.display_name, search_topics_path(q: "list:#{ml.display_name}"), class: ("quick-filter-link is-active" if active_list == ml.display_name)
+
     - if @saved_searches.present?
       .sidebar-section
         h3.sidebar-heading Saved searches

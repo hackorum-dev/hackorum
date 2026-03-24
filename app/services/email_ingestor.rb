@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class EmailIngestor
-  def ingest_raw(raw_message, fallback_threading: false, trust_date: false, update_existing: [])
+  def ingest_raw(raw_message, mailing_list:, fallback_threading: false, trust_date: false, update_existing: [])
     m = Mail.new(raw_message)
 
     message_id = clean_reference(m.message_id)
@@ -16,6 +16,7 @@ class EmailIngestor
     if existing_message
       update_existing_message(existing_message, body: body, sent_at: sent_at,
                               reply_to_message_id: reply_to_message_id, update_existing: update_existing)
+      associate_mailing_list(existing_message, mailing_list)
       return existing_message
     end
 
@@ -29,7 +30,7 @@ class EmailIngestor
 
     reply_to_msg, import_log = resolve_threading(m, reply_to_message_id, import_log)
     if fallback_threading && reply_to_msg.nil? && subject.present? && subject.match?(/\A\s*(re|aw|fwd):/i)
-      reply_to_msg = fallback_thread_lookup(subject, message_id: message_id, references: m.references, sent_at: sent_at)
+      reply_to_msg = fallback_thread_lookup(subject, message_id: message_id, references: m.references, sent_at: sent_at, mailing_list: mailing_list)
       import_log = [ import_log, "Resolved by subject fallback" ].reject(&:blank?).join(" | ") if reply_to_msg
     end
 
@@ -54,6 +55,8 @@ class EmailIngestor
       import_log: import_log
     )
 
+    associate_mailing_list(msg, mailing_list)
+
     update_default_alias_for_person(msg.sender)
 
     add_mentions(msg, to)
@@ -67,6 +70,10 @@ class EmailIngestor
   end
 
   private
+
+  def associate_mailing_list(message, mailing_list)
+    MessageMailingList.find_or_create_by!(message: message, mailing_list: mailing_list)
+  end
 
   def update_existing_message(message, body:, sent_at:, reply_to_message_id:, update_existing:)
     return if update_existing.empty?
@@ -273,7 +280,7 @@ class EmailIngestor
     end
   end
 
-  def fallback_thread_lookup(subject, message_id:, references:, sent_at:)
+  def fallback_thread_lookup(subject, message_id:, references:, sent_at:, mailing_list: nil)
     normalized_subject = subject.to_s.strip
     return nil if normalized_subject.blank?
 
@@ -284,9 +291,11 @@ class EmailIngestor
     target_variant = normalize_subject_for_threading(normalized_subject)
 
     candidates = Message.where(created_at: window_start..window_end)
-                        .order(created_at: :desc)
-                        .limit(300)
-                        .to_a
+    if mailing_list
+      candidates = candidates.joins(:message_mailing_lists)
+                             .where(message_mailing_lists: { mailing_list_id: mailing_list.id })
+    end
+    candidates = candidates.order(created_at: :desc).limit(300).to_a
 
     matched = candidates.select do |msg|
       normalize_subject_for_threading(msg.subject) == target_variant

@@ -24,9 +24,11 @@ module Search
 
     COMMITFEST_SELECTORS = %i[commitfest]
 
+    LIST_SELECTORS = %i[list].freeze
+
     ALL_SELECTORS = (DATE_SELECTORS + COUNT_SELECTORS + AUTHOR_SELECTORS +
                      STATE_SELECTORS + CONTENT_SELECTORS + TAG_SELECTORS +
-                     COMMITFEST_SELECTORS + [ :has ]).freeze
+                     COMMITFEST_SELECTORS + LIST_SELECTORS + [ :has ]).freeze
 
     HAS_VALUES = %w[attachment patch contributor committer core_team commitfest].freeze
 
@@ -110,6 +112,8 @@ module Search
                     validate_tag_selector(node)
       when *COMMITFEST_SELECTORS
                     validate_commitfest_selector(node)
+      when *LIST_SELECTORS
+                    validate_list_selector(node)
       when :has
                     validate_has_selector(node)
       else
@@ -261,6 +265,10 @@ module Search
     end
 
     def validate_commitfest_selector(node)
+      node
+    end
+
+    def validate_list_selector(node)
       node
     end
 

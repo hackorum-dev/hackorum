@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_03_04_120000) do
+ActiveRecord::Schema[8.0].define(version: 2026_03_24_054041) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -211,6 +211,17 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_04_120000) do
     t.index ["mailbox_label"], name: "index_imap_sync_states_on_mailbox_label", unique: true
   end
 
+  create_table "mailing_lists", force: :cascade do |t|
+    t.string "identifier", null: false
+    t.string "display_name", null: false
+    t.string "email"
+    t.text "description"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email"], name: "index_mailing_lists_on_email", unique: true, where: "(email IS NOT NULL)"
+    t.index ["identifier"], name: "index_mailing_lists_on_identifier", unique: true
+  end
+
   create_table "mentions", force: :cascade do |t|
     t.bigint "message_id", null: false
     t.bigint "alias_id", null: false
@@ -220,6 +231,16 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_04_120000) do
     t.index ["alias_id"], name: "index_mentions_on_alias_id"
     t.index ["message_id"], name: "index_mentions_on_message_id"
     t.index ["person_id"], name: "index_mentions_on_person_id"
+  end
+
+  create_table "message_mailing_lists", force: :cascade do |t|
+    t.bigint "message_id", null: false
+    t.bigint "mailing_list_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["mailing_list_id"], name: "index_message_mailing_lists_on_mailing_list_id"
+    t.index ["message_id", "mailing_list_id"], name: "idx_message_mailing_lists_unique", unique: true
+    t.index ["message_id"], name: "index_message_mailing_lists_on_message_id"
   end
 
   create_table "message_moves", force: :cascade do |t|
@@ -358,102 +379,6 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_04_120000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["default_alias_id"], name: "index_people_on_default_alias_id"
-  end
-
-  create_table "rails_pulse_operations", force: :cascade do |t|
-    t.bigint "request_id", null: false, comment: "Link to the request"
-    t.bigint "query_id", comment: "Link to the normalized SQL query"
-    t.string "operation_type", null: false, comment: "Type of operation (e.g., database, view, gem_call)"
-    t.string "label", null: false, comment: "Descriptive name (e.g., SELECT FROM users WHERE id = 1, render layout)"
-    t.decimal "duration", precision: 15, scale: 6, null: false, comment: "Operation duration in milliseconds"
-    t.string "codebase_location", comment: "File and line number (e.g., app/models/user.rb:25)"
-    t.float "start_time", default: 0.0, null: false, comment: "Operation start time in milliseconds"
-    t.datetime "occurred_at", precision: nil, null: false, comment: "When the request started"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["created_at", "query_id"], name: "idx_operations_for_aggregation"
-    t.index ["created_at"], name: "idx_operations_created_at"
-    t.index ["occurred_at", "duration", "operation_type"], name: "index_rails_pulse_operations_on_time_duration_type"
-    t.index ["occurred_at"], name: "index_rails_pulse_operations_on_occurred_at"
-    t.index ["operation_type"], name: "index_rails_pulse_operations_on_operation_type"
-    t.index ["query_id", "duration", "occurred_at"], name: "index_rails_pulse_operations_query_performance"
-    t.index ["query_id", "occurred_at"], name: "index_rails_pulse_operations_on_query_and_time"
-    t.index ["query_id"], name: "index_rails_pulse_operations_on_query_id"
-    t.index ["request_id"], name: "index_rails_pulse_operations_on_request_id"
-  end
-
-  create_table "rails_pulse_queries", force: :cascade do |t|
-    t.string "normalized_sql", limit: 1000, null: false, comment: "Normalized SQL query string (e.g., SELECT * FROM users WHERE id = ?)"
-    t.datetime "analyzed_at", comment: "When query analysis was last performed"
-    t.text "explain_plan", comment: "EXPLAIN output from actual SQL execution"
-    t.text "issues", comment: "JSON array of detected performance issues"
-    t.text "metadata", comment: "JSON object containing query complexity metrics"
-    t.text "query_stats", comment: "JSON object with query characteristics analysis"
-    t.text "backtrace_analysis", comment: "JSON object with call chain and N+1 detection"
-    t.text "index_recommendations", comment: "JSON array of database index recommendations"
-    t.text "n_plus_one_analysis", comment: "JSON object with enhanced N+1 query detection results"
-    t.text "suggestions", comment: "JSON array of optimization recommendations"
-    t.text "tags", comment: "JSON array of tags for filtering and categorization"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["normalized_sql"], name: "index_rails_pulse_queries_on_normalized_sql", unique: true
-  end
-
-  create_table "rails_pulse_requests", force: :cascade do |t|
-    t.bigint "route_id", null: false, comment: "Link to the route"
-    t.decimal "duration", precision: 15, scale: 6, null: false, comment: "Total request duration in milliseconds"
-    t.integer "status", null: false, comment: "HTTP status code (e.g., 200, 500)"
-    t.boolean "is_error", default: false, null: false, comment: "True if status >= 500"
-    t.string "request_uuid", null: false, comment: "Unique identifier for the request (e.g., UUID)"
-    t.string "controller_action", comment: "Controller and action handling the request (e.g., PostsController#show)"
-    t.datetime "occurred_at", precision: nil, null: false, comment: "When the request started"
-    t.text "tags", comment: "JSON array of tags for filtering and categorization"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["created_at", "route_id"], name: "idx_requests_for_aggregation"
-    t.index ["created_at"], name: "idx_requests_created_at"
-    t.index ["occurred_at"], name: "index_rails_pulse_requests_on_occurred_at"
-    t.index ["request_uuid"], name: "index_rails_pulse_requests_on_request_uuid", unique: true
-    t.index ["route_id", "occurred_at"], name: "index_rails_pulse_requests_on_route_id_and_occurred_at"
-    t.index ["route_id"], name: "index_rails_pulse_requests_on_route_id"
-  end
-
-  create_table "rails_pulse_routes", force: :cascade do |t|
-    t.string "method", null: false, comment: "HTTP method (e.g., GET, POST)"
-    t.string "path", null: false, comment: "Request path (e.g., /posts/index)"
-    t.text "tags", comment: "JSON array of tags for filtering and categorization"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["method", "path"], name: "index_rails_pulse_routes_on_method_and_path", unique: true
-  end
-
-  create_table "rails_pulse_summaries", force: :cascade do |t|
-    t.datetime "period_start", null: false, comment: "Start of the aggregation period"
-    t.datetime "period_end", null: false, comment: "End of the aggregation period"
-    t.string "period_type", null: false, comment: "Aggregation period type: hour, day, week, month"
-    t.string "summarizable_type", null: false
-    t.bigint "summarizable_id", null: false, comment: "Link to Route or Query"
-    t.integer "count", default: 0, null: false, comment: "Total number of requests/operations"
-    t.float "avg_duration", comment: "Average duration in milliseconds"
-    t.float "min_duration", comment: "Minimum duration in milliseconds"
-    t.float "max_duration", comment: "Maximum duration in milliseconds"
-    t.float "p50_duration", comment: "50th percentile duration"
-    t.float "p95_duration", comment: "95th percentile duration"
-    t.float "p99_duration", comment: "99th percentile duration"
-    t.float "total_duration", comment: "Total duration in milliseconds"
-    t.float "stddev_duration", comment: "Standard deviation of duration"
-    t.integer "error_count", default: 0, comment: "Number of error responses (5xx)"
-    t.integer "success_count", default: 0, comment: "Number of successful responses"
-    t.integer "status_2xx", default: 0, comment: "Number of 2xx responses"
-    t.integer "status_3xx", default: 0, comment: "Number of 3xx responses"
-    t.integer "status_4xx", default: 0, comment: "Number of 4xx responses"
-    t.integer "status_5xx", default: 0, comment: "Number of 5xx responses"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["created_at"], name: "index_rails_pulse_summaries_on_created_at"
-    t.index ["period_type", "period_start"], name: "index_rails_pulse_summaries_on_period"
-    t.index ["summarizable_type", "summarizable_id", "period_type", "period_start"], name: "idx_pulse_summaries_unique", unique: true
-    t.index ["summarizable_type", "summarizable_id"], name: "index_rails_pulse_summaries_on_summarizable"
   end
 
   create_table "saved_search_preferences", force: :cascade do |t|
@@ -705,6 +630,16 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_04_120000) do
     t.index ["user_id"], name: "index_thread_awarenesses_on_user_id"
   end
 
+  create_table "topic_mailing_lists", force: :cascade do |t|
+    t.bigint "topic_id", null: false
+    t.bigint "mailing_list_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["mailing_list_id"], name: "index_topic_mailing_lists_on_mailing_list_id"
+    t.index ["topic_id", "mailing_list_id"], name: "idx_topic_mailing_lists_unique", unique: true
+    t.index ["topic_id"], name: "index_topic_mailing_lists_on_topic_id"
+  end
+
   create_table "topic_merges", force: :cascade do |t|
     t.bigint "source_topic_id", null: false
     t.bigint "target_topic_id", null: false
@@ -804,10 +739,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_04_120000) do
   end
 
   add_foreign_key "activities", "users"
-  add_foreign_key "admin_email_changes", "users", column: "performed_by_id"
-  add_foreign_key "admin_email_changes", "users", column: "target_user_id"
   add_foreign_key "aliases", "people"
-  add_foreign_key "aliases", "users"
   add_foreign_key "attachments", "messages"
   add_foreign_key "commitfest_patch_commitfests", "commitfest_patches"
   add_foreign_key "commitfest_patch_commitfests", "commitfests"
@@ -822,6 +754,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_04_120000) do
   add_foreign_key "mentions", "aliases"
   add_foreign_key "mentions", "messages"
   add_foreign_key "mentions", "people"
+  add_foreign_key "message_mailing_lists", "mailing_lists"
+  add_foreign_key "message_mailing_lists", "messages"
   add_foreign_key "message_moves", "messages"
   add_foreign_key "message_moves", "topic_merges"
   add_foreign_key "message_read_ranges", "topics"
@@ -840,24 +774,18 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_04_120000) do
   add_foreign_key "notes", "users", column: "last_editor_id"
   add_foreign_key "patch_files", "attachments"
   add_foreign_key "people", "aliases", column: "default_alias_id"
-  add_foreign_key "rails_pulse_operations", "rails_pulse_queries", column: "query_id"
-  add_foreign_key "rails_pulse_operations", "rails_pulse_requests", column: "request_id"
-  add_foreign_key "rails_pulse_requests", "rails_pulse_routes", column: "route_id"
-  add_foreign_key "saved_search_preferences", "saved_searches", name: "saved_search_preferences_saved_search_id_fkey"
-  add_foreign_key "saved_search_preferences", "users", name: "saved_search_preferences_user_id_fkey"
-  add_foreign_key "saved_searches", "teams", name: "saved_searches_team_id_fkey"
-  add_foreign_key "saved_searches", "users", name: "saved_searches_user_id_fkey"
+  add_foreign_key "saved_search_preferences", "saved_searches"
   add_foreign_key "team_members", "teams"
   add_foreign_key "team_members", "users"
   add_foreign_key "thread_awarenesses", "topics"
   add_foreign_key "thread_awarenesses", "users"
+  add_foreign_key "topic_mailing_lists", "mailing_lists"
+  add_foreign_key "topic_mailing_lists", "topics"
   add_foreign_key "topic_merges", "topics", column: "source_topic_id"
   add_foreign_key "topic_merges", "topics", column: "target_topic_id"
-  add_foreign_key "topic_merges", "users", column: "merged_by_id"
   add_foreign_key "topic_participants", "people"
   add_foreign_key "topic_participants", "topics"
   add_foreign_key "topic_stars", "topics"
-  add_foreign_key "topic_stars", "users"
   add_foreign_key "topics", "aliases", column: "creator_id"
   add_foreign_key "topics", "messages", column: "last_message_id"
   add_foreign_key "topics", "people", column: "creator_person_id"

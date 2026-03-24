@@ -1,7 +1,7 @@
 ENGINE  ?= $(shell command -v podman >/dev/null 2>&1 && echo podman || echo docker)
 COMPOSE ?= $(ENGINE) compose --env-file .env.development -f compose.dev.yml
 
-.PHONY: dev dev-detach down shell console test imap logs db-migrate db-reset db-import stats psql sim-email-once sim-email-stream
+.PHONY: dev dev-detach down shell console test imap logs db-migrate db-reset db-import mbox-import stats psql sim-email-once sim-email-stream
 
 dev: ## Start dev stack (foreground)
 	$(COMPOSE) up --build
@@ -44,12 +44,26 @@ db-reset: ## Drop and setup (create/migrate/seed) - stops web if running, restar
 
 db-import: ## Drop dev DB and import a public dump (env: DUMP=/path/to/public-YYYY-MM.sql.gz)
 	@if [ -z "$(DUMP)" ]; then echo "Set DUMP=/path/to/public-YYYY-MM.sql.gz"; exit 1; fi
+	@if [ -z "$(PDUMP)" ]; then echo "Set PDUMP=/path/to/private-schema-YYYY-MM.sql.gz"; exit 1; fi
 	$(COMPOSE) exec -T db bash -lc 'psql -U $${POSTGRES_USER:-hackorum} -d postgres -c "DROP DATABASE IF EXISTS $${POSTGRES_DB:-hackorum_development};" -c "CREATE DATABASE $${POSTGRES_DB:-hackorum_development};"'
 	@if echo "$(DUMP)" | grep -qE '\.gz$$'; then \
 	  gzip -cd "$(DUMP)" | $(COMPOSE) exec -T db bash -lc 'psql -U $${POSTGRES_USER:-hackorum} -d $${POSTGRES_DB:-hackorum_development}'; \
 	else \
 	  cat "$(DUMP)" | $(COMPOSE) exec -T db bash -lc 'psql -U $${POSTGRES_USER:-hackorum} -d $${POSTGRES_DB:-hackorum_development}'; \
 	fi
+	@if echo "$(PDUMP)" | grep -qE '\.gz$$'; then \
+	  gzip -cd "$(PDUMP)" | $(COMPOSE) exec -T db bash -lc 'psql -U $${POSTGRES_USER:-hackorum} -d $${POSTGRES_DB:-hackorum_development}'; \
+	else \
+	  cat "$(PDUMP)" | $(COMPOSE) exec -T db bash -lc 'psql -U $${POSTGRES_USER:-hackorum} -d $${POSTGRES_DB:-hackorum_development}'; \
+	fi
+
+mbox-import: ## Import mbox files (env: LIST=id MBOX_DIR=/path MBOX_FILES="*.mbox" ARGS="--update-body")
+	@if [ -z "$(LIST)" ]; then echo "Set LIST=<mailing-list-identifier>"; exit 1; fi
+	@if [ -z "$(MBOX_DIR)" ]; then echo "Set MBOX_DIR=/path/to/mbox/directory"; exit 1; fi
+	@if [ -z "$(MBOX_FILES)" ]; then echo "Set MBOX_FILES='*.mbox' or specific filenames"; exit 1; fi
+	$(COMPOSE) run --rm \
+		-v $(MBOX_DIR):/import:ro,z \
+		web bash -c 'ruby script/mbox_import.rb --list $(LIST) $(ARGS) $(addprefix /import/,$(MBOX_FILES))'
 
 stats: ## Rebuild stats (env: GRANULARITY=all|daily|weekly|monthly)
 	$(COMPOSE) exec web bundle exec ruby script/build_stats.rb $${GRANULARITY:-all}

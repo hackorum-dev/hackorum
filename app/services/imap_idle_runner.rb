@@ -146,23 +146,40 @@ class ImapIdleRunner
     end
     return unless raw
 
+    mailing_lists = resolve_mailing_lists_from_headers(raw)
+    if mailing_lists.empty?
+      log_warn(event: "no_list_match", uid: uid, message: "Could not resolve mailing list from To/CC headers")
+      return { ingested: false, attachments: 0, patch_files: 0 }
+    end
+
     msg = nil
     ActiveRecord::Base.transaction do
       msg = instrument("ingestor.ingest", uid: uid) do
-        @ingestor.ingest_raw(raw, trust_date: true)
+        @ingestor.ingest_raw(raw, mailing_list: mailing_lists.first, trust_date: true)
+      end
+      mailing_lists.drop(1).each do |ml|
+        MessageMailingList.find_or_create_by!(message: msg, mailing_list: ml) if msg
       end
     end
 
-    # Only after commit and successful ingest do we mark seen and advance the cursor
     @client.mark_seen(uid)
     state.update!(last_uid: uid, last_checked_at: Time.now, last_error: nil)
-    log_info(event: "ingest", uid: uid, message_id: msg&.message_id, duplicate: (msg.nil?), attachments: (msg ? msg.attachments.count : 0), patch_files: (msg ? msg.attachments.joins(:patch_files).count : 0))
+    log_info(event: "ingest", uid: uid, message_id: msg&.message_id, duplicate: msg.nil?, attachments: (msg ? msg.attachments.count : 0), patch_files: (msg ? msg.attachments.joins(:patch_files).count : 0))
     { ingested: !msg.nil?, attachments: (msg ? msg.attachments.count : 0), patch_files: (msg ? msg.attachments.joins(:patch_files).count : 0) }
   rescue => e
     log_error(event: "ingest_error", uid: uid, error_class: e.class.to_s, message: e.message)
     update_state(last_error: short_error(e), last_checked_at: Time.now)
-    # Do not advance last_uid on failure; idempotency ensures safe retry
     { ingested: false, attachments: 0, patch_files: 0 }
+  end
+
+  def resolve_mailing_lists_from_headers(raw)
+    mail = Mail.new(raw)
+    all_addresses = []
+    all_addresses.concat(Array(mail.to)) if mail.to
+    all_addresses.concat(Array(mail.cc)) if mail.cc
+
+    known_lists = MailingList.where.not(email: nil).index_by { |ml| ml.email.downcase }
+    all_addresses.filter_map { |addr| known_lists[addr.to_s.downcase] }.uniq
   end
 
   def short_error(e)

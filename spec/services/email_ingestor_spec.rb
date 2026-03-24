@@ -30,6 +30,7 @@ RSpec.describe EmailIngestor do
 
   describe "#ingest_raw with message activities" do
     let(:ingestor) { described_class.new }
+    let(:mailing_list) { create(:mailing_list) }
     let(:user1) { create(:user, username: "user1") }
     let(:user2) { create(:user, username: "user2") }
 
@@ -57,7 +58,7 @@ RSpec.describe EmailIngestor do
         allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([ sender_alias ])
 
         expect {
-          ingestor.ingest_raw(raw_email)
+          ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
         }.to change { TopicStar.count }.by(1)
 
         star = TopicStar.last
@@ -70,7 +71,7 @@ RSpec.describe EmailIngestor do
         allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([ guest_alias ])
 
         expect {
-          ingestor.ingest_raw(raw_email)
+          ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
         }.not_to change { TopicStar.count }
       end
 
@@ -78,14 +79,14 @@ RSpec.describe EmailIngestor do
         sender_alias = create(:alias, email: "sender@example.com", user: user1)
         allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([ sender_alias ])
 
-        first_message = ingestor.ingest_raw(raw_email)
+        first_message = ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
         expect(TopicStar.count).to eq(1)
 
         reply_email = raw_email.gsub("<test123@example.com>", "<test456@example.com>")
         reply_email = reply_email.gsub("Subject: Test Subject", "Subject: Re: Test Subject\nIn-Reply-To: <test123@example.com>")
 
         expect {
-          ingestor.ingest_raw(reply_email)
+          ingestor.ingest_raw(reply_email, mailing_list: mailing_list)
         }.not_to change { TopicStar.count }
 
         expect(TopicStar.where(user: user1, topic: first_message.topic).count).to eq(1)
@@ -97,7 +98,7 @@ RSpec.describe EmailIngestor do
         sender_alias = create(:alias, email: "sender@example.com", user: user1)
         allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([ sender_alias ])
 
-        first_message = ingestor.ingest_raw(raw_email)
+        first_message = ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
         topic = first_message.topic
 
         create(:topic_star, user: user2, topic: topic)
@@ -111,7 +112,7 @@ RSpec.describe EmailIngestor do
         reply_message = nil
         # Activities created for user1 and user2 (not reply_sender since they're the sender)
         expect {
-          reply_message = ingestor.ingest_raw(reply_email)
+          reply_message = ingestor.ingest_raw(reply_email, mailing_list: mailing_list)
         }.to change { Activity.where(activity_type: "topic_message_received").count }.by(2)
 
         activities = Activity.where(activity_type: "topic_message_received", subject: reply_message)
@@ -122,7 +123,7 @@ RSpec.describe EmailIngestor do
         sender_alias = create(:alias, email: "sender@example.com", user: user1)
         allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([ sender_alias ])
 
-        first_message = ingestor.ingest_raw(raw_email)
+        first_message = ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
         topic = first_message.topic
 
         create(:topic_star, user: user2, topic: topic)
@@ -131,7 +132,7 @@ RSpec.describe EmailIngestor do
         reply_email = reply_email.gsub("Subject: Test Subject", "Subject: Re: Test Subject\nIn-Reply-To: <test123@example.com>")
 
         # user1 is the sender of the reply (build_from_aliases still returns sender_alias)
-        reply_message = ingestor.ingest_raw(reply_email)
+        reply_message = ingestor.ingest_raw(reply_email, mailing_list: mailing_list)
 
         # Sender (user1) should not get an activity
         sender_activity = Activity.find_by(user: user1, activity_type: "topic_message_received", subject: reply_message)
@@ -147,7 +148,7 @@ RSpec.describe EmailIngestor do
         sender_alias = create(:alias, email: "sender@example.com", name: "Test Sender", user: user1)
         allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([ sender_alias ])
 
-        first_message = ingestor.ingest_raw(raw_email)
+        first_message = ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
         topic = first_message.topic
 
         create(:topic_star, user: user2, topic: topic)
@@ -157,7 +158,7 @@ RSpec.describe EmailIngestor do
         reply_email = reply_email.gsub("Subject: Test Subject", "Subject: Re: Test Subject\nIn-Reply-To: <test123@example.com>")
         allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([ reply_sender_alias ])
 
-        reply_message = ingestor.ingest_raw(reply_email)
+        reply_message = ingestor.ingest_raw(reply_email, mailing_list: mailing_list)
 
         activity = Activity.find_by(user: user2, subject: reply_message)
         expect(activity.payload).to eq({
@@ -165,6 +166,77 @@ RSpec.describe EmailIngestor do
           "message_id" => reply_message.id
         })
       end
+    end
+  end
+
+  describe "#ingest_raw mailing list association" do
+    let(:ingestor) { described_class.new }
+    let(:mailing_list) { create(:mailing_list, identifier: "pgsql-hackers", display_name: "hackers") }
+    let(:other_list) { create(:mailing_list, identifier: "pgsql-bugs", display_name: "bugs") }
+
+    let(:raw_email) do
+      <<~EMAIL
+        From: sender@example.com
+        To: recipient@example.com
+        Subject: Test Subject
+        Message-ID: <list-test-123@example.com>
+        Date: #{Time.current.rfc2822}
+
+        This is the email body.
+      EMAIL
+    end
+
+    it "creates MessageMailingList for new message" do
+      msg = ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
+      expect(msg.mailing_lists).to include(mailing_list)
+    end
+
+    it "creates TopicMailingList via callback" do
+      msg = ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
+      expect(msg.topic.mailing_lists).to include(mailing_list)
+    end
+
+    it "adds list association to existing message without updating it" do
+      msg = ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
+      original_body = msg.body
+
+      msg2 = ingestor.ingest_raw(raw_email, mailing_list: other_list)
+      expect(msg2.id).to eq(msg.id)
+      expect(msg2.body).to eq(original_body)
+      expect(msg2.mailing_lists).to include(mailing_list, other_list)
+    end
+
+    it "does not duplicate list association on re-import" do
+      ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
+      expect {
+        ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
+      }.not_to change { MessageMailingList.count }
+    end
+  end
+
+  describe "#fallback_thread_lookup scoped to list" do
+    let(:ingestor) { described_class.new }
+    let(:hackers_list) { create(:mailing_list, identifier: "pgsql-hackers", display_name: "hackers") }
+    let(:bugs_list) { create(:mailing_list, identifier: "pgsql-bugs", display_name: "bugs") }
+
+    let!(:hackers_topic) { create(:topic) }
+    let!(:hackers_msg) do
+      msg = create(:message, topic: hackers_topic, subject: "Parallel query plans", created_at: 2.days.ago)
+      MessageMailingList.create!(message: msg, mailing_list: hackers_list)
+      msg
+    end
+
+    let!(:bugs_topic) { create(:topic) }
+    let!(:bugs_msg) do
+      msg = create(:message, topic: bugs_topic, subject: "Parallel query plans", created_at: 2.days.ago)
+      MessageMailingList.create!(message: msg, mailing_list: bugs_list)
+      msg
+    end
+
+    it "only matches messages from the same list" do
+      found = ingestor.send(:fallback_thread_lookup, "Re: Parallel query plans",
+        message_id: nil, references: [], sent_at: Time.current, mailing_list: bugs_list)
+      expect(found).to eq(bugs_msg)
     end
   end
 end

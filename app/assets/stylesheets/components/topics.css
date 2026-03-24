@@ -1020,3 +1020,26 @@ a.topic-icon {
   margin: var(--spacing-8);
   text-align: center;
 }
+
+.mailing-list-badges {
+  display: inline-flex;
+  gap: 4px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.mailing-list-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 0.7rem;
+  border-radius: 3px;
+  background: var(--color-primary-3);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.message-lists {
+  display: inline-flex;
+  gap: 4px;
+}

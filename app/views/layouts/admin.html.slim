@@ -9,6 +9,9 @@
       = link_to admin_users_path, class: admin_nav_link_class(:users) do
         i.fas.fa-users
         span Users
+      = link_to admin_mailing_lists_path, class: admin_nav_link_class(:mailing_lists) do
+        i.fas.fa-mail-bulk
+        span Mailing Lists
       = link_to admin_email_changes_path, class: admin_nav_link_class(:email_changes) do
         i.fas.fa-envelope
         span Email Changes

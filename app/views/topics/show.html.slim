@@ -175,6 +175,9 @@
       span.creator Started by #{@topic.creator_display_alias.name}
       span.date #{time_ago_in_words(@topic.created_at)} ago
       span.message-count #{@messages.size} messages
+      - if @topic_mailing_lists.present?
+        span.mailing-lists
+          = mailing_list_badges_html(@topic_mailing_lists)
     - if current_admin?
       .admin-actions
         = link_to new_admin_topic_merge_path(@topic), class: "button button-secondary button-small" do

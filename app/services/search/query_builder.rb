@@ -125,6 +125,8 @@ module Search
                  apply_last_date_selector(:<, value, relation, negated: negated)
       when :commitfest
                  apply_commitfest_selector(value, relation, negated: negated, conditions: conditions)
+      when :list
+                 apply_list_selector(value, relation, negated: negated)
       else
                  @warnings << "Unknown selector: #{key}"
                  relation
@@ -889,6 +891,23 @@ module Search
       predicate = column.lower.eq(value.downcase)
       predicate = predicate.not if negated
       relation.where(predicate)
+    end
+
+    # === List Selector ===
+
+    def apply_list_selector(value, relation, negated:)
+      return relation if value.blank?
+
+      list_topic_ids = TopicMailingList
+        .joins(:mailing_list)
+        .where("LOWER(mailing_lists.display_name) = LOWER(?)", value)
+        .select(:topic_id)
+
+      if negated
+        relation.where.not(id: list_topic_ids)
+      else
+        relation.where(id: list_topic_ids)
+      end
     end
 
     # === Helpers ===

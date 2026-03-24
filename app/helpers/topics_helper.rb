@@ -227,6 +227,16 @@ module TopicsHelper
     end
   end
 
+  def mailing_list_badges_html(mailing_lists)
+    return "".html_safe if mailing_lists.blank?
+
+    badges = mailing_lists.map do |ml|
+      tag.span(ml.display_name, class: "mailing-list-badge", title: ml.identifier)
+    end
+
+    tag.span(class: "mailing-list-badges") { safe_join(badges) }
+  end
+
   def topic_title_link(topic)
     if user_signed_in? && current_user.open_threads_at_first_unread?
       topic_path(topic, anchor: "first-unread")

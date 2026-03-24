@@ -29,6 +29,8 @@ class Topic < ApplicationRecord
   has_many :topics_merged_into_this, class_name: "Topic", foreign_key: :merged_into_topic_id
   has_one :topic_merge_as_source, class_name: "TopicMerge", foreign_key: :source_topic_id
   has_many :topic_merges_as_target, class_name: "TopicMerge", foreign_key: :target_topic_id
+  has_many :topic_mailing_lists, dependent: :destroy
+  has_many :mailing_lists, through: :topic_mailing_lists
 
   scope :active, -> { where(merged_into_topic_id: nil) }
   scope :merged, -> { where.not(merged_into_topic_id: nil) }

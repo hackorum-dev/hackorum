@@ -3,6 +3,7 @@ require_relative "../app/services/email_ingestor"
 require_relative "../lib/import_options"
 
 options = ImportOptions.parse!
+mailing_list = MailingList.find_by!(identifier: options[:list])
 
 if ARGV.length != 2
   puts "Usage: #{$PROGRAM_NAME} [options] /path/to/mbox <message-id>"
@@ -24,14 +25,14 @@ rescue => e
   ''
 end
 
-def process_message(message, target_id, update_existing:)
+def process_message(message, target_id, update_existing:, mailing_list:)
   return false if message.empty?
 
   message_id = normalize_message_id(message)
   return false if message_id.empty?
   return false unless message_id == target_id
 
-  msg = EmailIngestor.new.ingest_raw(message, fallback_threading: true, update_existing: update_existing)
+  msg = EmailIngestor.new.ingest_raw(message, mailing_list: mailing_list, fallback_threading: true, update_existing: update_existing)
   if msg
     puts "Reimported #{msg.message_id}"
   else
@@ -51,7 +52,7 @@ File.open(mbox_path, "r") do |f|
     line = line.encode("utf-8", invalid: :replace)
 
     if line.match(/^From [^@]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+/i)
-      if process_message(message, target_id, update_existing: update_existing)
+      if process_message(message, target_id, update_existing: update_existing, mailing_list: mailing_list)
         found = true
         break
       end
@@ -63,7 +64,7 @@ File.open(mbox_path, "r") do |f|
 end
 
 if !found
-  found = process_message(message, target_id, update_existing: update_existing)
+  found = process_message(message, target_id, update_existing: update_existing, mailing_list: mailing_list)
 end
 
 puts "Message not found in #{mbox_path}" unless found

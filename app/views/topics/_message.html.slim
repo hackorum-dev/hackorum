@@ -41,6 +41,11 @@
         - parent_number = (@message_numbers && @message_numbers[message.reply_to.id]) || "-"
         .reply-indicator
           span.reply-to In reply to: #{message.reply_to.sender_display_alias.name} (##{parent_number})
+      - if @topic_is_multi_list
+        - msg_lists = @message_mailing_lists_map&.dig(message.id) || []
+        - if msg_lists.any?
+          .message-lists
+            = mailing_list_badges_html(msg_lists)
       - if message.message_id.present?
         .message-archive-link
           = link_to "https://postgr.es/m/#{ERB::Util.url_encode(message.message_id)}", target: "_blank", rel: "noopener", data: { turbo: false }, title: "View on postgr.es", "aria-label": "View on postgr.es" do

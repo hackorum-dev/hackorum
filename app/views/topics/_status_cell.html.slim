@@ -27,7 +27,11 @@ td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") 
   .topic-title-main
     .topic-title-icons
       == icons_html
-    = link_to topic.title, topic_title_link(topic), class: "topic-link"
+    span
+      - topic_lists = @topic_mailing_lists_map&.dig(topic.id) || []
+      - if topic_lists.any?
+        = mailing_list_badges_html(topic_lists)
+      = link_to topic.title, topic_title_link(topic), class: "topic-link"
   .topic-title-mobile
     = link_to topic.title, topic_title_link(topic), class: "topic-link"
     - if creator || last_sender
