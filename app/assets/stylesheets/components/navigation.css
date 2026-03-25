@@ -184,16 +184,11 @@
 }
 
 .theme-toggle {
-  border-color: var(--color-border);
-  background: var(--color-bg-card);
-  color: var(--color-text-secondary);
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  border-radius: 999px;
-
-  &:hover {
-    background: var(--color-bg-hover);
-  }
+  appearance: none;
+  font: inherit;
+  line-height: inherit;
+  margin: 0;
 }
 
 .nav-overflow-dropdown {
@@ -367,15 +362,20 @@
     display: none;
   }
 
-  .mobile-nav-menu .nav-link {
-    width: 100%;
-    justify-content: space-between;
-  }
+.mobile-nav-menu .nav-link {
+  width: 100%;
+  justify-content: space-between;
+}
 
-  .mobile-nav-menu .nav-user {
-    display: block;
-    padding: 0 var(--spacing-2);
-  }
+.mobile-nav-theme-control {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.mobile-nav-menu .nav-user {
+  display: block;
+  padding: 0 var(--spacing-2);
+}
 
   .mobile-nav-menu {
     position: fixed;

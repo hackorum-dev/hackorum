@@ -56,6 +56,7 @@ html data-theme="light"
               span.mobile-nav-label Menu
               i.fa-solid.fa-caret-down
             .mobile-nav-menu data-action="click->sidebar#closeMenuOnNavigate"
+              = render "shared/theme_control", extra_class: "mobile-nav-theme-control", show_label: true
               = link_to "Topics", topics_path, class: "nav-link"
               - if user_signed_in?
                 - icon_class = starred_active ? "fa-solid fa-star" : "fa-regular fa-star"
@@ -101,6 +102,7 @@ html data-theme="light"
               - if user_signed_in?
                 - if current_user&.person&.default_alias
                   = link_to current_user.person.default_alias.name, person_path(current_user.person.default_alias.email), class: "nav-link nav-user"
+                = render "shared/theme_control", extra_class: "nav-theme-control", show_label: false
                 - unread = activity_unread_count
                 = link_to activities_path, class: "nav-link nav-link-activity", title: "Activity" do
                   i.fa-regular.fa-bell
@@ -109,6 +111,7 @@ html data-theme="light"
               - else
                 = link_to "Sign in", new_session_path, class: "nav-link"
                 = link_to "Register", new_registration_path, class: "nav-link"
+                = render "shared/theme_control", extra_class: "nav-theme-control", show_label: false
           details.nav-overflow-dropdown data-controller="nav-dropdown"
             summary.nav-link.nav-overflow-toggle aria-label="Menu" data-action="click->sidebar#closeMenuOnNavigate"
               i.fa-solid.fa-bars

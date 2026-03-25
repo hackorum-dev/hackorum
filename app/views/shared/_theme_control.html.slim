@@ -1,0 +1,5 @@
+- classes = ["nav-link", "theme-toggle", local_assigns[:extra_class]].compact.join(" ")
+button class=classes type="button" data-controller="theme" data-action="click->theme#toggle" aria-label="Toggle theme"
+  i.fa-regular.fa-moon data-theme-target="icon" aria-hidden="true"
+  - if local_assigns.fetch(:show_label, true)
+    span Theme

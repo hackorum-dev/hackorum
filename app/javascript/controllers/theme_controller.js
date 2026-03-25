@@ -49,11 +49,13 @@ export default class extends Controller {
     }
 
     if (this.hasIconTarget) {
-      this.iconTarget.classList.remove("fa-moon", "fa-sun")
+      this.iconTarget.classList.remove("fa-regular", "fa-solid", "fa-moon", "fa-sun")
+      this.iconTarget.classList.add("fa-solid")
       this.iconTarget.classList.add(theme === "dark" ? "fa-sun" : "fa-moon")
     }
 
     this.element.setAttribute("aria-pressed", theme === "dark")
+    this.element.setAttribute("aria-label", `Switch to ${theme === "dark" ? "light" : "dark"} mode`)
     this.element.setAttribute("title", `Switch to ${theme === "dark" ? "light" : "dark"} mode`)
 
     if (this.hasButtonTarget) {
