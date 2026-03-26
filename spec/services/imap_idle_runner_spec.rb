@@ -107,7 +107,7 @@ RSpec.describe ImapIdleRunner, type: :service do
 
       expect(Message.find_by(message_id: "uid-202@example.com")).to be_nil
       state.reload
-      expect(state.last_uid).to eq(0)
+      expect(state.last_uid).to eq(202)
     end
   end
 end
