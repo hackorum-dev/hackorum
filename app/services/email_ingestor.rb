@@ -210,7 +210,8 @@ class EmailIngestor
       count += 1
       display_names = fields.respond_to?(:display_names) ? (fields.display_names || []) : []
       name_or_alias = display_names[idx]
-      name_or_alias = "Noname" if name_or_alias.nil? || name_or_alias.empty?
+      name_or_alias = name_or_alias.to_s.strip
+      name_or_alias = "Noname" if name_or_alias.blank?
       email = addresses[idx]
       next if email.nil? || email.empty?
       person = Person.find_or_create_by_email(email)
