@@ -348,6 +348,14 @@ class EmailIngestor
   def sanitize_email_date(mail_date, mail_date_header, message_id)
     return mail_date if mail_date.nil?
 
+    unless mail_date.respond_to?(:utc)
+      begin
+        mail_date = Time.parse(mail_date.to_s)
+      rescue ArgumentError, TypeError
+        return Time.parse("2000-01-01 00:00:00 UTC")
+      end
+    end
+
     current_time_utc = Time.now.utc
     mail_date_utc = mail_date.utc
     min_valid_date = Time.parse("1996-01-01 00:00:00 UTC")
