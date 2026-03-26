@@ -57,7 +57,7 @@ RSpec.describe ImapIdleRunner, type: :service do
       state = ImapSyncState.for_label("INBOX")
       allow(imap_client).to receive(:connect!).and_return(true)
       allow(imap_client).to receive(:disconnect!).and_return(true)
-      expect(imap_client).to receive(:uids_after).with(0).and_return([201])
+      expect(imap_client).to receive(:uids_after).with(0).and_return([ 201 ])
       raw = <<~MAIL
         From: Test <test@example.com>
         To: pgsql-hackers@lists.postgresql.org
@@ -83,11 +83,11 @@ RSpec.describe ImapIdleRunner, type: :service do
     end
 
     it "resolves list from alternate email in CC" do
-      hackers_list.update!(alternate_emails: ["pgsql-hackers@postgresql.org"])
+      hackers_list.update!(alternate_emails: [ "pgsql-hackers@postgresql.org" ])
       state = ImapSyncState.for_label("INBOX")
       allow(imap_client).to receive(:connect!).and_return(true)
       allow(imap_client).to receive(:disconnect!).and_return(true)
-      expect(imap_client).to receive(:uids_after).with(0).and_return([203])
+      expect(imap_client).to receive(:uids_after).with(0).and_return([ 203 ])
       raw = <<~MAIL
         From: Test <test@example.com>
         To: peter@eisentraut.org
@@ -117,7 +117,7 @@ RSpec.describe ImapIdleRunner, type: :service do
       state = ImapSyncState.for_label("INBOX")
       allow(imap_client).to receive(:connect!).and_return(true)
       allow(imap_client).to receive(:disconnect!).and_return(true)
-      expect(imap_client).to receive(:uids_after).with(0).and_return([202])
+      expect(imap_client).to receive(:uids_after).with(0).and_return([ 202 ])
       raw = <<~MAIL
         From: Test <test@example.com>
         To: someone@example.com

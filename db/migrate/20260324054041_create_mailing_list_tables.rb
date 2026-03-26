@@ -15,14 +15,14 @@ class CreateMailingListTables < ActiveRecord::Migration[8.0]
       t.references :mailing_list, null: false, foreign_key: true
       t.timestamps
     end
-    add_index :message_mailing_lists, [:message_id, :mailing_list_id], unique: true, name: "idx_message_mailing_lists_unique"
+    add_index :message_mailing_lists, [ :message_id, :mailing_list_id ], unique: true, name: "idx_message_mailing_lists_unique"
 
     create_table :topic_mailing_lists do |t|
       t.references :topic, null: false, foreign_key: true
       t.references :mailing_list, null: false, foreign_key: true
       t.timestamps
     end
-    add_index :topic_mailing_lists, [:topic_id, :mailing_list_id], unique: true, name: "idx_topic_mailing_lists_unique"
+    add_index :topic_mailing_lists, [ :topic_id, :mailing_list_id ], unique: true, name: "idx_topic_mailing_lists_unique"
 
     hackers = execute <<~SQL
       INSERT INTO mailing_lists (identifier, display_name, email, created_at, updated_at)

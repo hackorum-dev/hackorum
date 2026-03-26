@@ -48,7 +48,7 @@ Signal.trap('TERM') { stop_w.write_nonblock("\0") rescue nil }
 Signal.trap('INT')  { stop_w.write_nonblock("\0") rescue nil }
 
 Thread.new do
-  IO.select([stop_r])
+  IO.select([ stop_r ])
   stop_r.close
   logger.info('[imap_idle] Signal received, stopping...') if logger
   runner.stop!

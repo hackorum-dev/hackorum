@@ -8,7 +8,7 @@ class MailingList < ApplicationRecord
   validates :display_name, presence: true
 
   def all_emails
-    [email, *alternate_emails].compact.reject(&:blank?).map(&:downcase)
+    [ email, *alternate_emails ].compact.reject(&:blank?).map(&:downcase)
   end
 
   def self.email_lookup_index

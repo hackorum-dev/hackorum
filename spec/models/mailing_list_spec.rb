@@ -12,7 +12,7 @@ RSpec.describe MailingList, type: :model do
   describe ".email_lookup_index" do
     it "indexes by primary and alternate emails" do
       ml = create(:mailing_list, email: "pgsql-hackers@lists.postgresql.org",
-                                 alternate_emails: ["pgsql-hackers@postgresql.org"])
+                                 alternate_emails: [ "pgsql-hackers@postgresql.org" ])
       index = described_class.email_lookup_index
       expect(index["pgsql-hackers@lists.postgresql.org"]).to eq(ml)
       expect(index["pgsql-hackers@postgresql.org"]).to eq(ml)
