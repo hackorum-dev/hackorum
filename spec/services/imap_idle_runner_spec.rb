@@ -82,6 +82,37 @@ RSpec.describe ImapIdleRunner, type: :service do
       expect(msg.mailing_lists).to include(hackers_list)
     end
 
+    it "resolves list from alternate email in CC" do
+      hackers_list.update!(alternate_emails: ["pgsql-hackers@postgresql.org"])
+      state = ImapSyncState.for_label("INBOX")
+      allow(imap_client).to receive(:connect!).and_return(true)
+      allow(imap_client).to receive(:disconnect!).and_return(true)
+      expect(imap_client).to receive(:uids_after).with(0).and_return([203])
+      raw = <<~MAIL
+        From: Test <test@example.com>
+        To: peter@eisentraut.org
+        CC: pgsql-hackers@postgresql.org
+        Subject: Re: SQL Property Graph Queries
+        Date: Fri, 1 Jan 2021 12:00:00 +0000
+        Message-ID: <uid-203@example.com>
+        MIME-Version: 1.0
+        Content-Type: text/plain; charset=UTF-8
+
+        Body
+      MAIL
+      expect(imap_client).to receive(:uid_fetch_rfc822).with(203).and_return(raw)
+      expect(imap_client).to receive(:mark_seen).with(203)
+      expect(imap_client).to receive(:idle_once).and_return(:timeout)
+      allow(imap_client).to receive(:uids_after).with(203).and_return([])
+
+      runner = described_class.new(client: imap_client, label: "INBOX")
+      runner.run(max_cycles: 1, idle_timeout: 1)
+
+      msg = Message.find_by(message_id: "uid-203@example.com")
+      expect(msg).to be_present
+      expect(msg.mailing_lists).to include(hackers_list)
+    end
+
     it "skips message when no list can be resolved" do
       state = ImapSyncState.for_label("INBOX")
       allow(imap_client).to receive(:connect!).and_return(true)

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_03_24_054041) do
+ActiveRecord::Schema[8.0].define(version: 2026_03_26_074352) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -218,6 +218,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_24_054041) do
     t.text "description"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "alternate_emails", default: [], array: true
     t.index ["email"], name: "index_mailing_lists_on_email", unique: true, where: "(email IS NOT NULL)"
     t.index ["identifier"], name: "index_mailing_lists_on_identifier", unique: true
   end

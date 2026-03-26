@@ -181,7 +181,7 @@ class ImapIdleRunner
     all_addresses.concat(Array(mail.to)) if mail.to
     all_addresses.concat(Array(mail.cc)) if mail.cc
 
-    known_lists = MailingList.where.not(email: nil).index_by { |ml| ml.email.downcase }
+    known_lists = MailingList.email_lookup_index
     all_addresses.filter_map { |addr| known_lists[addr.to_s.downcase] }.uniq
   end
 

@@ -6,4 +6,16 @@ class MailingList < ApplicationRecord
 
   validates :identifier, presence: true, uniqueness: true
   validates :display_name, presence: true
+
+  def all_emails
+    [email, *alternate_emails].compact.reject(&:blank?).map(&:downcase)
+  end
+
+  def self.email_lookup_index
+    index = {}
+    where.not(email: nil).find_each do |ml|
+      ml.all_emails.each { |e| index[e] = ml }
+    end
+    index
+  end
 end
