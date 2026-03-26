@@ -42,18 +42,26 @@ class EmailIngestor
     )
     import_log = nil if import_log == ""
 
-    msg = Message.create!(
-      topic: topic,
-      sender: from[0],
-      sender_person_id: from[0].person_id,
-      reply_to: reply_to_msg,
-      reply_to_message_id: reply_to_message_id,
-      subject: subject,
-      body: body,
-      created_at: sent_at,
-      message_id: message_id,
-      import_log: import_log
-    )
+    begin
+      msg = Message.create!(
+        topic: topic,
+        sender: from[0],
+        sender_person_id: from[0].person_id,
+        reply_to: reply_to_msg,
+        reply_to_message_id: reply_to_message_id,
+        subject: subject,
+        body: body,
+        created_at: sent_at,
+        message_id: message_id,
+        import_log: import_log
+      )
+    rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
+      raise unless message_id && (e.is_a?(ActiveRecord::RecordNotUnique) || e.message.include?("Message has already been taken"))
+      existing_message = Message.find_by(message_id: message_id)
+      raise unless existing_message
+      associate_mailing_list(existing_message, mailing_list)
+      return existing_message
+    end
 
     associate_mailing_list(msg, mailing_list)
 
