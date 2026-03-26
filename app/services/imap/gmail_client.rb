@@ -129,6 +129,7 @@ module Imap
           # the connection is torn down before the thread runs.
           idle_done_called = false
           @imap.idle(timeout) do |resp|
+            next unless resp.is_a?(Net::IMAP::UntaggedResponse)
             got_activity = true
             yield resp if block_given?
             unless idle_done_called
