@@ -43,19 +43,20 @@ end
 
 runner = ImapIdleRunner.new(label: label, logger: logger)
 
-Signal.trap('TERM') do
-  logger.info('[imap_idle] SIGTERM received, stopping...') if logger
-  runner.stop!
-end
-Signal.trap('INT') do
-  logger.info('[imap_idle] SIGINT received, stopping...') if logger
+stop_r, stop_w = IO.pipe
+Signal.trap('TERM') { stop_w.write_nonblock("\0") rescue nil }
+Signal.trap('INT')  { stop_w.write_nonblock("\0") rescue nil }
+
+Thread.new do
+  IO.select([stop_r])
+  stop_r.close
+  logger.info('[imap_idle] Signal received, stopping...') if logger
   runner.stop!
 end
 
 logger.info("[imap_idle] Starting IMAP IDLE runner for #{label}") if logger
 
 begin
-  # Infinite loop: use stop! via signal to exit
   runner.run
 rescue SystemExit, Interrupt
   # normal exit
@@ -63,5 +64,6 @@ rescue => e
   logger.error("[imap_idle] Fatal error: #{e.class}: #{e.message}") if logger
   raise
 ensure
+  stop_w.close rescue nil
   logger.info('[imap_idle] Exiting') if logger
 end

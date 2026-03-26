@@ -194,10 +194,7 @@ class ImapIdleRunner
 
   def stop!
     @stop = true
-    begin
-      disconnect!
-    rescue StandardError
-    end
+    @client&.interrupt_idle!
   end
 
   def respond_to_logger_info?

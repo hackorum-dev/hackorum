@@ -122,17 +122,18 @@ module Imap
       begin
         if @imap.respond_to?(:idle)
           # Break IDLE promptly on first response so the caller can FETCH.
-          # Response handlers run outside the monitor in the receiver thread,
-          # and idle's wait releases the monitor, so idle_done can be called
-          # directly without deadlock. Avoids a detached Thread that can
-          # outlive the connection and hit a torn-down monitor.
+          # idle_done must be called from a separate thread: the response
+          # handler runs inside the receiver thread's monitor lock, so a
+          # direct call would deadlock or extend the lock window and race
+          # with signal-driven shutdown. rescue nil handles the case where
+          # the connection is torn down before the thread runs.
           idle_done_called = false
           @imap.idle(timeout) do |resp|
             got_activity = true
             yield resp if block_given?
             unless idle_done_called
               idle_done_called = true
-              @imap.idle_done
+              Thread.new { @imap.idle_done rescue nil }
             end
           end
         else
@@ -157,6 +158,11 @@ module Imap
         raise e
       end
       got_activity ? :activity : :timeout
+    end
+
+    def interrupt_idle!
+      @imap&.idle_done
+    rescue StandardError
     end
 
     private
