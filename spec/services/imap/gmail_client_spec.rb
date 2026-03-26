@@ -49,10 +49,6 @@ RSpec.describe Imap::GmailClient, type: :service do
     # Simulate Net::IMAP#idle with yielding one response
     allow(imap_double).to receive(:respond_to?).with(:idle).and_return(true)
     allow(imap_double).to receive(:idle_done)
-    allow(Thread).to receive(:new).and_wrap_original do |m, *args, &blk|
-      blk.call
-      double('Thread', join: true)
-    end
     yielded = []
     expect(imap_double).to receive(:idle) do |timeout, &blk|
       blk.call(double('Resp', name: 'EXISTS', data: 1))

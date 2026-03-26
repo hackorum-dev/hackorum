@@ -28,7 +28,7 @@ class ImapIdleRunner
       begin
         main_loop(max_cycles: max_cycles, idle_timeout: idle_timeout)
       rescue => e
-        @logger.error("IMAP runner fatal error: #{e.class}: #{e.message}")
+        @logger.error("IMAP runner fatal error: #{e.class}: #{e.message}\n#{e.backtrace&.first(10)&.join("\n")}")
         update_state(last_error: short_error(e))
         raise
       end
