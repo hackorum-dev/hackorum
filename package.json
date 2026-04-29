@@ -2,9 +2,11 @@
   "name": "app",
   "private": "true",
   "scripts": {
-    "build:css": "postcss ./app/assets/stylesheets/application.postcss.css -o ./app/assets/builds/application.css"
+    "copy:fontawesome": "mkdir -p app/assets/builds/fontawesome app/assets/builds/webfonts && cp node_modules/@fortawesome/fontawesome-free/css/all.min.css app/assets/builds/fontawesome/all.min.css && cp -R node_modules/@fortawesome/fontawesome-free/webfonts/. app/assets/builds/webfonts/",
+    "build:css": "npm run copy:fontawesome && postcss ./app/assets/stylesheets/application.postcss.css -o ./app/assets/builds/application.css"
   },
   "devDependencies": {
+    "@fortawesome/fontawesome-free": "^7.2.0",
     "autoprefixer": "^10.4.23",
     "postcss": "^8.5.6",
     "postcss-cli": "^11.0.1",

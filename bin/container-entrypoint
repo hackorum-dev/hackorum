@@ -9,9 +9,15 @@ fi
 # Ensure gems are installed when using a persistent bundle volume.
 bundle check || bundle install
 
-# Ensure JS dependencies are present when using a node_modules volume.
-if [ -f package.json ] && [ ! -d node_modules ]; then
-  npm install --no-progress
+# Ensure JS dependencies are present and in sync with package-lock.json
+# when using a node_modules volume.
+if [ -f package.json ]; then
+  lock_marker="node_modules/.package-lock-checksum"
+  current_sum=$(sha1sum package-lock.json 2>/dev/null | cut -d' ' -f1)
+  if [ ! -d node_modules ] || [ ! -f "$lock_marker" ] || [ "$(cat "$lock_marker" 2>/dev/null)" != "$current_sum" ]; then
+    npm install --no-progress
+    echo "$current_sum" > "$lock_marker"
+  fi
 fi
 
 # If running the rails server (directly or via bin/dev), create or migrate the database

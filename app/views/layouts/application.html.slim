@@ -32,8 +32,8 @@ html data-theme="light"
           document.documentElement.dataset.theme = theme;
         })();
     = stylesheet_link_tag "application", "data-turbo-track": "reload"
+    = stylesheet_link_tag "fontawesome/all.min", "data-turbo-track": "reload"
     = javascript_importmap_tags
-    script[src="https://kit.fontawesome.com/92fb6aa8ba.js"]
     - if ENV["UMAMI_WEBSITE_ID"].present?
       - umami_host = ENV["UMAMI_HOST"].presence || "https://umami.hackorum.dev"
       script[async defer data-website-id=ENV["UMAMI_WEBSITE_ID"] src="#{umami_host}/script.js"]
