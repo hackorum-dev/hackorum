@@ -69,6 +69,22 @@
   text-overflow: ellipsis;
 }
 
+.nav-dev-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--spacing-2);
+  height: calc(var(--nav-height) - var(--spacing-2));
+  background: #c62828;
+  color: #fff;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-radius: var(--radius-sm, 4px);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .brand-icon {
   height: var(--nav-height);
   width: auto;

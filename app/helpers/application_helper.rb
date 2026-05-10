@@ -1,9 +1,13 @@
 module ApplicationHelper
   def meta_title
-    return content_for(:meta_title) if content_for?(:meta_title)
-    return "#{content_for(:title)} - Hackorum" if content_for?(:title)
-
-    "Hackorum"
+    base = if content_for?(:meta_title)
+      content_for(:meta_title)
+    elsif content_for?(:title)
+      "#{content_for(:title)} - Hackorum"
+    else
+      "Hackorum"
+    end
+    Rails.env.production? ? base : "[DEV] #{base}"
   end
 
   def meta_description

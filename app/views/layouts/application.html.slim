@@ -51,6 +51,8 @@ html data-theme="light"
           = link_to root_path, class: "brand-link" do
             img.brand-icon src="/icon.png" alt="Hackorum" width="24" height="24"
             span.brand-text Hackorum
+          - unless Rails.env.production?
+            span.nav-dev-badge title="Non-production environment" DEVELOPMENT MODE
           details.mobile-nav-dropdown
             summary.mobile-nav-toggle aria-label="Open menu"
               span.mobile-nav-label Menu
