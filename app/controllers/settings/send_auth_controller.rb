@@ -4,6 +4,8 @@ require "net/http"
 
 module Settings
   class SendAuthController < Settings::BaseController
+    before_action :require_admin
+
     def destroy
       identity = current_user.identities.find(params[:identity_id])
       revoke_remotely(identity)
@@ -17,6 +19,10 @@ module Settings
     end
 
     private
+
+    def require_admin
+      redirect_to settings_account_path, alert: "Not authorized." unless current_admin?
+    end
 
     def revoke_remotely(identity)
       return if identity.refresh_token.blank?

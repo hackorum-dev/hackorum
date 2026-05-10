@@ -28,32 +28,33 @@
     - else
       p No connected accounts yet.
 
-  .settings-section
-    h2 Email sending
-    - if @send_identity
-      p Status: Authorized as #{@send_identity.email}
-      - if @send_identity.send_authorized_at
+  - if current_admin?
+    .settings-section
+      h2 Email sending
+      - if @send_identity
+        p Status: Authorized as #{@send_identity.email}
+        - if @send_identity.send_authorized_at
+          p
+            | Authorized:
+            |
+            time datetime=@send_identity.send_authorized_at.iso8601
+              = l(@send_identity.send_authorized_at, format: :short)
+        - if @send_identity.last_send_error.present?
+          p
+            strong Last error:
+            |
+            = @send_identity.last_send_error
+        = button_to "Revoke authorization",
+                    settings_send_auth_path(identity_id: @send_identity.id),
+                    method: :delete,
+                    data: { turbo_confirm: "Revoke sending authorization?" },
+                    class: "button-danger"
+      - else
         p
-          | Authorized:
-          |
-          time datetime=@send_identity.send_authorized_at.iso8601
-            = l(@send_identity.send_authorized_at, format: :short)
-      - if @send_identity.last_send_error.present?
-        p
-          strong Last error:
-          |
-          = @send_identity.last_send_error
-      = button_to "Revoke authorization",
-                  settings_send_auth_path(identity_id: @send_identity.id),
-                  method: :delete,
-                  data: { turbo_confirm: "Revoke sending authorization?" },
-                  class: "button-danger"
-    - else
-      p
-        | Authorize Hackorum to send replies via your Google account. Uses the
-        | gmail.send scope (send-only, never reads your inbox).
-      = link_to "Authorize sending", "/auth/google_oauth2?send=1",
-                class: "button-primary", data: { turbo: false }
+          | Authorize Hackorum to send replies via your Google account. Uses the
+          | gmail.send scope (send-only, never reads your inbox).
+        = link_to "Authorize sending", "/auth/google_oauth2?send=1",
+                  class: "button-primary", data: { turbo: false }
 
   .settings-section
     h2 Add alias

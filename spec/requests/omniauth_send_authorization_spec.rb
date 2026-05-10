@@ -1,7 +1,7 @@
 require 'rails_helper'
 
 RSpec.describe 'Send authorization callback', type: :request do
-  let(:user) { create(:user) }
+  let(:user) { create(:user, admin: true) }
 
   before do
     OmniAuth.config.test_mode = true
@@ -58,6 +58,14 @@ RSpec.describe 'Send authorization callback', type: :request do
     allow_any_instance_of(ApplicationController).to receive(:user_signed_in?).and_return(false)
     trigger_callback
     expect(response).to redirect_to(new_session_path)
+  end
+
+  it 'rejects non-admin users' do
+    non_admin = create(:user)
+    sign_in_as(non_admin)
+    trigger_callback
+    expect(response).to redirect_to(settings_account_path)
+    expect(non_admin.reload.identities).to be_empty
   end
 
   it 'records the granted scope on the identity' do

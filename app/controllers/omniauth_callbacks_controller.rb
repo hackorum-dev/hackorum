@@ -19,6 +19,7 @@ class OmniauthCallbacksController < ApplicationController
 
     if sending
       return redirect_to new_session_path, alert: "Sign in first." unless current_user
+      return redirect_to settings_account_path, alert: "Not authorized." unless current_admin?
 
       if Alias.by_email(email).where.not(user_id: [ nil, current_user.id ]).exists?
         return redirect_to settings_account_path, alert: "Email is linked to another account. Delete that account first to release it."
