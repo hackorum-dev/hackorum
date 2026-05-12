@@ -1,0 +1,57 @@
+- content_for :title, "My emails"
+
+.drafts-page
+  .drafts-header
+    h2 My emails
+
+  nav.tabs.draft-state-tabs
+    - %w[all in_progress sent failed].each do |state|
+      - label = { "all" => "All", "in_progress" => "In progress", "sent" => "Sent", "failed" => "Failed" }[state]
+      = link_to label, drafts_path(state: state),
+                class: ("tab is-active" if @state == state) || "tab"
+
+  - if @drafts.empty?
+    p No emails yet.
+  - else
+    table.drafts-list
+      thead
+        tr
+          th State
+          th Subject
+          th To
+          th Topic
+          th When
+          th
+      tbody
+        - @drafts.each do |draft|
+          tr
+            td
+              - if draft.sent?
+                span.badge.badge-sent Sent
+              - elsif draft.sending?
+                span.badge.badge-sending Sending
+              - elsif draft.failed?
+                span.badge.badge-failed Failed
+              - else
+                span.badge.badge-draft Draft
+            td = draft.subject
+            td
+              - if draft.sent? && draft.sent_message&.sent_to_address.present?
+                = draft.sent_message.sent_to_address
+              - else
+                = draft.sender_alias.email
+            td
+              = link_to draft.topic.title.presence || "(no subject)",
+                        topic_path(draft.topic)
+            td
+              - ts = draft.sent_at || draft.updated_at
+              time datetime=ts.iso8601 title=absolute_time_display(ts) = smart_time_display(ts)
+            td.actions
+              - if draft.sent?
+                = link_to "View", draft_path(draft), class: "button-link"
+              - elsif draft.failed?
+                = link_to "Retry", topic_path(draft.topic, anchor: "message-#{draft.reply_to_message_id}"),
+                          class: "button-link"
+              - elsif draft.idle?
+                = link_to "Resume", topic_path(draft.topic, anchor: "message-#{draft.reply_to_message_id}"),
+                          class: "button-link"

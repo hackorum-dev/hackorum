@@ -1,0 +1,37 @@
+- content_for :title, "Sent: #{@draft.subject}"
+
+.drafts-page
+  - if @draft.sent?
+    .sent-header
+      h2 = @draft.subject
+      p.muted
+        | Sent
+        '
+        - if @draft.sent_at
+          time datetime=@draft.sent_at.iso8601 title=absolute_time_display(@draft.sent_at) = smart_time_display(@draft.sent_at)
+        |  as
+        '
+        strong = @draft.sender_alias.name
+        '
+        | &lt;
+        = @draft.sender_alias.email
+        | &gt;
+        - if @draft.sent_message&.sent_to_address.present?
+          |  to
+          '
+          = @draft.sent_message.sent_to_address
+
+    .sent-body
+      pre = @draft.body
+
+    .sent-footer
+      - if @draft.sent_message
+        = link_to "View in topic",
+                  topic_path(@draft.topic, anchor: "message-#{@draft.sent_message_id}"),
+                  class: "button-secondary"
+      = link_to "Back to my emails", drafts_path, class: "button-secondary"
+  - else
+    p This draft has not been sent yet.
+    = link_to "Open composer",
+              topic_path(@draft.topic, anchor: "message-#{@draft.reply_to_message_id}"),
+              class: "button-primary"
