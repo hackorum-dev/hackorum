@@ -220,4 +220,34 @@ RSpec.describe DraftsController, type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
     end
   end
+
+  describe 'full send flow' do
+    it 'send_now marks draft sent and it appears in index and show' do
+      draft = create(:outgoing_draft,
+                     user: user, topic: topic,
+                     reply_to_message: parent,
+                     identity: identity, sender_alias: sender,
+                     subject: 'Re: hi', body: 'hello',
+                     status: 'idle')
+
+      builder = Outgoing::MessageBuilder::Result.new(
+        encoded: "raw", message_id: "<flow@x>",
+        subject: "Re: hi", recipient: "to@x")
+      allow(OAuth::TokenRefresher).to receive(:call)
+      allow(Outgoing::MessageBuilder).to receive(:build).and_return(builder)
+      allow(Gmail::SendClient).to receive(:send_raw).and_return({"id" => "g"})
+
+      post send_now_draft_path(draft)
+      draft.reload
+      expect(draft).to be_sent
+      expect(draft.sent_message_id).to be_present
+
+      get drafts_path(state: 'sent')
+      expect(response.body).to include('Re: hi')
+
+      get draft_path(draft)
+      expect(response.body).to include('Re: hi')
+      expect(response.body).to include('hello')
+    end
+  end
 end
