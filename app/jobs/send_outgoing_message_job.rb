@@ -29,7 +29,14 @@ class SendOutgoingMessageJob < ApplicationJob
         sent_via_identity_id: draft.identity_id,
         sent_to_address:      rfc.recipient
       )
-      draft.destroy!
+      draft.update_columns(
+        status:             OutgoingDraft::STATUS_SENT,
+        sent_message_id:    msg.id,
+        sent_at:            Time.current,
+        last_send_error:    nil,
+        sending_started_at: nil,
+        updated_at:         Time.current
+      )
     end
 
     ActiveSupport::Notifications.instrument("outgoing.send.success",

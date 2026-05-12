@@ -28,11 +28,13 @@ RSpec.describe SendOutgoingMessageJob do
     allow(Outgoing::MessageBuilder).to receive(:build).with(draft).and_return(builder_result)
   end
 
-  it 'creates a pending message and destroys the draft on success' do
+  it 'creates a pending message and marks the draft sent on success' do
     allow(Gmail::SendClient).to receive(:send_raw).and_return({"id" => "g"})
+
     expect {
       described_class.new.perform(draft.id)
-    }.to change(Message, :count).by(1).and change(OutgoingDraft, :count).by(-1)
+    }.to change(Message, :count).by(1)
+     .and change(OutgoingDraft, :count).by(0)
 
     msg = Message.where(message_id: '<m@x>').first
     expect(msg).to be_present
@@ -45,6 +47,18 @@ RSpec.describe SendOutgoingMessageJob do
     expect(msg.sender_person_id).to eq(sender.person_id)
     expect(msg.reply_to_id).to eq(parent.id)
     expect(msg.reply_to_message_id).to eq(parent.message_id)
+
+    draft.reload
+    expect(draft).to be_sent
+    expect(draft.sent_message_id).to eq(msg.id)
+    expect(draft.sent_at).to be_within(5.seconds).of(Time.current)
+    expect(draft.last_send_error).to be_nil
+  end
+
+  it 'no-ops if the draft is already sent' do
+    draft.update_columns(status: 'sent', sent_at: 1.minute.ago)
+    expect(Gmail::SendClient).not_to receive(:send_raw)
+    described_class.new.perform(draft.id)
   end
 
   it 'persists error and resets draft to idle on PermanentError' do
