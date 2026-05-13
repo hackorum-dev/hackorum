@@ -3,7 +3,7 @@
 - collapse_read = local_assigns.fetch(:collapse_read, true)
 - is_collapsed = (render_mode == :collapsed) || (render_mode == :shell && is_read && collapse_read)
 - message_classes = [("reply-message" if message.reply_to_id), ("message-branch-#{local_assigns[:branch_index]}" unless local_assigns[:branch_index].nil?), ("is-collapsed" if is_collapsed)].compact.join(" ")
-.message-card id=message_dom_id(message) class=message_classes data-controller="message-collapse" data-message-collapse-collapsed-value=is_collapsed data-message-id=message.id data-read=(is_read ? "true" : "false")
+.message-card id=message_dom_id(message) class=message_classes data-controller="message-collapse reply-quote" data-message-collapse-collapsed-value=is_collapsed data-message-id=message.id data-read=(is_read ? "true" : "false")
   - if (mid_anchor = message_id_anchor(message))
     a.message-id-anchor id=mid_anchor aria-hidden="true"
   - if local_assigns[:is_first_unread]
@@ -68,7 +68,7 @@
         - elsif can_reply
           = button_to drafts_path, params: { reply_to_message_id: message.id },
                       method: :post,
-                      form: { data: { turbo_frame: "draft-#{message.id}" } },
+                      form: { data: { turbo_frame: "draft-#{message.id}", action: "submit->reply-quote#injectSelection" } },
                       class: "message-action message-action-form",
                       title: "Reply", "aria-label": "Reply" do
             i.fa-solid.fa-reply
