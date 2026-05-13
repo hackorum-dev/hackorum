@@ -125,6 +125,7 @@ body.sidebar-collapsed .topics-table th.topic-title .sidebar-burger-button {
   & .topic-replies {
     width: 100px;
   }
+  & .topic-mailing-lists,
   & .topic-activity {
     width: 150px;
   }
@@ -274,6 +275,7 @@ a.topic-icon {
     }
 
     & th.activity-header,
+    & th.mailing-lists-header,
     & td.topic-activity {
       display: none;
     }

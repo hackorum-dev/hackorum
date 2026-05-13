@@ -14,6 +14,10 @@
 
   tr id=dom_id(topic) class="topic-row" data-topic-id=topic.id data-last-message-id=topic.last_message_id
     = render partial: "topics/status_cell", locals: { topic: topic, state: {}, note_count: 0, team_readers: [], star_data: {} }
+    td.topic-mailing-lists data-label="Mailing Lists"
+      - topic_lists = @topic_mailing_lists_map&.dig(topic.id) || []
+      - if topic_lists.any?
+        = mailing_list_badges_html(topic_lists)
     td.topic-activity data-label="Activity"
       - replies_count = [topic.message_count - 1, 0].max
       .activity-info.compact
