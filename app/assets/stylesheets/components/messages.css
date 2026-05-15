@@ -10,7 +10,7 @@
   background: var(--color-bg-card);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--border-radius-lg);
-  overflow: hidden;
+  overflow: clip;
   scroll-margin-top: 90px;
 }
 
@@ -28,6 +28,9 @@
   align-items: flex-start;
   flex-wrap: wrap;
   gap: var(--spacing-3);
+  position: sticky;
+  top: var(--nav-height);
+  z-index: 10;
 }
 
 .message-author {
