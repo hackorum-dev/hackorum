@@ -16,6 +16,7 @@ jobs:
       - name: Prepare deploy env file
         run: |
           cp deploy/.env.example deploy/.env
+          sed -i '/^RAILS_MASTER_KEY=/d' deploy/.env
           # Override secrets/SSL for CI boot
           ruby -e "require 'securerandom'; puts \"SECRET_KEY_BASE=#{SecureRandom.hex(64)}\"" >> deploy/.env
           # AR encryption keys — production.rb normally loads these from
