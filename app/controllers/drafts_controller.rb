@@ -42,7 +42,7 @@ class DraftsController < ApplicationController
         identity: identity,
         sender_alias: sender,
         subject: build_default_subject(parent),
-        body: ""
+        body: build_quoted_body(parent, params[:selected_text])
       )
     rescue ActiveRecord::RecordNotUnique
       current_user.outgoing_drafts
@@ -137,6 +137,16 @@ class DraftsController < ApplicationController
   def build_default_subject(parent)
     base = parent.subject.to_s.sub(/\A(re|aw|fwd):\s*/i, "")
     "Re: #{base}"
+  end
+
+  def build_quoted_body(parent, selected_text)
+    return "" if selected_text.blank?
+
+    display = parent.sender_display_alias
+    date_str = parent.created_at.strftime("%a, %d %b %Y")
+    header = "On #{date_str}, #{display.name} <#{display.email}> wrote:"
+    quoted = selected_text.strip.each_line.map { |l| "> #{l.chomp}" }.join("\n")
+    "#{header}\n#{quoted}\n\n"
   end
 
   def active_settings_section
