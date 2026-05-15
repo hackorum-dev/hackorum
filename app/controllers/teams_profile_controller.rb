@@ -17,7 +17,7 @@ class TeamsProfileController < ApplicationController
   def daily_activity
     date = parse_activity_date
     @activity_period = { type: :day, date: date }
-    load_activity_data(scope: messages_scope_for_date(date))
+    load_activity_data(scope: messages_scope_for_date(date), year: date.year)
     render :activity
   end
 

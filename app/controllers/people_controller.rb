@@ -20,7 +20,7 @@ class PeopleController < ApplicationController
     date = parse_activity_date
     @profile_email = profile_email
     @activity_period = { type: :day, date: date }
-    load_activity_data(scope: messages_scope_for_date(date))
+    load_activity_data(scope: messages_scope_for_date(date), year: date.year)
     render :activity
   end
 
