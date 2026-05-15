@@ -1,1 +1,2 @@
 = turbo_stream.replace "draft-#{@draft.reply_to_message_id}", partial: "drafts/composer", locals: { draft: @draft, autoscroll: true }
+= turbo_stream.replace "topic-drafts-sidebar", partial: "topics/drafts_sidebar", locals: { drafts: @sidebar_drafts, message_numbers: @message_numbers }

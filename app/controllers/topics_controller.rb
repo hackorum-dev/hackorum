@@ -1,4 +1,6 @@
 class TopicsController < ApplicationController
+  include DraftSidebarLoader
+
   before_action :set_topic, only: [ :show, :message_batch, :attachments_sidebar, :aware, :read_all, :unread_all, :star, :unstar, :latest_patchset ]
   before_action :require_authentication, only: [ :aware, :aware_bulk, :aware_all, :read_all, :unread_all, :star, :unstar ]
 
@@ -90,8 +92,11 @@ class TopicsController < ApplicationController
                                        .where.not(status: OutgoingDraft::STATUS_SENT)
                                        .where(topic_id: @topic.id)
                                        .index_by(&:reply_to_message_id)
+      @sidebar_drafts = @drafts_by_parent.values
+                                          .sort_by { |d| @message_numbers[d.reply_to_message_id] || Float::INFINITY }
     else
       @drafts_by_parent = {}
+      @sidebar_drafts = []
     end
 
     @has_patches =

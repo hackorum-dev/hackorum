@@ -60,6 +60,16 @@ RSpec.describe DraftsController, type: :request do
       expect(draft.sender_alias).to eq(sender)
       expect(draft.sender_alias.name).to eq('Alice')
     end
+
+    it 'turbo_stream response replaces topic-drafts-sidebar' do
+      post drafts_path,
+           params: { reply_to_message_id: parent.id },
+           headers: { 'Accept' => 'text/vnd.turbo-stream.html' }
+      expect(response).to have_http_status(:ok)
+      expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
+      expect(response.body).to include(%(turbo-stream action="replace" target="topic-drafts-sidebar"))
+      expect(response.body).to include('drafts-list')
+    end
   end
 
   describe 'POST /drafts after a sent draft to the same parent' do
@@ -130,6 +140,11 @@ RSpec.describe DraftsController, type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
       expect(response.body).to include(%(turbo-stream action="replace" target="draft-#{parent.id}"))
+    end
+
+    it 'turbo_stream response also replaces topic-drafts-sidebar' do
+      delete draft_path(draft), headers: { 'Accept' => 'text/vnd.turbo-stream.html' }
+      expect(response.body).to include(%(turbo-stream action="replace" target="topic-drafts-sidebar"))
     end
   end
 

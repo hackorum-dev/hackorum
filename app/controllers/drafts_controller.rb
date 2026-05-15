@@ -4,6 +4,8 @@ class DraftsController < ApplicationController
   before_action :reject_sent_drafts, only: [ :update, :destroy, :edit, :confirm, :send_now ]
   layout :resolve_layout
 
+  include DraftSidebarLoader
+
   helper_method :active_settings_section
 
   def index
@@ -51,6 +53,7 @@ class DraftsController < ApplicationController
     end
 
     @draft = draft
+    @sidebar_drafts, @message_numbers = load_sidebar_drafts(parent.topic)
     respond_to do |format|
       format.json { render json: { id: draft.id } }
       format.turbo_stream # renders create.turbo_stream.slim
@@ -70,7 +73,9 @@ class DraftsController < ApplicationController
 
   def destroy
     @reply_to_message_id = @draft.reply_to_message_id
+    topic = @draft.topic
     @draft.destroy!
+    @sidebar_drafts, @message_numbers = load_sidebar_drafts(topic)
     respond_to do |format|
       format.turbo_stream
       format.html { head :no_content }

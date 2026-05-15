@@ -486,3 +486,31 @@ RSpec.describe "Topics", type: :request do
     end
   end
 end
+
+RSpec.describe 'Topics show — drafts sidebar', type: :request do
+  let(:user)     { create(:user) }
+  let!(:identity){ create(:identity, user: user, email: 'a@b', refresh_token: 'r', send_authorized_at: 1.hour.ago) }
+  let!(:sender)  { create(:alias, user: user, email: 'a@b', name: 'Alice') }
+  let(:list)     { create(:mailing_list, post_address: 'real@list.example') }
+  let(:topic)    { create(:topic, mailing_lists: [list]) }
+  let!(:parent)  { create(:message, topic: topic, subject: 'Hi') }
+
+  before { sign_in_as(user) }
+
+  it 'renders no Drafts heading when no drafts exist' do
+    get topic_path(topic)
+    expect(response.body).not_to include('drafts-list')
+  end
+
+  it 'renders Drafts section with the message number when a draft exists' do
+    create(:outgoing_draft, user: user, topic: topic,
+           reply_to_message: parent, identity: identity, sender_alias: sender)
+    get topic_path(topic)
+    html = Nokogiri::HTML(response.body)
+    list  = html.css('ul.drafts-list')
+    expect(list).not_to be_empty
+    items = list.css('li .drafts-link')
+    expect(items.size).to eq(1)
+    expect(items.first.css('.drafts-target').text.strip).to eq('#1')
+  end
+end

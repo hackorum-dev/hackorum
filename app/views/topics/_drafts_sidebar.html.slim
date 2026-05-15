@@ -1,0 +1,21 @@
+- drafts = local_assigns[:drafts] || []
+- numbers = local_assigns[:message_numbers] || {}
+= turbo_frame_tag "topic-drafts-sidebar"
+  - if drafts.any?
+    details.sidebar-section open=true
+      summary.sidebar-heading Drafts
+      .sidebar-section
+        ul.drafts-list
+          - drafts.each do |draft|
+            - parent_msg = draft.reply_to_message
+            - num = numbers[draft.reply_to_message_id]
+            - name = parent_msg&.sender_display_alias&.name || "Unknown"
+            li
+              = link_to "#draft-#{draft.reply_to_message_id}",
+                        class: "drafts-link",
+                        data: { controller: "draft-jump",
+                                "draft-jump-message-id-value": draft.reply_to_message_id,
+                                action: "click->draft-jump#jump" } do
+                span.drafts-target = "##{num}"
+                span.drafts-arrow aria-hidden="true" ↳
+                span.drafts-recipient = name

@@ -1,2 +1,3 @@
 = turbo_stream.replace "draft-#{@reply_to_message_id}" do
   = turbo_frame_tag "draft-#{@reply_to_message_id}"
+= turbo_stream.replace "topic-drafts-sidebar", partial: "topics/drafts_sidebar", locals: { drafts: @sidebar_drafts, message_numbers: @message_numbers }
