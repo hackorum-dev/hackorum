@@ -1,12 +1,17 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static values  = { draftId: Number }
+  static values  = { draftId: Number, autoscroll: Boolean }
   static targets = ["form", "status", "body"]
 
   connect() {
     this.dirtyTimer = null
     if (this.hasStatusTarget) this.statusTarget.textContent = "Saved"
+    if (this.autoscrollValue) {
+      requestAnimationFrame(() => {
+        this.element.scrollIntoView({ behavior: "smooth", block: "start" })
+      })
+    }
   }
 
   disconnect() {

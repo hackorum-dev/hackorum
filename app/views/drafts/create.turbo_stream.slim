@@ -1,1 +1,1 @@
-= turbo_stream.replace "draft-#{@draft.reply_to_message_id}", partial: "drafts/composer", locals: { draft: @draft }
+= turbo_stream.replace "draft-#{@draft.reply_to_message_id}", partial: "drafts/composer", locals: { draft: @draft, autoscroll: true }

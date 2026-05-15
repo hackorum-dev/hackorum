@@ -63,7 +63,10 @@
           span.message-action.is-disabled title="Sending…" aria-label="Sending"
             i.fa-solid.fa-spinner.fa-spin
         - elsif existing_draft
-          = link_to "##{message_dom_id(message)}-composer", class: "message-action is-active", title: "Continue draft", "aria-label": "Continue draft" do
+          = link_to "##{message_dom_id(message)}-composer",
+                    class: "message-action is-active",
+                    data: { controller: "scroll-to", "scroll-to-target-value": "#draft-#{message.id}", action: "click->scroll-to#scroll" },
+                    title: "Continue draft", "aria-label": "Continue draft" do
             i.fa-solid.fa-pen-to-square
         - elsif can_reply
           = button_to drafts_path, params: { reply_to_message_id: message.id },

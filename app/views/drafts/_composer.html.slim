@@ -1,5 +1,6 @@
+- autoscroll = local_assigns.fetch(:autoscroll, false)
 = turbo_frame_tag "draft-#{draft.reply_to_message_id}"
-  .composer-card data-controller="reply-composer" data-reply-composer-draft-id-value=draft.id
+  .composer-card data-controller="reply-composer" data-reply-composer-draft-id-value=draft.id data-reply-composer-autoscroll-value=autoscroll
     .composer-meta
       span.composer-from
         i.fa-regular.fa-envelope

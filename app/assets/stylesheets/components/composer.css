@@ -8,6 +8,7 @@
   padding: var(--spacing-5) var(--spacing-6);
   margin: var(--spacing-4) 0 var(--spacing-2);
   box-shadow: var(--shadow-sm);
+  scroll-margin-top: 90px;
 }
 
 .composer-meta {
