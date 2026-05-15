@@ -489,10 +489,10 @@ end
 
 RSpec.describe 'Topics show — drafts sidebar', type: :request do
   let(:user)     { create(:user) }
-  let!(:identity){ create(:identity, user: user, email: 'a@b', refresh_token: 'r', send_authorized_at: 1.hour.ago) }
+  let!(:identity) { create(:identity, user: user, email: 'a@b', refresh_token: 'r', send_authorized_at: 1.hour.ago) }
   let!(:sender)  { create(:alias, user: user, email: 'a@b', name: 'Alice') }
   let(:list)     { create(:mailing_list, post_address: 'real@list.example') }
-  let(:topic)    { create(:topic, mailing_lists: [list]) }
+  let(:topic)    { create(:topic, mailing_lists: [ list ]) }
   let!(:parent)  { create(:message, topic: topic, subject: 'Hi') }
 
   before { sign_in_as(user) }
