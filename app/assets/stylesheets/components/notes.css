@@ -129,7 +129,7 @@
 }
 
 .note-field {
-  margin-bottom: var(--spacing-2);
+  margin: var(--spacing-2);
 }
 
 .note-textarea {
@@ -144,6 +144,11 @@
 .note-actions {
   display: flex;
   justify-content: flex-end;
+  margin: 0 var(--spacing-2);
+}
+
+.note-actions > input {
+  margin: 0;
 }
 
 .note-actions-row {
