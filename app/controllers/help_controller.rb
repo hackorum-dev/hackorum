@@ -39,7 +39,7 @@ class HelpController < ApplicationController
       if line =~ /^(\#{2,3})\s+(.+)$/
         level = $1.length
         title = $2.strip
-        id = title.downcase.gsub(/[^a-z0-9\s-]/, " ").gsub(/\s+/, "-")
+        id = title.downcase.gsub(/'/, "").gsub(/[^\w\s-]/, "-").gsub(/[\s-]+/, "-").gsub(/^-|-$/, "")
         headings << { level: level, title: title, id: id }
       end
     end

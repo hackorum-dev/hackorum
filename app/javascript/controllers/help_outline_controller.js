@@ -7,7 +7,7 @@ export default class extends Controller {
     this.observer = new IntersectionObserver(
       this.onIntersect.bind(this),
       {
-        rootMargin: "0px 0px -80% 0px",
+        rootMargin: "0px 0px -90% 0px",
         threshold: 0
       }
     )
