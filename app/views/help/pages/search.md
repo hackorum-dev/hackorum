@@ -327,7 +327,7 @@ from:committer[last_before:1m] -has:contributor  # Inactive committers
 (from:alvaro[body:patch] OR has:patch[from:alvaro]) first_after:1m
 ```
 
-### Negation
+### Selectors negation
 
 You can negate selectors with dependent conditions:
 
