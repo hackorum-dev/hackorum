@@ -22,6 +22,10 @@
   position: relative;
 }
 
+body.has-sidebar .nav-burger {
+  display: inline-flex;
+}
+
 .nav-burger {
   display: none;
   align-items: center;
@@ -349,10 +353,6 @@
 
   .nav-mobile-star + .nav-mobile-bell {
     margin-left: 0;
-  }
-
-  body.has-sidebar .nav-burger {
-    display: inline-flex;
   }
 
   .mobile-nav-dropdown {

@@ -86,10 +86,6 @@
   font-size: var(--font-size-base);
 }
 
-body.sidebar-collapsed .topics-table th.topic-title .sidebar-burger-button {
-  display: inline-flex;
-}
-
 .topics-table {
   & table {
     width: 100%;
