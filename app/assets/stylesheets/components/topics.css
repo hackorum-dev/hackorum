@@ -272,7 +272,8 @@ a.topic-icon {
 
     & th.activity-header,
     & th.mailing-lists-header,
-    & td.topic-activity {
+    & td.topic-activity,
+    & td.topic-mailing-lists {
       display: none;
     }
   }
