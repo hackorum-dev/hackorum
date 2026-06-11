@@ -45,4 +45,9 @@
             span.radio-text
               strong Collapse read messages
               span.radio-description Automatically collapse already-read messages when opening a thread
+          label
+            = f.check_box :collapse_quotes
+            span.radio-text
+              strong Collapse quoted text
+              span.radio-description Collapse all quoted text in message bodies behind a "Show quoted text" toggle
       = f.submit "Save", class: "button-primary"

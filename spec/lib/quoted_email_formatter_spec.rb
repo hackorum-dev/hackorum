@@ -102,5 +102,103 @@ RSpec.describe QuotedEmailFormatter do
 
       expect(html).to include(resolver_path)
     end
+
+    it "collapses only trailing quoted text by default" do
+      body = <<~BODY
+        On Mon, Jun 1, 2026 Alice wrote:
+        > first quoted point
+
+        Reply to the first point.
+
+        > second quoted point
+
+        Reply to the second point.
+      BODY
+
+      html = described_class.new(body).to_html
+
+      expect(html.scan(/quoted-block/).size).to eq(0)
+      expect(html.scan(/<blockquote>/).size).to eq(2)
+    end
+
+    it "still collapses trailing quoted text by default" do
+      body = <<~BODY
+        My reply up top.
+
+        On Mon, Jun 1, 2026 Alice wrote:
+        > trailing quote
+      BODY
+
+      html = described_class.new(body).to_html
+
+      expect(html.scan(/quoted-block/).size).to eq(1)
+    end
+  end
+
+  describe "#to_html with collapse_quotes" do
+    it "wraps every quoted section in a collapsible details block" do
+      body = <<~BODY
+        On Mon, Jun 1, 2026 Alice wrote:
+        > first quoted point
+
+        Reply to the first point.
+
+        > second quoted point
+
+        Reply to the second point.
+      BODY
+
+      html = described_class.new(body, collapse_quotes: true).to_html
+
+      expect(html.scan(/<details class="quoted-block">/).size).to eq(2)
+      expect(html.scan(%r{<summary>Show quoted text</summary>}).size).to eq(2)
+      expect(html.scan(%r{</details>}).size).to eq(2)
+      # unquoted replies stay outside the collapsed blocks
+      expect(html).to include("Reply to the first point.")
+      expect(html).to include("Reply to the second point.")
+    end
+
+    it "pulls the quote attribution header into the collapsed block" do
+      body = <<~BODY
+        On Mon, Jun 1, 2026 Alice wrote:
+        > quoted point
+
+        My reply.
+      BODY
+
+      html = described_class.new(body, collapse_quotes: true).to_html
+
+      header_idx = html.index("Alice wrote:")
+      details_idx = html.index("<details")
+      expect(details_idx).to be < header_idx
+    end
+
+    it "keeps blank-line-separated quoted runs in one collapsed section" do
+      body = <<~BODY
+        > first paragraph of quote
+
+        > second paragraph of quote
+
+        Single reply.
+      BODY
+
+      html = described_class.new(body, collapse_quotes: true).to_html
+
+      expect(html.scan(/<details class="quoted-block">/).size).to eq(1)
+    end
+
+    it "produces well-formed nesting for nested quotes" do
+      body = <<~BODY
+        >> grandparent text
+        > parent text
+
+        Reply.
+      BODY
+
+      html = described_class.new(body, collapse_quotes: true).to_html
+
+      expect(html.scan(/<blockquote>/).size).to eq(html.scan(%r{</blockquote>}).size)
+      expect(html.scan(/<details/).size).to eq(html.scan(%r{</details>}).size)
+    end
   end
 end

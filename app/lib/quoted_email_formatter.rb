@@ -8,16 +8,22 @@ class QuotedEmailFormatter
     %r{\Ahttps?://postgr\.es/m/([^?#\s]+)}i
   ].freeze
 
-  def initialize(body)
+  def initialize(body, collapse_quotes: false)
     normalized = body.to_s.gsub("\r\n", "\n").gsub("\r", "\n")
     @lines = normalized.split("\n")
+    @collapse_quotes = collapse_quotes
     @reference_map = extract_reference_links(@lines)
   end
 
   def to_html
     parsed = parse_lines
-    trailing_start = find_trailing_quote_start(parsed)
-    build_html(parsed, trailing_start)
+    ranges = if @collapse_quotes
+      quote_section_ranges(parsed)
+    else
+      trailing_start = find_trailing_quote_start(parsed)
+      trailing_start ? [ trailing_start..(parsed.length - 1) ] : []
+    end
+    build_html(parsed, ranges)
   end
 
   private
@@ -74,18 +80,60 @@ class QuotedEmailFormatter
     text.strip.match?(HEADER_REGEX)
   end
 
-  def build_html(lines, trailing_start_idx)
+  # Each section is a maximal run of quoted lines (blank lines between quoted
+  # lines stay inside), extended to include an immediately preceding
+  # "On ... wrote:" header line.
+  def quote_section_ranges(lines)
+    ranges = []
+    idx = 0
+    while idx < lines.length
+      unless lines[idx][:depth].positive?
+        idx += 1
+        next
+      end
+
+      start_idx = idx
+      last_quote_idx = idx
+      scan = idx + 1
+      while scan < lines.length && (lines[scan][:depth].positive? || lines[scan][:blank])
+        last_quote_idx = scan if lines[scan][:depth].positive?
+        scan += 1
+      end
+
+      header_idx = start_idx - 1
+      if header_idx >= 0 && lines[header_idx][:depth].zero? && quote_header?(lines[header_idx][:text])
+        start_idx = header_idx
+      end
+
+      ranges << (start_idx..last_quote_idx)
+      idx = last_quote_idx + 1
+    end
+    ranges
+  end
+
+  def build_html(lines, collapse_ranges)
     html = +""
     buffer = []
     current_depth = 0
-    collapse_started = false
+    range_starts = collapse_ranges.to_h { |range| [ range.begin, range ] }
+    open_range = nil
 
     lines.each_with_index do |line, idx|
-      if trailing_start_idx && idx == trailing_start_idx && !collapse_started
+      if open_range && idx > open_range.end
+        flush_buffer(buffer, html, quoted: current_depth.positive?)
+        while current_depth.positive?
+          html << "</blockquote>\n"
+          current_depth -= 1
+        end
+        html << "</details>\n"
+        open_range = nil
+      end
+
+      if (range = range_starts[idx])
         flush_buffer(buffer, html, quoted: current_depth.positive?)
         html << %(<details class="quoted-block">\n)
         html << %(<summary>Show quoted text</summary>\n)
-        collapse_started = true
+        open_range = range
       end
 
       new_depth = line[:depth]
@@ -116,7 +164,7 @@ class QuotedEmailFormatter
       current_depth -= 1
     end
 
-    html << "</details>" if collapse_started
+    html << "</details>" if open_range
     html
   end
 

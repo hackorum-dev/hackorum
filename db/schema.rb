@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_06_03_180000) do
+ActiveRecord::Schema[8.0].define(version: 2026_06_11_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -767,6 +767,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_06_03_180000) do
     t.boolean "open_threads_at_first_unread", default: false, null: false
     t.datetime "last_login_at"
     t.boolean "collapse_read_messages", default: true, null: false
+    t.boolean "collapse_quotes", default: false, null: false
     t.index ["deleted_at"], name: "index_users_on_deleted_at"
     t.index ["person_id"], name: "index_users_on_person_id"
     t.index ["username"], name: "index_users_on_username", unique: true

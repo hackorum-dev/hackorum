@@ -55,7 +55,8 @@ module ApplicationHelper
   end
 
   def render_message_body(body)
-    QuotedEmailFormatter.new(body.to_s).to_html.html_safe
+    collapse_quotes = user_signed_in? && current_user.collapse_quotes?
+    QuotedEmailFormatter.new(body.to_s, collapse_quotes: collapse_quotes).to_html.html_safe
   end
 
   def message_dom_id(message)
