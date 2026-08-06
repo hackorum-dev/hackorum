@@ -31,7 +31,7 @@
             .author-name = link_to display_alias.name, profile_path, class: "author-name-link"
           - else
             .author-name = display_alias.name
-          .author-email = display_alias.email
+          .author-email = message.sender_person.user ? display_alias.email : message.sender.email
     .message-meta
       .message-date
         time datetime=message.created_at.iso8601 title=absolute_time_display(message.created_at)
