@@ -20,27 +20,15 @@ class TopicsController < ApplicationController
 
     if user_signed_in?
       @personalization = TopicListPersonalization.new(user: current_user, topics: @topics)
-      @page_cache_key = nil
-    else
-      @page_cache_key = topics_page_cache_key
+      load_visible_tags
     end
 
-    load_visible_tags if user_signed_in?
     load_saved_searches
     @all_mailing_lists = MailingList.order(:display_name)
 
     respond_to do |format|
       format.html
-      format.turbo_stream do
-        if user_signed_in?
-          render :index
-        else
-          body = topics_turbo_stream_cache_fetch do
-            render_to_string(:index, formats: [ :turbo_stream ])
-          end
-          render body:, content_type: "text/vnd.turbo-stream.html"
-        end
-      end
+      format.turbo_stream
     end
   end
 
@@ -956,21 +944,5 @@ class TopicsController < ApplicationController
       topic.define_singleton_method(:last_activity) { last_activity }
       topic
     end
-  end
-
-  def topics_page_cache_key
-    return nil unless @topics&.first
-
-    latest_topic = @topics.first
-    watermark = "#{latest_topic.last_activity.to_i}_#{latest_topic.id}"
-    [ "topics-index", watermark ]
-  end
-
-  def topics_turbo_stream_cache_key
-    [ "topics-index-turbo", params[:cursor].presence || "root" ]
-  end
-
-  def topics_turbo_stream_cache_fetch
-    Rails.cache.fetch(topics_turbo_stream_cache_key, expires_in: 10.minutes) { yield }
   end
 end

@@ -1,31 +1,24 @@
-- cache_block = lambda do
-  #new-topics-banner data-controller="new-topics-banner" data-new-topics-banner-url-value=new_topics_count_topics_path(viewing_since: @viewing_since.iso8601) data-new-topics-banner-interval-ms-value="180000"
-    = render partial: "new_topics_banner", locals: { count: @new_topics_count, viewing_since: @viewing_since }
+= render partial: "sidebar", locals: { available_note_tags: @available_note_tags, search_query: @search_query }
 
-  .topics-table
-    table
-      thead
-        tr
-          th.topic-title
-            | Topic
-          th.mailing-lists-header Mailing Lists
-          th.activity-header Activity
-          th.participants-header Participants
-      tbody#topics
-        = render partial: "topics", locals: { topics: @topics, personalization: @personalization }
+#new-topics-banner data-controller="new-topics-banner" data-new-topics-banner-url-value=new_topics_count_topics_path(viewing_since: @viewing_since.iso8601) data-new-topics-banner-interval-ms-value="180000"
+  = render partial: "new_topics_banner", locals: { count: @new_topics_count, viewing_since: @viewing_since }
 
-    - if @topics.size == 25
-      - last_topic = @topics.last
-      - cursor = "#{last_topic.last_activity.iso8601}_#{last_topic.id}"
-      = turbo_frame_tag "pagination", src: topics_path(cursor: cursor, viewing_since: @viewing_since.iso8601, format: :turbo_stream), loading: :lazy, data: { controller: "prefetch-frame" } do
-        .loading-indicator Loading more topics...
-    - else
-      = turbo_frame_tag "pagination"
+.topics-table
+  table
+    thead
+      tr
+        th.topic-title
+          | Topic
+        th.mailing-lists-header Mailing Lists
+        th.activity-header Activity
+        th.participants-header Participants
+    tbody#topics
+      = render partial: "topics", locals: { topics: @topics, personalization: @personalization }
 
-- if @page_cache_key
-  = render partial: "sidebar", locals: { available_note_tags: @available_note_tags, search_query: @search_query }
-  - cache(@page_cache_key) do
-    - cache_block.call
-- else
-  = render partial: "sidebar", locals: { available_note_tags: @available_note_tags, search_query: @search_query }
-  - cache_block.call
+  - if @topics.size == 25
+    - last_topic = @topics.last
+    - cursor = "#{last_topic.last_activity.iso8601}_#{last_topic.id}"
+    = turbo_frame_tag "pagination", src: topics_path(cursor: cursor, viewing_since: @viewing_since.iso8601, format: :turbo_stream), loading: :lazy, data: { controller: "prefetch-frame" } do
+      .loading-indicator Loading more topics...
+  - else
+    = turbo_frame_tag "pagination"

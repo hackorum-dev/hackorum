@@ -19,9 +19,13 @@ MAX_CONSECUTIVE_FAILURES = 20
 # the one death a restart policy cannot see.
 HEARTBEAT_PATH = ENV.fetch("HACKORUM_ORCHESTRATOR_HEARTBEAT", "/tmp/orchestrator.heartbeat")
 
+# the env defaults exist so an ad-hoc `docker compose run/exec ... bin/orchestrator`
+# lands on the same repo as the daemon: that invocation replaces the compose
+# command line, flags and all, and the bare defaults below point nowhere in a
+# container. Same vars the entrypoint checks.
 options = {
-  repo: File.expand_path("../postgres", __dir__),
-  worktree: File.expand_path("../tmp/patch_ci_worktree", __dir__),
+  repo: ENV["CI_REPO_DIR"] || File.expand_path("../postgres", __dir__),
+  worktree: ENV["CI_WORKTREE_DIR"] || File.expand_path("../tmp/patch_ci_worktree", __dir__),
   remote: "origin",
   upstream_remote: "postgres",
   mirror_master: true,
@@ -42,8 +46,8 @@ OptionParser.new do |o|
   o.on("--max-pushes N", Integer, "stop pushing after N total (keep ingesting)") { |v| options[:max_pushes] = v }
   o.on("--budget N", Integer, "max queued+running CI runs (default PatchCi::Config::BUDGET)") { |v| options[:budget] = v }
   o.on("--interval N", Integer, "seconds between cycles (default 60)") { |v| options[:interval] = v }
-  o.on("--repo PATH", "postgres checkout (default ./postgres)") { |v| options[:repo] = v }
-  o.on("--worktree PATH", "apply worktree (default ./tmp/patch_ci_worktree)") { |v| options[:worktree] = v }
+  o.on("--repo PATH", "postgres checkout (default $CI_REPO_DIR or ./postgres)") { |v| options[:repo] = v }
+  o.on("--worktree PATH", "apply worktree (default $CI_WORKTREE_DIR or ./tmp/patch_ci_worktree)") { |v| options[:worktree] = v }
   o.on("--github-repo NAME", "owner/name CI runs in (default from PatchCi::Config)") { |v| options[:github_repo] = v }
   o.on("--master-ref REF", "ref that is master truth (default <upstream-remote>/master)") { |v| options[:master_ref] = v }
   o.on("--upstream-remote NAME", "remote master truth is fetched from (default postgres)") { |v| options[:upstream_remote] = v }

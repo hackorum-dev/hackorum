@@ -214,9 +214,11 @@ services:
       RAILS_MASTER_KEY: ${RAILS_MASTER_KEY}
       RAILS_LOG_LEVEL: ${RAILS_LOG_LEVEL:-warn}
       HACKORUM_GITHUB_TOKEN: ${HACKORUM_GITHUB_TOKEN}
-      # must stay in sync with the --repo above: the entrypoint's pre-flight
-      # check reads this, the daemon reads the flag
+      # the entrypoint's pre-flight check reads these, and so does
+      # bin/orchestrator when it is invoked without the flags above - which is
+      # what any `docker compose run/exec ... bin/orchestrator` does
       CI_REPO_DIR: /ci/repo
+      CI_WORKTREE_DIR: /ci/worktree
       # commit import defaults for a manual run inside this container
       HACKORUM_PG_REPO: /ci/repo
       GIT_SSH_COMMAND: ssh -i /root/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new
