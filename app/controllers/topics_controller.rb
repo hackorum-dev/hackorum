@@ -2,9 +2,10 @@ class TopicsController < ApplicationController
   include DraftSidebarLoader
 
   before_action :set_topic, only: [ :show, :message_batch, :attachments_sidebar, :patchsets_sidebar, :aware, :read_all, :unread_all, :star, :unstar, :ignore, :unignore, :latest_patchset, :summary, :messages ]
-  before_action :require_authentication, only: [ :aware, :read_all, :unread_all, :star, :unstar, :ignore, :unignore ]
+  before_action :require_authentication, only: [ :aware, :read_all, :unread_all, :star, :unstar, :ignore, :unignore, :row_states ]
 
   TOPIC_LIST_PRELOADS = [ :creator, { creator_person: :default_alias }, { last_sender_person: :default_alias } ].freeze
+  ROW_STATES_LIMIT = 50
 
   def index
     @search_query = nil
@@ -54,6 +55,23 @@ class TopicsController < ApplicationController
     refresh_path = search_query.present? ? search_topics_path(**refresh_params) : topics_path
 
     render partial: "new_topics_banner", locals: { count: @new_topics_count, viewing_since: @viewing_since, refresh_path: refresh_path }
+  end
+
+  # Rows never disappear here: no apply_default_ignore_filter, an ignored
+  # topic still gets replaced so its icon stays in sync.
+  def row_states
+    ids = row_state_topic_ids
+    @topics = ids.empty? ? [] : Topic.includes(*TOPIC_LIST_PRELOADS).where(id: ids).to_a
+
+    preload_topic_participants
+    preload_commitfest_summaries
+    preload_commit_summaries
+    preload_topic_mailing_lists
+    @personalization = TopicListPersonalization.new(user: current_user, topics: @topics)
+
+    respond_to do |format|
+      format.turbo_stream
+    end
   end
 
   def show
@@ -409,6 +427,16 @@ class TopicsController < ApplicationController
     Time.zone.parse(value.to_s)
   rescue ArgumentError
     nil
+  end
+
+  def row_state_topic_ids
+    raw = params[:topic_ids]
+    raw = [ raw ] unless raw.is_a?(Array)
+
+    raw.filter_map { |id| Integer(id.to_s, 10, exception: false) }
+       .select(&:positive?)
+       .uniq
+       .first(ROW_STATES_LIMIT)
   end
 
   def alias_payload(alias_record)

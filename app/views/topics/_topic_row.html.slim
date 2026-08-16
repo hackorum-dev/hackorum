@@ -1,0 +1,41 @@
+- personalization = local_assigns[:personalization]
+- topic_participants_map = local_assigns[:topic_participants_map] || @topic_participants_map || {}
+- tp_data = topic_participants_map[topic.id] || {}
+- top_participants = tp_data[:top] || []
+- contributor_participants = tp_data[:contributors] || []
+- state = personalization ? personalization.state_for(topic) : {}
+- note_count = personalization ? personalization.note_count_for(topic) : 0
+- participation = personalization ? personalization.participation_for(topic) : {}
+- team_readers = personalization ? personalization.team_readers_for(topic) : []
+- star_data = personalization ? personalization.star_data_for(topic) : {}
+- ignored = personalization ? personalization.ignored_for(topic) : false
+- row_class = [ "topic-row" ]
+- if personalization
+  - status = state[:status] || "new"
+  - row_class << "topic-#{status}"
+  - row_class << "has-new-replies" if status.to_s == "reading"
+
+tr id=dom_id(topic) class=row_class.join(" ") data-topic-id=topic.id data-last-message-id=topic.last_message_id
+  = render partial: "topics/status_cell", locals: { topic: topic, state: state, note_count: note_count, team_readers: team_readers, star_data: star_data, ignored: ignored }
+  td.topic-mailing-lists data-label="Mailing Lists"
+    - topic_lists = @topic_mailing_lists_map&.dig(topic.id) || []
+    - if topic_lists.any?
+      = mailing_list_badges_html(topic_lists)
+  td.topic-activity data-label="Activity"
+    - replies_count = [topic.message_count - 1, 0].max
+    .activity-info.compact
+      .activity-replies = pluralize(replies_count, "reply")
+      .activity-time title=absolute_time_display(topic.last_message_at) = smart_time_display(topic.last_message_at)
+  td.topic-participants data-label="Participants"
+    - participants = top_participants.map { |tp| { alias: tp.person.default_alias, person: tp.person, message_count: tp.message_count, last_at: tp.last_message_at } }
+    = avatar_list_html(participants: participants, total_participants: topic.participant_count)
+    - if topic.contributor_participant_count.positive?
+      - contributor_data = contributor_participants.map { |tp| { alias: tp.person.default_alias, person: tp.person, message_count: tp.message_count, last_at: tp.last_message_at } }
+      div class="topic-icon activity-#{topic.highest_contributor_type || 'contributor'}" data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+        i.fa-solid.fa-users-rays
+        span.topic-icon-badge = topic.contributor_participant_count
+        - if contributor_data.any?
+          .topic-icon-hover data-hover-popover-target="popover" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+            - contributor_data.each do |participant|
+              = participant_row_html(participant: participant, avatar_size: 32)
+    = participation_icon_html(topic: topic, participation: participation)

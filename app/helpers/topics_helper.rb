@@ -262,4 +262,22 @@ module TopicsHelper
       topic_path(topic)
     end
   end
+
+  def visited_topic_attrs(topic)
+    return {} unless user_signed_in?
+
+    {
+      "data-controller" => "visited-topic",
+      "data-visited-topic-id-value" => topic.id
+    }
+  end
+
+  def topic_states_attrs
+    return {} unless user_signed_in?
+
+    {
+      "data-controller" => "topic-states",
+      "data-topic-states-url-value" => row_states_topics_path
+    }
+  end
 end

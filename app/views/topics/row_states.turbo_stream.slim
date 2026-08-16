@@ -1,0 +1,3 @@
+- @topics.each do |topic|
+  = turbo_stream.replace dom_id(topic) do
+    = render partial: "topics/topic_row", locals: { topic: topic, personalization: @personalization, topic_participants_map: @topic_participants_map }

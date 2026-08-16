@@ -584,6 +584,87 @@ RSpec.describe "Topics", type: :request do
     end
   end
 
+  describe "GET /topics/row_states" do
+    let!(:creator) { create(:alias) }
+    let!(:user) { create(:user) }
+    let!(:topic) { create(:topic, creator: creator) }
+    let!(:other_topic) { create(:topic, creator: creator) }
+    let!(:message1) { create(:message, topic: topic, sender: creator, created_at: 2.hours.ago) }
+    let!(:message2) { create(:message, topic: topic, sender: creator, created_at: 1.hour.ago) }
+    let!(:other_message) { create(:message, topic: other_topic, sender: creator) }
+
+    it "requires authentication" do
+      get row_states_topics_path, params: { topic_ids: [ topic.id ] }, as: :turbo_stream
+      expect(response).to redirect_to(new_session_path)
+    end
+
+    context "when signed in" do
+      before { sign_in_as(user) }
+
+      it "replaces only the requested rows" do
+        get row_states_topics_path, params: { topic_ids: [ topic.id ] }, as: :turbo_stream
+
+        expect(response).to have_http_status(:success)
+        expect(response.body).to include(%(target="topic_#{topic.id}"))
+        expect(response.body).not_to include(%(target="topic_#{other_topic.id}"))
+      end
+
+      it "reflects a topic that has been fully read" do
+        MessageReadRange.add_range(user: user, topic: topic, start_id: message1.id, end_id: message2.id)
+
+        get row_states_topics_path, params: { topic_ids: [ topic.id ] }, as: :turbo_stream
+
+        expect(response.body).to include("topic-row topic-read")
+        expect(response.body).to include("status-read")
+      end
+
+      it "still returns a row for an ignored topic" do
+        create(:topic_ignore, user: user, topic: topic)
+
+        get row_states_topics_path, params: { topic_ids: [ topic.id ] }, as: :turbo_stream
+
+        expect(response.body).to include(%(target="topic_#{topic.id}"))
+        expect(response.body).to include("is-ignored")
+      end
+
+      it "tolerates zero, negative, non numeric and unknown ids" do
+        get row_states_topics_path,
+            params: { topic_ids: [ "0", "-5", "abc", "99999999", topic.id.to_s ] },
+            as: :turbo_stream
+
+        expect(response).to have_http_status(:success)
+        expect(response.body).to include(%(target="topic_#{topic.id}"))
+      end
+
+      it "replaces every requested row in one response" do
+        get row_states_topics_path,
+            params: { topic_ids: [ topic.id, other_topic.id ] },
+            as: :turbo_stream
+
+        expect(response).to have_http_status(:success)
+        expect(response.body).to include(%(target="topic_#{topic.id}"))
+        expect(response.body).to include(%(target="topic_#{other_topic.id}"))
+      end
+
+      it "returns an empty stream when no id is usable" do
+        get row_states_topics_path, params: { topic_ids: [ "abc" ] }, as: :turbo_stream
+
+        expect(response).to have_http_status(:success)
+        expect(response.body).not_to include("turbo-stream")
+      end
+
+      it "caps the number of processed ids" do
+        ids = Array.new(TopicsController::ROW_STATES_LIMIT + 5) { |i| topic.id + 1000 + i }
+        ids << topic.id
+
+        get row_states_topics_path, params: { topic_ids: ids }, as: :turbo_stream
+
+        expect(response).to have_http_status(:success)
+        expect(response.body).not_to include(%(target="topic_#{topic.id}"))
+      end
+    end
+  end
+
   describe "GET /topics/:id/latest_patchset" do
     let!(:creator) { create(:alias) }
     let!(:topic) { create(:topic, creator: creator) }

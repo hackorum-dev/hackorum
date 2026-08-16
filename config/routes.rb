@@ -74,6 +74,7 @@ Rails.application.routes.draw do
     collection do
       get :search
       get :new_topics_count
+      get :row_states
     end
     member do
       post :aware

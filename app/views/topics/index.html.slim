@@ -3,7 +3,7 @@
 #new-topics-banner data-controller="new-topics-banner" data-new-topics-banner-url-value=new_topics_count_topics_path(viewing_since: @viewing_since.iso8601) data-new-topics-banner-interval-ms-value="180000"
   = render partial: "new_topics_banner", locals: { count: @new_topics_count, viewing_since: @viewing_since }
 
-.topics-table
+.topics-table *topic_states_attrs
   table
     thead
       tr

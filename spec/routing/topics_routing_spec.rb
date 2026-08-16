@@ -22,4 +22,10 @@ RSpec.describe "topics routes", type: :routing do
       expect(post: "/topics/1/aware").to be_routable
     end
   end
+
+  describe "row states" do
+    it "routes the collection endpoint" do
+      expect(get: "/topics/row_states").to route_to(controller: "topics", action: "row_states")
+    end
+  end
 end
