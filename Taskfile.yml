@@ -97,13 +97,17 @@ tasks:
         msg: 'PRIVATE_DATA file not found: {{.PRIVATE_DATA}}'
     cmds:
       - |
+        decompress() {
+          if echo "$1" | grep -qE '\.gz$'; then gzip -cd "$1"; else cat "$1"; fi
+        }
         import_file() {
-          if echo "$1" | grep -qE '\.gz$'; then
-            gzip -cd "$1" | {{.PSQL_IMPORT}}
-          else
-            cat "$1" | {{.PSQL_IMPORT}}
-          fi
-          if [ $? -ne 0 ]; then echo "$2 import failed"; return 1; fi
+          decompress "$1" | {{.PSQL_IMPORT}} || { echo "$2 import failed"; return 1; }
+        }
+        # data-only dumps list tables alphabetically, so rows arrive before the
+        # rows they reference; replica role skips FK and trigger checks for the load
+        import_data() {
+          { echo "SET session_replication_role = replica;"; decompress "$1"; } \
+            | {{.PSQL_IMPORT}} || { echo "$2 import failed"; return 1; }
         }
         WEB_WAS_RUNNING=$({{.COMPOSE}} ps --status running --format '{{ `{{.Service}}` }}' | grep -q '^web$' && echo 1 || echo 0)
         if [ "$WEB_WAS_RUNNING" = "1" ]; then
@@ -122,67 +126,15 @@ tasks:
         echo "Importing schema {{.SCHEMA}}..."
         import_file "{{.SCHEMA}}" schema || exit 1
         echo "Importing public data {{.PUBLIC_DATA}}..."
-        import_file "{{.PUBLIC_DATA}}" public-data || exit 1
+        import_data "{{.PUBLIC_DATA}}" public-data || exit 1
         if [ -n "{{.PRIVATE_DATA}}" ]; then
           echo "Importing private data {{.PRIVATE_DATA}}..."
-          import_file "{{.PRIVATE_DATA}}" private-data || exit 1
+          import_data "{{.PRIVATE_DATA}}" private-data || exit 1
         else
           echo "No PRIVATE_DATA provided; skipping private data load."
         fi
-        if [ "$WEB_WAS_RUNNING" = "1" ]; then
-          echo "Restarting web container..."
-          {{.COMPOSE}} start web
-        fi
-
-  db-import-legacy:
-    desc: 'Import legacy split dumps (vars: DUMP=/path/public-YYYY-MM.sql.gz PDUMP=/path/private-schema-YYYY-MM.sql.gz). Filters cross-dump FKs out of public and reapplies them after private loads.'
-    requires:
-      vars: [DUMP, PDUMP]
-    preconditions:
-      - sh: test -f "{{.DUMP}}"
-        msg: 'DUMP file not found: {{.DUMP}}'
-      - sh: test -f "{{.PDUMP}}"
-        msg: 'PDUMP file not found: {{.PDUMP}}'
-      - sh: test -f deploy/backup/private_tables.txt
-        msg: 'deploy/backup/private_tables.txt not found'
-      - sh: test -f deploy/backup/split_cross_fks.awk
-        msg: 'deploy/backup/split_cross_fks.awk not found'
-    cmds:
-      - |
-        import_file() {
-          if echo "$1" | grep -qE '\.gz$'; then
-            gzip -cd "$1" | {{.PSQL_IMPORT}}
-          else
-            cat "$1" | {{.PSQL_IMPORT}}
-          fi
-          if [ $? -ne 0 ]; then echo "$2 import failed"; return 1; fi
-        }
-        WEB_WAS_RUNNING=$({{.COMPOSE}} ps --status running --format '{{ `{{.Service}}` }}' | grep -q '^web$' && echo 1 || echo 0)
-        if [ "$WEB_WAS_RUNNING" = "1" ]; then
-          echo "Stopping web container..."
-          {{.COMPOSE}} stop web
-        fi
-        echo "Ensuring db container is running..."
-        {{.COMPOSE}} up -d db
-        echo "Waiting for db to accept connections..."
-        for i in $(seq 1 60); do
-          if {{.COMPOSE}} exec -T db bash -lc 'pg_isready -U ${POSTGRES_USER:-hackorum} -d postgres' >/dev/null 2>&1; then break; fi
-          sleep 1
-        done
-        echo "Dropping and recreating database..."
-        {{.COMPOSE}} exec -T db bash -lc 'psql -v ON_ERROR_STOP=1 -U ${POSTGRES_USER:-hackorum} -d postgres -c "DROP DATABASE IF EXISTS ${POSTGRES_DB:-hackorum_development};" -c "CREATE DATABASE ${POSTGRES_DB:-hackorum_development};"' || { echo "drop/create failed"; exit 1; }
-        PRIVATE_REGEX=$(grep -E '^[a-z0-9_]+$' deploy/backup/private_tables.txt | tr '\n' '|' | sed 's/|$//')
-        FK_TMP=$(mktemp)
-        trap 'rm -f "$FK_TMP"' EXIT
-        echo "Importing public dump (filtered) from {{.DUMP}}..."
-        if echo "{{.DUMP}}" | grep -qE '\.gz$'; then DECOMP="gzip -cd {{.DUMP}}"; else DECOMP="cat {{.DUMP}}"; fi
-        $DECOMP | awk -v t="$PRIVATE_REGEX" -v fkfile="$FK_TMP" -f deploy/backup/split_cross_fks.awk \
-          | {{.PSQL_IMPORT}} || { echo "public (filtered) import failed"; exit 1; }
-        echo "Extracted $(grep -c '^ALTER TABLE ONLY' $FK_TMP) cross-dump FK constraints to reapply after private load."
-        echo "Importing private schema {{.PDUMP}}..."
-        import_file "{{.PDUMP}}" private-schema || exit 1
-        echo "Reapplying cross-dump FK constraints..."
-        cat "$FK_TMP" | {{.PSQL_IMPORT}} || { echo "cross-FK reapply failed"; exit 1; }
+        echo "Creating testadmin user..."
+        {{.COMPOSE}} run --rm web bin/rails dev:testadmin || { echo "testadmin creation failed"; exit 1; }
         if [ "$WEB_WAS_RUNNING" = "1" ]; then
           echo "Restarting web container..."
           {{.COMPOSE}} start web
