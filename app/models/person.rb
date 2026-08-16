@@ -9,6 +9,27 @@ class Person < ApplicationRecord
 
   belongs_to :default_alias, class_name: "Alias", optional: true
 
+  scope :matching, ->(query) {
+    like = "%#{ActiveRecord::Base.sanitize_sql_like(query.to_s.strip)}%"
+    where(
+      "EXISTS (SELECT 1 FROM aliases WHERE aliases.person_id = people.id " \
+      "AND (aliases.email ILIKE :q OR aliases.name ILIKE :q))",
+      q: like
+    )
+  }
+
+  scope :registered, -> {
+    where("EXISTS (SELECT 1 FROM users WHERE users.person_id = people.id AND users.deleted_at IS NULL)")
+  }
+
+  scope :unregistered, -> {
+    where("NOT EXISTS (SELECT 1 FROM users WHERE users.person_id = people.id AND users.deleted_at IS NULL)")
+  }
+
+  scope :with_senders, -> {
+    where("EXISTS (SELECT 1 FROM aliases WHERE aliases.person_id = people.id AND aliases.sender_count > 0)")
+  }
+
   def display_name
     default_alias&.name || aliases.order(:created_at).first&.name || "Unknown"
   end

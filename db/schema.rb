@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_07_28_141138) do
+ActiveRecord::Schema[8.0].define(version: 2026_08_16_214615) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -540,6 +540,22 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_141138) do
     t.index ["default_alias_id"], name: "index_people_on_default_alias_id"
   end
 
+  create_table "person_merges", force: :cascade do |t|
+    t.bigint "performed_by_id", null: false
+    t.bigint "source_person_id", null: false
+    t.bigint "target_person_id", null: false
+    t.string "source_name"
+    t.string "target_name"
+    t.string "source_emails", default: [], null: false, array: true
+    t.integer "aliases_moved", default: 0, null: false
+    t.integer "topics_moved", default: 0, null: false
+    t.integer "messages_moved", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["performed_by_id"], name: "index_person_merges_on_performed_by_id"
+    t.index ["target_person_id"], name: "index_person_merges_on_target_person_id"
+  end
+
   create_table "release_tags", force: :cascade do |t|
     t.string "name", null: false
     t.string "version"
@@ -855,18 +871,6 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_141138) do
     t.index ["user_id"], name: "index_topic_stars_on_user_id"
   end
 
-  create_table "topic_subscriptions", force: :cascade do |t|
-    t.bigint "user_id", null: false
-    t.bigint "topic_id", null: false
-    t.string "unsubscribe_token", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["topic_id"], name: "index_topic_subscriptions_on_topic_id"
-    t.index ["unsubscribe_token"], name: "index_topic_subscriptions_on_unsubscribe_token", unique: true
-    t.index ["user_id", "topic_id"], name: "index_topic_subscriptions_on_user_id_and_topic_id", unique: true
-    t.index ["user_id"], name: "index_topic_subscriptions_on_user_id"
-  end
-
   create_table "topics", force: :cascade do |t|
     t.string "title", null: false
     t.bigint "creator_id", null: false
@@ -928,7 +932,6 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_141138) do
     t.datetime "deleted_at"
     t.bigint "person_id", null: false
     t.enum "mention_restriction", default: "anyone", null: false, enum_type: "user_mention_restriction"
-    t.boolean "bold_unread_threads", default: false, null: false
     t.boolean "open_threads_at_first_unread", default: false, null: false
     t.datetime "last_login_at"
     t.boolean "collapse_read_messages", default: true, null: false
@@ -941,7 +944,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_141138) do
   add_foreign_key "admin_email_changes", "users", column: "performed_by_id"
   add_foreign_key "admin_email_changes", "users", column: "target_user_id"
   add_foreign_key "aliases", "people"
-  add_foreign_key "aliases", "users"
+  add_foreign_key "aliases", "users", validate: false
   add_foreign_key "attachments", "messages"
   add_foreign_key "commit_files", "commits"
   add_foreign_key "commit_people", "commits"
@@ -968,7 +971,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_141138) do
   add_foreign_key "message_read_ranges", "topics"
   add_foreign_key "message_read_ranges", "users"
   add_foreign_key "messages", "aliases", column: "sender_id"
-  add_foreign_key "messages", "identities", column: "sent_via_identity_id"
+  add_foreign_key "messages", "identities", column: "sent_via_identity_id", validate: false
   add_foreign_key "messages", "messages", column: "reply_to_id"
   add_foreign_key "messages", "people", column: "sender_person_id"
   add_foreign_key "messages", "topics"
@@ -993,6 +996,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_141138) do
   add_foreign_key "patch_ci_runs", "patch_branches", on_delete: :cascade
   add_foreign_key "patch_submission_files", "messages"
   add_foreign_key "people", "aliases", column: "default_alias_id"
+  add_foreign_key "person_merges", "users", column: "performed_by_id"
   add_foreign_key "saved_search_preferences", "saved_searches"
   add_foreign_key "saved_search_preferences", "users"
   add_foreign_key "saved_searches", "teams"
@@ -1012,14 +1016,12 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_141138) do
   add_foreign_key "topic_participants", "topics"
   add_foreign_key "topic_stars", "topics"
   add_foreign_key "topic_stars", "users"
-  add_foreign_key "topic_subscriptions", "topics"
-  add_foreign_key "topic_subscriptions", "users"
   add_foreign_key "topics", "aliases", column: "creator_id"
   add_foreign_key "topics", "messages", column: "last_message_id"
   add_foreign_key "topics", "people", column: "creator_person_id"
   add_foreign_key "topics", "people", column: "last_sender_person_id"
   add_foreign_key "topics", "topics", column: "merged_into_topic_id"
-  add_foreign_key "user_features", "users"
+  add_foreign_key "user_features", "users", validate: false
   add_foreign_key "user_tokens", "users"
   add_foreign_key "users", "people"
 end

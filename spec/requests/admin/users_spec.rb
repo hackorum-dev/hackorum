@@ -249,4 +249,66 @@ RSpec.describe "Admin::Users", type: :request do
       expect(Alias.by_email("hack@example.com")).not_to exist
     end
   end
+
+  describe "GET /admin/users search" do
+    before { sign_in(email: "admin@example.com") }
+
+    let!(:searchable) do
+      user = create(:user, password: "secret", password_confirmation: "secret", username: "searchable_user")
+      attach_verified_alias(user, email: "findme@example.com")
+      create(:alias, user: user, person: user.person, email: "alt@elsewhere.test", name: "Alternate Name")
+      user
+    end
+
+    it "matches on a username substring" do
+      get admin_users_path(q: "searchable")
+
+      expect(response.body).to include("searchable_user")
+      expect(response.body).not_to include("regular_user")
+    end
+
+    it "matches on an alias email that is not the default" do
+      get admin_users_path(q: "elsewhere.test")
+
+      expect(response.body).to include("searchable_user")
+      expect(response.body).not_to include("regular_user")
+    end
+
+    it "matches on an alias name" do
+      get admin_users_path(q: "Alternate")
+
+      expect(response.body).to include("searchable_user")
+    end
+
+    it "treats LIKE wildcards as literal characters" do
+      get admin_users_path(q: "%")
+
+      expect(response.body).not_to include("searchable_user")
+      expect(response.body).not_to include("regular_user")
+    end
+  end
+
+  describe "GET /admin/users pagination" do
+    before { sign_in(email: "admin@example.com") }
+
+    it "splits the list across pages" do
+      stub_const("Admin::UsersController::PER_PAGE", 1)
+
+      # explicit, distinct timestamps: the factory default is the same
+      # 1.month.ago for every user, which leaves the page split undefined
+      newest = create(:user, password: "secret", password_confirmation: "secret",
+                             username: "newest_user", created_at: 1.minute.ago)
+      attach_verified_alias(newest, email: "newest@example.com")
+      admin.update_columns(created_at: 2.months.ago)
+      regular_user.update_columns(created_at: 3.months.ago)
+
+      get admin_users_path
+      expect(response.body).to include("newest_user")
+      expect(response.body).not_to include("regular_user")
+
+      get admin_users_path(page: 3)
+      expect(response.body).to include("regular_user")
+      expect(response.body).not_to include("newest_user")
+    end
+  end
 end

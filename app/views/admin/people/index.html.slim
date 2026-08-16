@@ -1,0 +1,58 @@
+- content_for :title, "Admin — People"
+
+.settings-page
+  h1
+    | People
+    span.settings-page-count = "(#{number_with_delimiter(@people_total_count)})"
+
+  = form_with url: admin_people_path, method: :get, class: "admin-search" do |f|
+    = f.search_field :q, value: @query, placeholder: "name or email", aria: { label: "Search people" }
+    = f.select :registered, options_for_select([ [ "All", "all" ], [ "Registered", "registered" ], [ "Unregistered", "unregistered" ] ], @registered)
+    label.admin-search-check
+      = f.check_box :senders, { checked: @senders_only, include_hidden: false }, "1"
+      span only people who sent mail
+    = f.submit "Search", name: nil
+    - if @query.present? || @registered != "all" || @senders_only
+      = link_to "clear", admin_people_path, class: "admin-search-clear"
+
+  .email-table-wrap
+    table.email-table
+      thead
+        tr
+          th Name
+          th Emails
+          th Messages
+          th User
+          th Created
+          th Actions
+      tbody
+        - @people.each do |person|
+          tr
+            td
+              - if person.default_alias
+                = link_to person.display_name, person_path(person.default_alias.email)
+              - else
+                = person.display_name
+              - if person.contributor_badge
+                span.role-badge = person.contributor_badge
+            td
+              - emails = person.aliases.map(&:email).uniq
+              - if emails.any?
+                - emails.each do |email|
+                  div
+                    = email
+                    - if email == person.default_alias&.email
+                      span.role-badge primary
+              - else
+                | —
+            td = number_with_delimiter(person.aliases.sum(&:sender_count))
+            td
+              - if person.user
+                = person.user.username || "user ##{person.user.id}"
+              - else
+                | —
+            td = person.created_at.strftime('%Y-%m-%d')
+            td
+              = link_to "Merge", new_admin_person_merge_path(person), class: "button-secondary button-small"
+
+  = paginate @people

@@ -645,3 +645,33 @@ textarea.form-input {
     grid-template-columns: 1fr;
   }
 }
+
+.settings-page .admin-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3);
+  margin-top: var(--spacing-4);
+}
+
+.settings-page .admin-search input[type="search"] {
+  flex: 1 1 240px;
+  padding: var(--spacing-2) var(--spacing-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-sm);
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
+}
+
+.settings-page .admin-search-check {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.settings-page .admin-search-clear {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-link);
+}

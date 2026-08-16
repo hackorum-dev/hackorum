@@ -25,6 +25,7 @@
 @import "components/stats.css";
 @import "components/reports.css";
 @import "components/help.css";
+@import "components/pagination.css";
 @import "components/ci.css";
 @import "components/ci-stats.css";
 @import "components/admin.css";

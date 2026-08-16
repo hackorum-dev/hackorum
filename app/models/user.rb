@@ -22,6 +22,16 @@ class User < ApplicationRecord
 
   scope :active, -> { where(deleted_at: nil) }
 
+  scope :matching, ->(query) {
+    like = "%#{ActiveRecord::Base.sanitize_sql_like(query.to_s.strip)}%"
+    where(
+      "users.username ILIKE :q OR EXISTS (" \
+      "SELECT 1 FROM aliases WHERE aliases.person_id = users.person_id " \
+      "AND (aliases.email ILIKE :q OR aliases.name ILIKE :q))",
+      q: like
+    )
+  }
+
   def primary_alias
     person&.default_alias
   end

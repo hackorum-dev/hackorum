@@ -1,0 +1,33 @@
+- content_for :title, "Person Merge Audit Log"
+
+.settings-page
+  h1 Person Merge Audit Log
+
+  - if @person_merges.empty?
+    p No people have been merged yet.
+  - else
+    .email-table-wrap
+      table.email-table
+        thead
+          tr
+            th Merged At
+            th Source
+            th Target
+            th Moved
+            th Merged By
+        tbody
+          - @person_merges.each do |merge|
+            tr
+              td = merge.created_at.strftime('%Y-%m-%d %H:%M')
+              td
+                div = merge.source_name
+                - merge.source_emails.each do |email|
+                  div = email
+              td
+                - target = merge.target_person
+                - if target&.default_alias
+                  = link_to merge.target_name, person_path(target.default_alias.email)
+                - else
+                  = merge.target_name
+              td = "#{merge.aliases_moved} aliases, #{merge.messages_moved} messages, #{merge.topics_moved} topics"
+              td = merge.performed_by.username || "user ##{merge.performed_by_id}"

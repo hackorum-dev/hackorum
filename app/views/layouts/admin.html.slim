@@ -9,6 +9,9 @@
       = link_to admin_users_path, class: admin_nav_link_class(:users) do
         i.fas.fa-users
         span Users
+      = link_to admin_people_path, class: admin_nav_link_class(:people) do
+        i.fas.fa-address-book
+        span People
       = link_to admin_mailing_lists_path, class: admin_nav_link_class(:mailing_lists) do
         i.fas.fa-mail-bulk
         span Mailing Lists
@@ -18,6 +21,9 @@
       = link_to admin_topic_merges_path, class: admin_nav_link_class(:topic_merges) do
         i.fas.fa-code-branch
         span Topic Merges
+      = link_to admin_person_merges_path, class: admin_nav_link_class(:person_merges) do
+        i.fas.fa-user-minus
+        span Person Merges
       = link_to admin_imap_sync_states_path, class: admin_nav_link_class(:imap_sync) do
         i.fas.fa-sync
         span IMAP Sync

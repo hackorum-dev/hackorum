@@ -11,6 +11,12 @@ Rails.application.routes.draw do
       resources :features, only: [ :index, :create, :destroy ],
         controller: "user_features", param: :name
     end
+    resources :people, only: [ :index ] do
+      resource :merge, controller: "person_merges", only: [ :new, :create ] do
+        post :preview
+      end
+    end
+    resources :person_merges, only: [ :index ]
     resources :email_changes, only: [ :index ]
     resources :imap_sync_states, only: [ :index ]
     resources :topic_merges, only: [ :index ]

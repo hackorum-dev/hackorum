@@ -354,25 +354,6 @@
   color: var(--color-bg-card);
 }
 
-/* kaminari pagination */
-.ci-container nav.pagination {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-3);
-  margin-top: var(--spacing-4);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-}
-
-.ci-container nav.pagination a {
-  color: var(--color-text-link);
-}
-
-.ci-container nav.pagination .page.current {
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
-}
-
 /* branch health */
 .ci-health {
   display: grid;

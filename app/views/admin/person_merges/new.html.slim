@@ -1,0 +1,59 @@
+- content_for :title, "Merge Person"
+
+.admin-merge-container
+  h1 Merge Person
+
+  .merge-source-card
+    h2 Source (merged into the target, then deleted)
+    .topic-info
+      .topic-title = @source_person.display_name
+      .topic-meta
+        span.meta-item
+          strong Emails:
+          = @source_person.aliases.map(&:email).uniq.join(", ")
+        span.meta-item
+          strong Messages:
+          = @source_person.aliases.sum(&:sender_count)
+        span.meta-item
+          strong Created:
+          = @source_person.created_at.strftime('%Y-%m-%d')
+
+  .merge-target-section
+    h2 Select Target Person
+    p Every alias, topic, message and mention of the source moves to the target. The source person is deleted.
+
+    = form_with url: new_admin_person_merge_path(@source_person), method: :get, class: "admin-search" do |f|
+      = f.search_field :target_q, value: @target_query, placeholder: "name or email", aria: { label: "Search target people" }
+      = f.submit "Search", name: nil
+
+    - if @candidates.any?
+      .suggestions-section
+        h3 Matches
+        .suggestions-list
+          - @candidates.each do |candidate|
+            .suggestion-item
+              = form_tag preview_admin_person_merge_path(@source_person), method: :post, data: { turbo: false } do
+                = hidden_field_tag :target_person_id, candidate.id
+                .suggestion-info
+                  .suggestion-title = candidate.display_name
+                  .suggestion-meta
+                    span.meta-item = candidate.aliases.map(&:email).uniq.join(", ")
+                    span.meta-item
+                      = candidate.aliases.sum(&:sender_count)
+                      |  messages
+                    - if candidate.user
+                      span.meta-item registered
+                button.button.button-primary type="submit" Select
+    - elsif @target_query.present?
+      p No people matched.
+
+    .manual-entry-section
+      h3 Or Enter Person ID
+      = form_tag preview_admin_person_merge_path(@source_person), method: :post, class: "manual-entry-form", data: { turbo: false } do
+        .form-group
+          = label_tag :target_person_id, "Target Person ID"
+          = text_field_tag :target_person_id, nil, placeholder: "Enter person ID", class: "form-input"
+        button.button.button-primary type="submit" Preview Merge
+
+  .merge-actions
+    = link_to "Cancel", admin_people_path, class: "button button-secondary"

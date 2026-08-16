@@ -6,6 +6,12 @@
     - if @users_total_count
       span.settings-page-count = "(#{@users_total_count})"
 
+  = form_with url: admin_users_path, method: :get, class: "admin-search" do |f|
+    = f.search_field :q, value: @query, placeholder: "username, name or email", aria: { label: "Search users" }
+    = f.submit "Search", name: nil
+    - if @query.present?
+      = link_to "clear", admin_users_path, class: "admin-search-clear"
+
   .email-table-wrap
     table.email-table
       thead
@@ -49,3 +55,5 @@
             td
               = link_to "Add email", new_email_admin_user_path(user), class: "button-secondary button-small"
               = link_to "Features", admin_user_features_path(user), class: "button-secondary button-small"
+
+  = paginate @users

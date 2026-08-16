@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class Admin::UsersController < Admin::BaseController
+  PER_PAGE = 50
+
   before_action :set_user, only: [ :toggle_admin, :new_email, :confirm_email, :add_email ]
 
   def active_admin_section
@@ -8,12 +10,12 @@ class Admin::UsersController < Admin::BaseController
   end
 
   def index
-    @users_total_count = User.active.count
-    @users = User.active
-                 .includes(person: [ :default_alias, :aliases ])
-                 .order(created_at: :desc)
-                 .limit(params.fetch(:limit, 50).to_i)
-                 .offset(params.fetch(:offset, 0).to_i)
+    @query = params[:q].to_s.strip
+    scope = User.active.includes(person: [ :default_alias, :aliases ])
+    scope = scope.matching(@query) if @query.present?
+
+    @users_total_count = scope.count
+    @users = scope.order(created_at: :desc).page(params[:page]).per(PER_PAGE)
   end
 
   def toggle_admin

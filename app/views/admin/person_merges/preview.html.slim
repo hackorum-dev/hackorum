@@ -1,0 +1,63 @@
+- content_for :title, "Preview Person Merge"
+
+.admin-merge-container
+  h1 Preview Person Merge
+
+  .merge-warning
+    i.fas.fa-exclamation-triangle
+    strong Warning:
+    |  This cannot be undone. The source person is deleted and all of its records move to the target.
+
+  .merge-comparison
+    .comparison-column.source-column
+      h2 Source — deleted
+      .topic-card
+        .topic-title = @preview[:source][:name]
+        .topic-stats
+          .stat-item
+            .stat-value = @preview[:moves][:aliases]
+            .stat-label Aliases
+          .stat-item
+            .stat-value = @preview[:moves][:messages]
+            .stat-label Messages
+          .stat-item
+            .stat-value = @preview[:moves][:topics]
+            .stat-label Topics
+          .stat-item
+            .stat-value = @preview[:moves][:mentions]
+            .stat-label Mentions
+        .topic-participants
+          h4 Emails moving
+          ul
+            - @preview[:source][:emails].each do |email|
+              li = email
+
+    .comparison-arrow
+      i.fas.fa-arrow-right
+
+    .comparison-column.target-column
+      h2 Target — survives
+      .topic-card
+        .topic-title = @preview[:target][:name]
+        .topic-stats
+          .stat-item
+            .stat-value = @preview[:target][:message_count]
+            .stat-label Messages
+        - if @preview[:target][:user]
+          p Registered account: = @preview[:target][:user].username || "user ##{@preview[:target][:user].id}"
+        .topic-participants
+          h4 Existing emails
+          ul
+            - @preview[:target][:emails].each do |email|
+              li = email
+
+  / turbo_confirm, not data-confirm: there is no rails-ujs here, and the form
+  / has to stay turbo-driven for turbo to raise the dialog at all
+  = form_tag admin_person_merge_path(@source_person), method: :post, class: "merge-form", data: { turbo_confirm: "Merge these people? This cannot be undone." } do
+    = hidden_field_tag :target_person_id, @target_person.id
+
+    .merge-actions
+      = link_to "Back", new_admin_person_merge_path(@source_person), class: "button button-secondary"
+      button.button.button-danger type="submit"
+        i.fas.fa-compress-arrows-alt
+        |  Confirm Merge
