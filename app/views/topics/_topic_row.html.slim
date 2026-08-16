@@ -15,10 +15,11 @@
   - row_class << "topic-#{status}"
   - row_class << "has-new-replies" if status.to_s == "reading"
 
+- topic_lists = @topic_mailing_lists_map&.dig(topic.id) || []
+
 tr id=dom_id(topic) class=row_class.join(" ") data-topic-id=topic.id data-last-message-id=topic.last_message_id
-  = render partial: "topics/status_cell", locals: { topic: topic, state: state, note_count: note_count, team_readers: team_readers, star_data: star_data, ignored: ignored }
+  = render partial: "topics/status_cell", locals: { topic: topic, state: state, note_count: note_count, team_readers: team_readers, star_data: star_data, ignored: ignored, topic_lists: topic_lists }
   td.topic-mailing-lists data-label="Mailing Lists"
-    - topic_lists = @topic_mailing_lists_map&.dig(topic.id) || []
     - if topic_lists.any?
       = mailing_list_badges_html(topic_lists)
   td.topic-activity data-label="Activity"

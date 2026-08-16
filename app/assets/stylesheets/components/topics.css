@@ -87,6 +87,8 @@
 }
 
 .topics-table {
+  --topic-icon-slots: [commit] 28px [patch] 28px;
+
   & table {
     width: 100%;
     border-collapse: collapse;
@@ -143,6 +145,14 @@
   }
 }
 
+.topics-table.has-personal-icons {
+  --topic-icon-slots: [reading] 28px [star] 28px [note] 28px [commit] 28px [patch] 28px;
+}
+
+.topics-table.has-personal-icons.has-team-icons {
+  --topic-icon-slots: [reading] 28px [star] 28px [note] 28px [team] 28px [commit] 28px [patch] 28px;
+}
+
 .topic-icon {
   display: inline-block;
   background: var(--color-bg-icon);
@@ -160,6 +170,11 @@ a.topic-icon {
   &:hover {
     filter: brightness(0.95);
   }
+}
+
+.topic-title-ignore {
+  margin-left: var(--spacing-2);
+  vertical-align: middle;
 }
 
 .topic-icon-badge {
@@ -291,10 +306,6 @@ a.topic-icon {
     gap: var(--spacing-2);
   }
 
-  .topic-title-icons {
-    min-width: 0;
-  }
-
   .topic-icon {
     padding: 2px;
     margin-right: 0;
@@ -404,7 +415,6 @@ a.topic-icon {
   padding: var(--spacing-2) var(--spacing-4) var(--spacing-2) var(--spacing-2);
   align-self: stretch;
   height: 100%;
-  min-width: var(--topic-title-icons-width, 190px);
   flex-shrink: 0;
 }
 
@@ -432,6 +442,7 @@ a.topic-icon {
   padding: var(--spacing-3);
   box-shadow: var(--shadow-lg);
   min-width: 320px;
+  text-align: left;
 }
 
 .topic-participants .topic-icon-hover {
@@ -1000,6 +1011,11 @@ a.topic-icon {
   vertical-align: middle;
 }
 
+.topic-inline-lists {
+  display: none;
+  margin-left: var(--spacing-2);
+}
+
 .mailing-list-badge {
   display: inline-block;
   padding: 1px 6px;
@@ -1076,4 +1092,100 @@ a.topic-icon {
 .commit-hover-more {
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
+}
+
+@media (min-width: 1400px) {
+  /* strip width = cell pad 8 + icons pad 8 + slots * 28 + gaps * 8 + icons pad 16 + 18 diagonal */
+  .topics-table {
+    --topic-new-replies-strip-width: 114px;
+  }
+
+  .topics-table.has-personal-icons {
+    --topic-new-replies-strip-width: 222px;
+  }
+
+  .topics-table.has-personal-icons.has-team-icons {
+    --topic-new-replies-strip-width: 258px;
+  }
+
+  .topic-title-icons {
+    display: grid;
+    grid-template-columns: var(--topic-icon-slots);
+    gap: var(--spacing-2);
+    justify-content: start;
+  }
+
+  .topic-title-icons > * {
+    grid-row: 1;
+    width: 100%;
+    box-sizing: border-box;
+    margin-right: 0;
+    text-align: center;
+  }
+
+  .topic-title-icons .topic-icon i {
+    width: 1.25em;
+    text-align: center;
+  }
+
+  .slot-reading {
+    grid-column: reading;
+  }
+
+  .slot-star {
+    grid-column: star;
+  }
+
+  .slot-note {
+    grid-column: note;
+  }
+
+  .slot-team {
+    grid-column: team;
+  }
+
+  .slot-commit {
+    grid-column: commit;
+  }
+
+  .slot-patch {
+    grid-column: patch;
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1399px) {
+  .topic-title-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-1);
+  }
+
+  /* icons come first in the markup, push them below the title */
+  .topic-title-icons {
+    order: 2;
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-2);
+    height: auto;
+    padding: 0;
+    align-self: flex-start;
+  }
+
+  .topic-title-icons > * {
+    margin-right: 0;
+  }
+
+  /* strip is sized for a left hand icon block */
+  .status-border.has-new-replies::before {
+    display: none;
+  }
+
+  .topics-table th.mailing-lists-header,
+  .topics-table td.topic-mailing-lists {
+    display: none;
+  }
+
+  .topic-inline-lists {
+    display: inline-flex;
+  }
 }

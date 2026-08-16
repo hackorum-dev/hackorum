@@ -2,7 +2,7 @@
 - visible_groups = groups.first(5)
 - remaining_count = groups.size - visible_groups.size
 
-div class="topic-icon commit-icon" data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+div class="topic-icon commit-icon slot-commit" data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
   i.fa-solid.fa-code-commit
   .topic-icon-hover data-hover-popover-target="popover" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
     .commit-hover

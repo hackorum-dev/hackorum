@@ -7,16 +7,18 @@
 - status_class = "status-#{status}"
 - status_class = "#{status_class} has-new-replies" if status.to_s == "reading"
 - ignored = local_assigns[:ignored] || false
+- topic_lists = local_assigns[:topic_lists] || []
 - star_data = star_data || {}
 - icons_html = capture do
-  - if status.to_s == "reading"
-    = link_to topic_path(topic, anchor: "first-unread"), class: "topic-icon topic-icon-reading", title: "Jump to first unread message (#{reading_unread_count} unread)" do
-      i.fa-solid.fa-envelope
-      span.topic-icon-badge.topic-icon-badge-sup = reading_unread_count
-  = star_icon_html(topic: topic, star_data: star_data)
-  = ignore_icon_html(topic: topic, ignored: ignored)
-  = note_icon_html(topic: topic, count: note_count.to_i)
-  = team_readers_icon_html(topic: topic, readers: team_readers)
+  - if user_signed_in?
+    - if status.to_s == "reading"
+      = link_to topic_path(topic, anchor: "first-unread"), class: "topic-icon topic-icon-reading slot-reading", title: "Jump to first unread message (#{reading_unread_count} unread)" do
+        i.fa-solid.fa-envelope
+        span.topic-icon-badge.topic-icon-badge-sup = reading_unread_count
+    = star_icon_html(topic: topic, star_data: star_data)
+    = note_icon_html(topic: topic, count: note_count.to_i)
+    - if current_user.team_ids.any?
+      = team_readers_icon_html(topic: topic, readers: team_readers)
   - commit_summary = @commit_summaries&.dig(topic.id)
   - if commit_summary
     = render partial: "topics/commit_icon", locals: { summary: commit_summary }
@@ -24,7 +26,7 @@
   - if commitfest_summary
     = render partial: "topics/commitfest_icon", locals: { summary: commitfest_summary }
   - elsif topic.has_attachments?
-    .topic-icon title="Attachments"
+    .topic-icon.slot-patch title="Attachments"
       i.fa-solid.fa-paperclip
 td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") data-label="Topic"
   - creator = topic.creator_display_alias
@@ -32,10 +34,17 @@ td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") 
   .topic-title-main
     .topic-title-icons
       == icons_html
-    span
+    span.topic-title-text
       = link_to topic.title, topic_title_link(topic), class: "topic-link"
+      - if topic_lists.any?
+        = mailing_list_badges_html(topic_lists, extra_class: "topic-inline-lists")
+      - if user_signed_in?
+        = ignore_icon_html(topic: topic, ignored: ignored)
   .topic-title-mobile
-    = link_to topic.title, topic_title_link(topic), class: "topic-link"
+    .topic-title-text
+      = link_to topic.title, topic_title_link(topic), class: "topic-link"
+      - if user_signed_in?
+        = ignore_icon_html(topic: topic, ignored: ignored)
     - if creator || last_sender
       .topic-byline
         - if creator

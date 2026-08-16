@@ -4,7 +4,7 @@
 - reviewers = summary[:reviewers] || []
 - tags = summary[:tags] || []
 
-div class="topic-icon commitfest-icon#{committed ? ' commitfest-committed' : ''}" data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+div class="topic-icon commitfest-icon slot-patch#{committed ? ' commitfest-committed' : ''}" data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
   i.fa-solid class=icon_class
   .topic-icon-hover data-hover-popover-target="popover" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
     .commitfest-hover

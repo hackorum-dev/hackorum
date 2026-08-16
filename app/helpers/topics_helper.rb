@@ -99,7 +99,7 @@ module TopicsHelper
   # Replaces app/views/topics/_note_icon.html.slim
   def note_icon_html(topic:, count:)
     count = count.to_i
-    classes = [ "topic-icon", "activity-note" ]
+    classes = [ "topic-icon", "activity-note", "slot-note" ]
     classes << "is-hidden" unless count.positive?
     tooltip_label = count.positive? ? "Notes: #{count}" : "Notes"
 
@@ -122,7 +122,7 @@ module TopicsHelper
     team_starrers = star_data[:team_starrers] || []
     total_count = (starred_by_me ? 1 : 0) + team_starrers.size
 
-    classes = [ "topic-icon", "activity-star" ]
+    classes = [ "topic-icon", "activity-star", "slot-star" ]
     classes << "is-hidden" if total_count.zero?
     classes << "is-starred" if starred_by_me
     icon_class = starred_by_me ? "fa-solid fa-star" : "fa-regular fa-star"
@@ -165,7 +165,7 @@ module TopicsHelper
     path = ignored ? unignore_topic_path(topic) : ignore_topic_path(topic)
     method = ignored ? :delete : :post
     icon_class = ignored ? "fa-solid fa-eye-slash" : "fa-regular fa-eye-slash"
-    classes = [ "topic-icon", "activity-ignore" ]
+    classes = [ "topic-icon", "activity-ignore", "topic-title-ignore" ]
     classes << "is-ignored" if ignored
 
     link_to path,
@@ -214,7 +214,7 @@ module TopicsHelper
   # Replaces app/views/topics/_team_readers_icon.html.slim
   def team_readers_icon_html(topic:, readers:)
     count = readers&.size.to_i
-    classes = [ "topic-icon", "activity-team-read" ]
+    classes = [ "topic-icon", "activity-team-read", "slot-team" ]
     classes << "is-hidden" if count.zero?
 
     tag.div(
@@ -245,14 +245,14 @@ module TopicsHelper
     end
   end
 
-  def mailing_list_badges_html(mailing_lists)
+  def mailing_list_badges_html(mailing_lists, extra_class: nil)
     return "".html_safe if mailing_lists.blank?
 
     badges = mailing_lists.map do |ml|
       tag.span(ml.display_name, class: "mailing-list-badge", title: ml.identifier)
     end
 
-    tag.span(class: "mailing-list-badges") { safe_join(badges) }
+    tag.span(class: [ "mailing-list-badges", extra_class ].compact.join(" ")) { safe_join(badges) }
   end
 
   def topic_title_link(topic)
@@ -279,5 +279,16 @@ module TopicsHelper
       "data-controller" => "topic-states",
       "data-topic-states-url-value" => row_states_topics_path
     }
+  end
+
+  def topics_table_class
+    classes = [ "topics-table" ]
+
+    if user_signed_in?
+      classes << "has-personal-icons"
+      classes << "has-team-icons" if current_user.team_ids.any?
+    end
+
+    classes.join(" ")
   end
 end
