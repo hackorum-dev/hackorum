@@ -1,46 +1,47 @@
 - content_for :title, "Activity"
 
-.activities-header
-  h2 Activity
-  - if @unread_count.positive?
-    = button_to "Mark all read (#{@unread_count})", mark_all_read_activities_path, method: :post, class: "button-secondary"
+.activities-container
+  .activities-header
+    h2 Activity
+    - if @unread_count.positive?
+      = button_to "Mark all read (#{@unread_count})", mark_all_read_activities_path, method: :post, class: "button-secondary"
 
-= form_with url: activities_path, method: :get, local: true, class: "activity-search" do |f|
-  = f.search_field :q, value: @search_query, placeholder: "Search your activity…", class: "search-input"
-  = f.submit "Search", class: "button-secondary"
+  = form_with url: activities_path, method: :get, local: true, class: "activity-search" do |f|
+    = f.search_field :q, value: @search_query, placeholder: "Search your activity…", class: "search-input"
+    = f.submit "Search", class: "button-secondary"
 
-- if @activities.any?
-  .activities-list
-    - @activities.each do |activity|
-      - subject = activity.subject
-      .activity-card class=("is-unread" if activity.read_at.nil?)
-        .activity-meta
-          span.activity-type = activity_type_label(activity)
-          span.activity-time title=absolute_time_display(activity.created_at) = smart_time_display(activity.created_at)
-          - if activity.read_at.nil?
-            span.activity-unread-badge Unread
+  - if @activities.any?
+    .activities-list
+      - @activities.each do |activity|
+        - subject = activity.subject
+        .activity-card class=("is-unread" if activity.read_at.nil?)
+          .activity-meta
+            span.activity-type = activity_type_label(activity)
+            span.activity-time title=absolute_time_display(activity.created_at) = smart_time_display(activity.created_at)
+            - if activity.read_at.nil?
+              span.activity-unread-badge Unread
 
-        - if subject.is_a?(Note)
-          .activity-body
-            .activity-title
-              = link_to(subject.topic.title, topic_path(subject.topic, anchor: subject.message_id ? message_dom_id(subject.message) : "thread-notes"))
-            .activity-snippet = truncate(subject.body, length: 160)
-            - if subject.note_tags.any?
-              .activity-tags
-                - subject.note_tags.each do |tag|
-                  span.note-tag ##{tag.tag}
-            - if current_user.id == subject.author_id
-              .activity-actions
-                = button_to "Delete note", note_path(subject), method: :delete, class: "note-delete-button", form: { data: { turbo_confirm: "Delete this note?" } }
-        - elsif subject.is_a?(Message)
-          .activity-body
-            .activity-title
-              = link_to(subject.topic.title, topic_path(subject.topic, anchor: message_dom_id(subject)))
-            .activity-snippet
-              strong> = subject.subject
-              = truncate(subject.body, length: 140)
-        - else
-          .activity-body
-            span.activity-missing Content not available anymore.
-- else
-  p No activity yet.
+          - if subject.is_a?(Note)
+            .activity-body
+              .activity-title
+                = link_to(subject.topic.title, topic_path(subject.topic, anchor: subject.message_id ? message_dom_id(subject.message) : "thread-notes"))
+              .activity-snippet = truncate(subject.body, length: 160)
+              - if subject.note_tags.any?
+                .activity-tags
+                  - subject.note_tags.each do |tag|
+                    span.note-tag ##{tag.tag}
+              - if current_user.id == subject.author_id
+                .activity-actions
+                  = button_to "Delete note", note_path(subject), method: :delete, class: "note-delete-button", form: { data: { turbo_confirm: "Delete this note?" } }
+          - elsif subject.is_a?(Message)
+            .activity-body
+              .activity-title
+                = link_to(subject.topic.title, topic_path(subject.topic, anchor: message_dom_id(subject)))
+              .activity-snippet
+                strong> = subject.subject
+                = truncate(subject.body, length: 140)
+          - else
+            .activity-body
+              span.activity-missing Content not available anymore.
+  - else
+    p No activity yet.
