@@ -1,3 +1,9 @@
+.activities-container {
+  max-width: var(--max-width-container);
+  margin: 0 auto;
+  padding: var(--spacing-6);
+}
+
 .activities-header {
   display: flex;
   justify-content: space-between;
