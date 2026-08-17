@@ -234,8 +234,12 @@ module CiHelper
   # register. The two are independent on purpose, so a label matching or
   # echoing a CI_BADGES one (tests failed, infra error) is coincidence, not a
   # link to keep in sync.
+  #
+  # success is deliberately not fa-circle-check: the commitfest icon wears that
+  # one for a committed thread, and the two sit in neighbouring columns on the
+  # index. The vial keeps it in the same lab-glass family as tests_failed.
   CI_RUN_ICONS = {
-    "success" => [ "fa-circle-check", "green", "CI passed" ],
+    "success" => [ "fa-vial-circle-check", "green", "CI passed" ],
     "tests_failed" => [ "fa-flask", "amber", "tests failed" ],
     "tests_timeout" => [ "fa-flask", "amber", "tests timed out" ],
     "build_failed" => [ "fa-hammer", "red", "build failed" ],
@@ -275,6 +279,70 @@ module CiHelper
   def ci_github_run_url(run)
     url = "#{GITHUB_URL}/#{PatchCi::Config::GITHUB_REPO}/actions/runs/#{run.github_run_id}"
     run.run_attempt > 1 ? "#{url}/attempts/#{run.run_attempt}" : url
+  end
+
+  # one copyable command line. The banner prints four of them, so the clipboard
+  # wiring lives here rather than four times in the template.
+  def ci_copy_code(command)
+    tag.div(class: "ci-banner-cmd-line") do
+      tag.code(command, class: "ci-copy", title: "Copy",
+               data: { controller: "clipboard", action: "click->clipboard#copy",
+                       "clipboard-url-value": command })
+    end
+  end
+
+  # the remote a reader adds for the fork. Named, not a bare URL: the fetch
+  # below has to name something, and a URL there would leave them on a detached
+  # FETCH_HEAD with no way back to the branch.
+  CI_GIT_REMOTE = "hackorum".freeze
+
+  def ci_github_clone_url
+    "#{GITHUB_URL}/#{PatchCi::Config::GITHUB_REPO}.git"
+  end
+
+  # for someone with no postgres checkout at all
+  def ci_git_clone_command(branch_name)
+    "git clone --branch #{branch_name} #{ci_github_clone_url}"
+  end
+
+  # one-time, and separate from the fetch on purpose: a reader who ran it once
+  # copies the next line only
+  def ci_git_remote_command
+    "git remote add #{CI_GIT_REMOTE} #{ci_github_clone_url}"
+  end
+
+  # a single branch, not the whole remote: the fork carries one branch per
+  # patchset of every thread, and fetching all of them to read one patch is
+  # rude. Naming the remote lets git build the tracking ref, so the checkout
+  # lands on a branch rather than a detached head.
+  def ci_git_checkout_command(branch_name)
+    "git fetch #{CI_GIT_REMOTE} #{branch_name} && git checkout #{branch_name}"
+  end
+
+  # the one branch link, so the banner, the patchset list and the attachment
+  # header cannot grow three different ways of naming the same branch. nil text
+  # writes the branch name beside the glyph, blank text leaves the glyph alone -
+  # the name does not fit a narrow sidebar row that already carries two links.
+  def ci_branch_link(branch_name, text: nil, class_name: "ci-branch-link")
+    label = text.nil? ? branch_name : text.presence
+    glyph = tag.i(class: "fa-brands fa-github", aria: { hidden: true })
+    link_to ci_github_branch_url(branch_name), class: class_name, target: "_blank",
+            rel: "noopener", title: "Branch #{branch_name} on GitHub",
+            "aria-label": "Branch #{branch_name} on GitHub" do
+      label ? safe_join([ glyph, tag.span(label, class: "ci-branch-name") ]) : glyph
+    end
+  end
+
+  # message -> its pushed branch name, or nil. One query per topic, and only
+  # for topics that carry a patch at all: the message body renders from three
+  # entry points, and none of them can preload for the others.
+  def ci_message_branch_name(message)
+    return nil unless message.is_patch_submission
+    @ci_message_branch_names ||= {}
+    @ci_message_branch_names[message.topic_id] ||=
+      PatchBranch.where(topic_id: message.topic_id).where.not(pushed_at: nil)
+                 .pluck(:message_id, :branch_name).to_h
+    @ci_message_branch_names[message.topic_id][message.id]
   end
 
   # the one "nothing to show here" mark, so a table cannot grow a second one

@@ -694,7 +694,7 @@ RSpec.describe CiHelper, type: :helper do
     end
 
     {
-      "success" => [ "fa-circle-check", "green" ],
+      "success" => [ "fa-vial-circle-check", "green" ],
       "tests_failed" => [ "fa-flask", "amber" ],
       "tests_timeout" => [ "fa-flask", "amber" ],
       "build_failed" => [ "fa-hammer", "red" ],

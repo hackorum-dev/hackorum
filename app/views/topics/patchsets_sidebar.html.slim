@@ -9,6 +9,8 @@
           = link_to "##{message_dom_id(msg)}", class: "patchset-link", data: { turbo: false } do
             span.patchset-target = "##{number}"
             span.patchset-date = smart_time_display(msg.created_at)
+          - if (branch = @patchset_branches[msg.id])
+            = ci_branch_link(branch, text: "", class_name: "patchset-branch")
           = link_to message_patchset_path(msg), class: "patchset-download", data: { turbo: false }, "aria-label": "Download patchset ##{number}" do
             i.fas.fa-download
   - else

@@ -179,7 +179,12 @@ class TopicsController < ApplicationController
       .select(&:is_patch_submission)
       .sort_by(&:created_at)
       .reverse
-    @has_patch_branches = PatchBranch.where(topic_id: @topic.id).exists?
+
+    # a row with no pushed_at has no branch on github yet, but it still counts
+    # as CI history worth linking to
+    branches = PatchBranch.where(topic_id: @topic.id).pluck(:message_id, :branch_name, :pushed_at)
+    @has_patch_branches = branches.any?
+    @patchset_branches = branches.filter_map { |message_id, name, pushed_at| [ message_id, name ] if pushed_at }.to_h
 
     render layout: false
   end

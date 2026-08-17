@@ -36,7 +36,7 @@ RSpec.describe "Public CI", type: :request do
 
       get topics_path
 
-      expect(glyphs.first).to include("fa-circle-check")
+      expect(glyphs.first).to include("fa-vial-circle-check")
     end
 
     it "shows the apply glyph for a patch that never applied" do
@@ -70,7 +70,7 @@ RSpec.describe "Public CI", type: :request do
 
       get row_states_topics_path, params: { topic_ids: [ topic.id ] }, as: :turbo_stream
 
-      expect(glyphs.first).to include("fa-circle-check")
+      expect(glyphs.first).to include("fa-vial-circle-check")
     end
   end
 
@@ -140,6 +140,24 @@ RSpec.describe "Public CI", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).not_to include("ci-thread-section")
+    end
+
+    it "links the branch the patchset was pushed to" do
+      repo_state
+      topic = thread_with_run({ ci_status: "success" }, { status: "success" })
+
+      get topic_path(topic)
+
+      expect(sidebar).to include("https://github.com/hackorum-dev/postgres/tree/t#{topic.id}_1")
+    end
+
+    it "drops the branch link on a patchset that was never pushed" do
+      repo_state
+      topic = thread_with_run(pushed_at: nil)
+
+      get topic_path(topic)
+
+      expect(sidebar).not_to include("GitHub branch")
     end
   end
 
@@ -228,6 +246,99 @@ RSpec.describe "Public CI", type: :request do
       expect(banner).to include("Beta feature")
       expect(banner).to include(">applies<")
       expect(banner).not_to include("docker run")
+    end
+
+    # no image needed for this one: the branch exists as soon as the push lands
+    it "offers a checkout for both a fresh clone and an existing one" do
+      repo_state
+      patchset(1, ci_status: "build_failed")
+
+      get topic_path(topic)
+
+      expect(banner).to include("git clone --branch t#{topic.id}_1 https://github.com/hackorum-dev/postgres.git")
+      expect(banner).to include("git remote add hackorum https://github.com/hackorum-dev/postgres.git")
+      expect(banner).to include("git fetch hackorum t#{topic.id}_1 &amp;&amp; git checkout t#{topic.id}_1")
+    end
+
+    it "links the branch it just told you to check out" do
+      repo_state
+      patchset(1, ci_status: "build_failed")
+
+      get topic_path(topic)
+
+      expect(banner).to include("https://github.com/hackorum-dev/postgres/tree/t#{topic.id}_1")
+      expect(banner).to include("Patchset v1")
+    end
+
+    it "drops the branch section on a patchset that was never pushed" do
+      repo_state
+      patchset(1, pushed_at: nil)
+
+      get topic_path(topic)
+
+      expect(banner).to include("Beta feature")
+      expect(banner).not_to include("git clone")
+      expect(banner).not_to include("git fetch")
+    end
+  end
+
+  describe "thread attachments" do
+    let(:repo_state) { create(:patch_ci_repo_state, master_committed_at: Time.current) }
+    let(:topic) { create(:topic, last_message_at: Time.current) }
+
+    def patch_message(**branch_attrs)
+      message = create(:message, topic: topic, is_patch_submission: true)
+      create(:attachment, :patch_file, message: message)
+      create(:patch_branch, topic: topic, message: message,
+             branch_name: "t#{topic.id}_1", base_sha: repo_state.master_sha,
+             pushed_at: 1.hour.ago, base_committed_at: 1.day.ago,
+             base_commit_height: 10, **branch_attrs)
+      message
+    end
+
+    it "links the branch beside the attachment list" do
+      repo_state
+      patch_message(ci_status: "success")
+
+      get topic_path(topic)
+
+      head = Nokogiri::HTML(response.body).at_css(".message-attachments-head").to_html
+      expect(head).to include("https://github.com/hackorum-dev/postgres/tree/t#{topic.id}_1")
+    end
+
+    it "leaves the attachment list alone when the patchset was never pushed" do
+      repo_state
+      patch_message(pushed_at: nil)
+
+      get topic_path(topic)
+
+      head = Nokogiri::HTML(response.body).at_css(".message-attachments-head").to_html
+      expect(head).not_to include("/tree/")
+    end
+  end
+
+  describe "patchsets sidebar" do
+    let(:repo_state) { create(:patch_ci_repo_state, master_committed_at: Time.current) }
+    let(:topic) { create(:topic, last_message_at: Time.current) }
+
+    def patch_message(index, **branch_attrs)
+      message = create(:message, topic: topic, is_patch_submission: true)
+      create(:attachment, :patch_file, message: message)
+      create(:patch_branch, topic: topic, message: message,
+             branch_name: "t#{topic.id}_#{index}", base_sha: repo_state.master_sha,
+             pushed_at: 1.hour.ago, **branch_attrs)
+      message
+    end
+
+    it "links the branch of every pushed patchset" do
+      repo_state
+      patch_message(1)
+      patch_message(2, pushed_at: nil)
+
+      get patchsets_sidebar_topic_path(topic)
+
+      expect(response.body).to include("https://github.com/hackorum-dev/postgres/tree/t#{topic.id}_1")
+      expect(response.body).not_to include("/tree/t#{topic.id}_2")
     end
   end
 end

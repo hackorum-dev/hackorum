@@ -513,12 +513,14 @@
   font-size: var(--font-size-sm);
 }
 
-.sidebar .patchset-download {
+.sidebar .patchset-download,
+.sidebar .patchset-branch {
   color: var(--color-text-secondary);
   padding: var(--spacing-1) var(--spacing-2);
 }
 
-.sidebar .patchset-download:hover {
+.sidebar .patchset-download:hover,
+.sidebar .patchset-branch:hover {
   color: var(--color-text-link);
 }
 

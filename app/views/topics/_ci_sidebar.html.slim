@@ -44,4 +44,6 @@ details.sidebar-section.ci-thread-section.ci-badges open=true
     .ci-thread-links
       - if run
         = link_to "GitHub run", ci_github_run_url(run), target: "_blank", rel: "noopener"
+      - if row.pushed_at
+        = link_to "GitHub branch", ci_github_branch_url(row.branch_name), target: "_blank", rel: "noopener"
       = link_to "CI history", ci_topic_path(topic)

@@ -15,7 +15,10 @@
 
   - if message.attachments.any?
     .message-attachments id="message-#{message.id}-attachments"
-      h4 Attachments:
+      .message-attachments-head
+        h4 Attachments:
+        - if (branch = ci_message_branch_name(message))
+          = ci_branch_link(branch)
       - message.attachments.each do |attachment|
         - if attachment.patch? || attachment.text?
           details.attachment

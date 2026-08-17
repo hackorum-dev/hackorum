@@ -17,9 +17,7 @@
     .ci-banner-docker
       p.ci-banner-docker-lead
         | You can run a PostgreSQL built from this patch straight from Docker, with no checkout and no build:
-      .ci-banner-cmd-line
-        code.ci-copy data-controller="clipboard" data-action="click->clipboard#copy" data-clipboard-url-value=command title="Copy"
-          = command
+      = ci_copy_code(command)
       .ci-banner-cmd-line
         code.ci-banner-cmd-text psql -h localhost -U postgres
       - if status.image_current?
@@ -29,3 +27,17 @@
         p.ci-banner-warning
           i.fa-solid.fa-triangle-exclamation aria-hidden="true"
           span = ci_image_mismatch_warning(status, message_numbers)
+  - if row.pushed_at
+    .ci-banner-branch
+      p.ci-banner-docker-lead
+        | Every patchset is also pushed to a branch of our PostgreSQL fork, so you can check out the same tree CI built. Without a PostgreSQL checkout:
+      = ci_copy_code(ci_git_clone_command(row.branch_name))
+      p.ci-banner-docker-lead
+        | In a checkout you already have, add the fork once:
+      = ci_copy_code(ci_git_remote_command)
+      p.ci-banner-docker-lead
+        | then, for this patchset and every later one:
+      = ci_copy_code(ci_git_checkout_command(row.branch_name))
+      p.ci-banner-provenance
+        = "#{ci_patchset_label(row, message_numbers).capitalize} is on "
+        = ci_branch_link(row.branch_name)

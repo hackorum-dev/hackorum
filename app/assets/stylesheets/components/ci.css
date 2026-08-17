@@ -702,7 +702,8 @@
 
 /* the commands are the one thing here worth acting on, so they get a rule of
    their own rather than sitting flush against the prose above them */
-.ci-banner-docker {
+.ci-banner-docker,
+.ci-banner-branch {
   border-top: var(--border-width) solid var(--color-border);
   padding-top: var(--spacing-2);
 }
@@ -729,6 +730,12 @@
   color: var(--color-text-secondary);
 }
 
+/* the branch block alternates prose and commands; a lead that follows a command
+   needs air above it, the one that opens the block does not */
+.ci-banner-cmd-line + .ci-banner-docker-lead {
+  margin-top: var(--spacing-2);
+}
+
 .ci-banner-warning {
   display: flex;
   gap: var(--spacing-2);
@@ -739,4 +746,19 @@
   background: var(--ci-amber-bg);
   color: var(--ci-amber-fg);
   font-size: var(--font-size-sm);
+}
+
+/* the glyph and the branch name are one word, so they must not be pulled apart
+   by a line break in a narrow column. Used outside the banner too - the thread
+   attachment header and the patchset sidebar carry the same link. */
+.ci-branch-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--spacing-1);
+  white-space: nowrap;
+}
+
+.ci-branch-name {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
 }
