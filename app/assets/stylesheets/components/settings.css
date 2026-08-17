@@ -1,11 +1,10 @@
 .settings-page {
-  padding: var(--spacing-10) var(--spacing-6) var(--spacing-12);
+  padding: var(--spacing-6);
 }
 
 .settings-page h1 {
-  font-size: var(--font-size-2xl);
+  font-size: var(--font-size-3xl);
   color: var(--color-text-primary);
-  margin-bottom: var(--spacing-8);
 }
 
 .settings-page .settings-page-count {
@@ -416,7 +415,7 @@
 }
 
 .settings-page .teams-section {
-  margin-bottom: var(--spacing-8);
+  padding: var(--spacing-6) 0;
 }
 
 .settings-page .team-actions,
@@ -751,4 +750,12 @@
   margin-top: var(--spacing-8);
   display: flex;
   gap: var(--spacing-3);
+}
+
+.settings-page .saved-searches-section {
+  padding: var(--spacing-6) 0;
+}
+
+.settings-page .saved-searches-new-button-section {
+  padding-bottom: var(--spacing-6);
 }
