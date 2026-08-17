@@ -56,18 +56,20 @@ class Admin::UsersController < Admin::BaseController
     end
 
     if aliases.exists?
-      aliases.find_each do |al|
-        person.attach_alias!(al, user: @user)
-        al.update_columns(verified_at: Time.current)
-      end
+      ApplicationRecord.transaction do
+        aliases.find_each do |al|
+          person.attach_alias!(al, user: @user)
+          al.update_columns(verified_at: Time.current)
+        end
 
-      AdminEmailChange.create!(
-        performed_by: current_user,
-        target_user: @user,
-        email: email,
-        aliases_attached: aliases.count,
-        created_new_alias: false
-      )
+        AdminEmailChange.create!(
+          performed_by: current_user,
+          target_user: @user,
+          email: email,
+          aliases_attached: aliases.count,
+          created_new_alias: false
+        )
+      end
     else
       al = Alias.create!(person: person, user: @user, name: email, email: email, verified_at: Time.current)
       person.update!(default_alias_id: al.id) if person.default_alias_id.nil?

@@ -27,9 +27,6 @@ class PersonMergeService
       # row for a topic both people are in instead of summing it
       affected_topic_ids = merge_topic_participants!
       target_person.reassign_authored_records(source_person)
-      # reassign_authored_records does not know about commit credits, and the
-      # column carries a foreign key, so the destroy below would fail without it
-      CommitPerson.where(person_id: source_person.id).update_all(person_id: target_person.id)
 
       source_person.update_columns(default_alias_id: nil)
       source_person.destroy!

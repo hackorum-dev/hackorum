@@ -108,11 +108,13 @@ class Person < ApplicationRecord
   end
 
   def attach_alias!(alias_record, user: nil)
-    old_person = alias_record.person
-    alias_record.update!(person_id: id, user_id: user&.id || alias_record.user_id)
-    if old_person && old_person.id != id
-      merge_contributor_memberships_from(old_person)
-      cleanup_orphaned_person(old_person)
+    transaction do
+      old_person = alias_record.person
+      alias_record.update!(person_id: id, user_id: user&.id || alias_record.user_id)
+      if old_person && old_person.id != id
+        merge_contributor_memberships_from(old_person)
+        cleanup_orphaned_person(old_person)
+      end
     end
   end
 
@@ -128,6 +130,7 @@ class Person < ApplicationRecord
     Topic.where(last_sender_person_id: old_person.id).update_all(last_sender_person_id: id)
     Message.where(sender_person_id: old_person.id).update_all(sender_person_id: id)
     Mention.where(person_id: old_person.id).update_all(person_id: id)
+    CommitPerson.where(person_id: old_person.id).update_all(person_id: id)
     TopicParticipant.where(person_id: old_person.id).where.not(topic_id: TopicParticipant.where(person_id: id).select(:topic_id)).update_all(person_id: id)
     TopicParticipant.where(person_id: old_person.id).delete_all
   end

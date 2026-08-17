@@ -219,6 +219,18 @@ RSpec.describe "Admin::Users", type: :request do
       expect(aliases.where(verified_at: nil)).to be_empty
     end
 
+    it "moves commit credits off the orphaned person" do
+      orphan = create(:alias, email: "committer@example.com", name: "Committer Alias")
+      commit_person = create(:commit_person, person: orphan.person)
+      old_person_id = orphan.person_id
+
+      post add_email_admin_user_path(regular_user), params: { email: "committer@example.com" }
+      expect(response).to redirect_to(admin_users_path)
+
+      expect(commit_person.reload.person_id).to eq(regular_user.person_id)
+      expect(Person.find_by(id: old_person_id)).to be_nil
+    end
+
     it "refuses when email belongs to another user" do
       other = create(:user)
       attach_verified_alias(other, email: "owned@example.com")
