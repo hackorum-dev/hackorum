@@ -38,16 +38,16 @@ td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") 
     .topic-title-icons
       == icons_html
     span.topic-title-text
+      - if user_signed_in?
+        = ignore_icon_html(topic: topic, ignored: ignored)
       = link_to topic.title, topic_title_link(topic), class: "topic-link"
       - if topic_lists.any?
         = mailing_list_badges_html(topic_lists, extra_class: "topic-inline-lists")
-      - if user_signed_in?
-        = ignore_icon_html(topic: topic, ignored: ignored)
   .topic-title-mobile
     .topic-title-text
-      = link_to topic.title, topic_title_link(topic), class: "topic-link"
       - if user_signed_in?
         = ignore_icon_html(topic: topic, ignored: ignored)
+      = link_to topic.title, topic_title_link(topic), class: "topic-link"
     - if creator || last_sender
       .topic-byline
         - if creator

@@ -176,8 +176,9 @@ a.topic-icon {
   }
 }
 
-.topic-title-ignore {
-  margin-left: var(--spacing-2);
+/* specificity beats the mobile .topic-icon margin reset */
+.topic-title-text .topic-title-ignore {
+  margin: 0 var(--spacing-2) 0 0;
   vertical-align: middle;
 }
 
@@ -347,18 +348,19 @@ a.topic-icon {
   }
 }
 
+/* hidden but keeps its slot, so the title never shifts under the cursor on hover */
 .activity-ignore {
-  display: none;
+  visibility: hidden;
   color: var(--color-text-secondary);
 }
 
 .activity-ignore.is-ignored {
-  display: inline-block;
+  visibility: visible;
   background-color: var(--color-bg-activity-team);
 }
 
 .topic-row:hover .activity-ignore {
-  display: inline-block;
+  visibility: visible;
 }
 
 .is-hidden {
@@ -1106,8 +1108,8 @@ a.topic-icon {
   color: var(--color-text-muted);
 }
 
-/* 1385px = old 1400px viewport breakpoint minus a scrollbar, i.e. sidebar closed */
-@container topics (min-width: 1385px) {
+/* icons on the left only when the table is very wide: ~1920px viewport, sidebar closed */
+@container topics (min-width: 1900px) {
   /* strip width = cell pad 8 + icons pad 8 + slots * 28 + gaps * 8 + icons pad 16 + 18 diagonal */
   .topics-table table {
     --topic-new-replies-strip-width: 150px;
@@ -1172,7 +1174,7 @@ a.topic-icon {
 
 /* media guard keeps the mobile card layout untouched below 1025px */
 @media (min-width: 1025px) {
-  @container topics (max-width: 1384.98px) {
+  @container topics (max-width: 1899.98px) {
     .topic-title-main {
       display: flex;
       flex-direction: column;
@@ -1198,7 +1200,10 @@ a.topic-icon {
     .status-border.has-new-replies::before {
       display: none;
     }
+  }
 
+  /* own breakpoint: the column only has to go once the table is actually narrow */
+  @container topics (max-width: 1384.98px) {
     .topics-table th.mailing-lists-header,
     .topics-table td.topic-mailing-lists {
       display: none;
