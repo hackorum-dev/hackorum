@@ -218,6 +218,38 @@ module CiHelper
     "empty" => "applied but changed nothing"
   }.freeze
 
+  # the index icon: glyph names the stage the patch is at or died at, tone
+  # carries the verdict. Two glyphs belong to the apply stage alone and no CI
+  # outcome can wear them, so the glyph alone tells them apart even read in
+  # grayscale.
+  TopicIcon = Struct.new(:glyph, :tone, :label)
+
+  # retired for a reason that is not a verdict on the patch. The commit icon
+  # beside it already says the thread landed, and a merged thread's patchsets
+  # belong to the thread it merged into - an icon here would be a second, worse
+  # answer to a question already answered.
+  CI_QUIET_REASONS = [ "committed", "merged thread" ].freeze
+
+  # this is the hover-card headline, not the badge chip - CI_BADGES owns that
+  # register. The two are independent on purpose, so a label matching or
+  # echoing a CI_BADGES one (tests failed, infra error) is coincidence, not a
+  # link to keep in sync.
+  CI_RUN_ICONS = {
+    "success" => [ "fa-circle-check", "green", "CI passed" ],
+    "tests_failed" => [ "fa-flask", "amber", "tests failed" ],
+    "tests_timeout" => [ "fa-flask", "amber", "tests timed out" ],
+    "build_failed" => [ "fa-hammer", "red", "build failed" ],
+    "build_timeout" => [ "fa-hammer", "red", "build timed out" ],
+    "infra_error" => [ "fa-plug-circle-exclamation", "purple", "infrastructure error" ],
+    "push_failed" => [ "fa-plug-circle-exclamation", "purple", "push failed" ],
+    "cancelled" => [ "fa-plug-circle-exclamation", "muted", "run cancelled" ]
+  }.freeze
+
+  # an applying row with no mapped status has no result at all rather than one
+  # in progress: bucket_sql routes every in-flight status to awaiting_ci first,
+  # so nil is the only value that reaches here
+  CI_NO_RESULT_ICON = [ "fa-hourglass-half", "muted", "applies, no CI result" ].freeze
+
   # the one-phrase "what became of this patchset", for a row with nothing to
   # expand. A row that reached CI says it in badges instead.
   def ci_patchset_outcome(row)
@@ -387,13 +419,79 @@ module CiHelper
     end
   end
 
-  private
+  # nil means render nothing at all - the one visibility rule, so the index
+  # icon and the two thread blocks cannot disagree about which threads have
+  # something to say about CI
+  def ci_topic_icon(row)
+    return nil if row.nil?
+
+    case row.health_bucket
+    when "wont_retry" then ci_retired_icon(row)
+    when "never_applied" then ci_never_applied_icon(row)
+    when "needs_rebase" then TopicIcon.new("fa-code-merge", "amber", "does not apply to master")
+    when "awaiting_ci" then ci_pending_icon(row)
+    when "applies" then ci_applied_icon(row)
+    end
+  end
+
+  # the thread blocks stay quiet on exactly the rows the index icon does - one
+  # rule, so a thread cannot be worth an icon but not a block, or the reverse
+  def ci_thread_visible?(status)
+    status&.present? && ci_topic_icon(status.row).present?
+  end
+
+  # "patchset v3 (message #12)" - the index off the branch name, the number off
+  # the numbering the thread page already built. Falls back to the index alone
+  # rather than inventing a number.
+  def ci_patchset_label(row, message_numbers)
+    index = ci_patchset_index(row) || "?"
+    number = message_numbers[row.message_id]
+    number ? "patchset v#{index} (message ##{number})" : "patchset v#{index}"
+  end
+
+  # the tag is per topic and every run overwrites it, so the image a reader is
+  # about to pull is whichever patchset finished last. Name it, or they test a
+  # patch nobody is discussing.
+  def ci_image_mismatch_warning(status, message_numbers)
+    built = status.image_branch
+    current = ci_patchset_label(status.row, message_numbers)
+    return "This image was not built from the current #{current}." if built.nil?
+
+    "This image is from #{ci_patchset_label(built, message_numbers)} - " \
+      "the current #{current} has not produced an image."
+  end
 
   # the one "build / test" pair, so a table cannot grow a second one with a
-  # different blank case
+  # different blank case. Public: the thread sidebar calls it straight from
+  # the view, like every other formatter here.
   def ci_duration_pair(run)
     return ci_muted_dash if run.build_seconds.blank? && run.test_seconds.blank?
     tag.span("#{ci_duration(run.build_seconds)} / #{ci_duration(run.test_seconds)}")
+  end
+
+  private
+
+  def ci_retired_icon(row)
+    return nil if CI_QUIET_REASONS.include?(row.wont_retry_reason)
+    return TopicIcon.new("fa-plug-circle-exclamation", "muted", "retired, base too old") if row.wont_retry_reason == "base too old"
+    TopicIcon.new("fa-plug-circle-exclamation", "purple", "CI skipped: #{row.wont_retry_reason}")
+  end
+
+  # empty is the one failure stage that is not a broken patch: the apply worked
+  # and produced nothing, which usually means it is already upstream
+  def ci_never_applied_icon(row)
+    return TopicIcon.new("fa-file-circle-xmark", "muted", "applied but changed nothing") if row.failure_stage == "empty"
+    TopicIcon.new("fa-file-circle-xmark", "red", FAILURE_STAGE_PHRASES.fetch(row.failure_stage, "apply failed"))
+  end
+
+  def ci_pending_icon(row)
+    return TopicIcon.new("fa-hourglass-half", "blue", "CI running") if row.ci_status == "running"
+    label = row.pushed_at.nil? ? "waiting to be pushed" : "waiting for CI"
+    TopicIcon.new("fa-hourglass-half", "muted", label)
+  end
+
+  def ci_applied_icon(row)
+    TopicIcon.new(*CI_RUN_ICONS.fetch(row.ci_status, CI_NO_RESULT_ICON))
   end
 
   # a chip reading "ci none" over a badge reading "no CI" is the same row

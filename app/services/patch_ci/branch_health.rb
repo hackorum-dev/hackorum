@@ -80,6 +80,18 @@ module PatchCi
               .select(PatchBranch.arel_table[Arel.star], Arel.sql("(#{bucket_sql}) AS health_bucket"))
     end
 
+    # rows plus why a retired row retired. Deliberately not folded into
+    # with_bucket: the three pages that render the shared table never read it,
+    # and the CASE carries an EXISTS per row. The CASE resolves for every row
+    # though, ELSE and all - off the wont_retry bucket it would call a healthy
+    # row "base too old". Naming the column for the bucket it is true of makes
+    # that visibly wrong at the call site instead of silently wrong.
+    def with_reason(relation = base_scope)
+      relation.joins(:topic)
+              .select(PatchBranch.arel_table[Arel.star],
+                      Arel.sql("(#{wont_retry_reason_sql}) AS wont_retry_reason"))
+    end
+
     private
 
     # memoized alongside counts/bucket_for/scope_for for the same reason:

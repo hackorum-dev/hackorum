@@ -327,4 +327,50 @@ RSpec.describe PatchCi::BranchHealth do
       expect(health_no_repo.bucket_for(row)).to eq("needs_rebase")
     end
   end
+
+  describe "#with_reason" do
+    def reason_for(row)
+      health.with_reason(PatchBranch.where(id: row.id)).first.wont_retry_reason
+    end
+
+    it "labels a committed thread" do
+      row = branch
+      create(:commit_topic, topic: row.topic)
+
+      expect(reason_for(row)).to eq("committed")
+    end
+
+    it "labels a merged thread" do
+      row = branch
+      row.topic.update!(merged_into_topic: create(:topic))
+
+      expect(reason_for(row)).to eq("merged thread")
+    end
+
+    it "carries the skip reason of a ci_none row" do
+      row = branch(ci_status: "ci_none", ci_skip_reason: "push failed: timeout")
+
+      expect(reason_for(row)).to eq("push failed: timeout")
+    end
+
+    it "labels an aged out base" do
+      row = branch(base_committed_at: stale_time)
+
+      expect(reason_for(row)).to eq("base too old")
+    end
+
+    # the icon reads this column and wont_retry_breakdown reads the same CASE;
+    # a second copy of it is how they would start naming the same row two things.
+    # Mixed population on purpose: both sides must agree on which rows are even
+    # in scope, not just on what the retired ones are called.
+    it "agrees with wont_retry_breakdown over a mixed population" do
+      branch(ci_status: "ci_none", ci_skip_reason: "custom reason")
+      committed = branch
+      create(:commit_topic, topic: committed.topic)
+      branch(pushed_at: Time.current, ci_status: "success", base_committed_at: fresh_time)
+
+      expect(health.with_reason(health.scope_for("wont_retry")).map(&:wont_retry_reason))
+        .to match_array(health.wont_retry_breakdown.keys)
+    end
+  end
 end

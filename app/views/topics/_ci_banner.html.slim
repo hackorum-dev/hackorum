@@ -1,0 +1,31 @@
+- row = status.row
+- image = status.image_run
+.ci-banner.ci-badges
+  .ci-banner-head
+    span.ci-banner-tag
+      i.fa-solid.fa-flask-vial aria-hidden="true"
+      span Beta feature
+  p.ci-banner-lead
+    | Hackorum builds and tests every patch posted to the lists, not only commitfest submissions. This is Hackorum's own CI rather than the PostgreSQL project's, and it is still under testing - please report anything that looks wrong.
+  .ci-banner-status
+    = ci_bucket_badge(row.health_bucket)
+    - if row.ci_status.present?
+      = ci_status_badge(row.ci_status, title: ci_skip_reason_for(row))
+    = link_to "CI history", ci_topic_path(topic), class: "ci-banner-link"
+  - if image
+    - command = ci_docker_command(image.image_ref)
+    .ci-banner-docker
+      p.ci-banner-docker-lead
+        | You can run a PostgreSQL built from this patch straight from Docker, with no checkout and no build:
+      .ci-banner-cmd-line
+        code.ci-copy data-controller="clipboard" data-action="click->clipboard#copy" data-clipboard-url-value=command title="Copy"
+          = command
+      .ci-banner-cmd-line
+        code.ci-banner-cmd-text psql -h localhost -U postgres
+      - if status.image_current?
+        p.ci-banner-provenance
+          = "Built from #{ci_patchset_label(row, message_numbers)}, #{absolute_time_display(image.completed_at || image.created_at)}."
+      - else
+        p.ci-banner-warning
+          i.fa-solid.fa-triangle-exclamation aria-hidden="true"
+          span = ci_image_mismatch_warning(status, message_numbers)

@@ -619,4 +619,107 @@ RSpec.describe CiHelper, type: :helper do
       expect(helper.ci_ccache_line(ccache_run(%({"a": 1}), "213"))).to be_nil
     end
   end
+
+  describe "#ci_topic_icon" do
+    # health_bucket and wont_retry_reason are select aliases on real rows, not
+    # model methods, so a verified double cannot stand in for them
+    def status(bucket:, reason: nil, ci_status: nil, status: "applied",
+               failure_stage: nil, pushed_at: Time.current)
+      branch = build(:patch_branch, status: status, ci_status: ci_status,
+                     failure_stage: failure_stage, pushed_at: pushed_at)
+      branch.define_singleton_method(:health_bucket) { bucket }
+      branch.define_singleton_method(:wont_retry_reason) { reason }
+      branch
+    end
+
+    it "renders nothing for a nil row" do
+      expect(helper.ci_topic_icon(nil)).to be_nil
+    end
+
+    it "stays quiet on a committed thread" do
+      expect(helper.ci_topic_icon(status(bucket: "wont_retry", reason: "committed"))).to be_nil
+    end
+
+    it "stays quiet on a merged thread" do
+      expect(helper.ci_topic_icon(status(bucket: "wont_retry", reason: "merged thread"))).to be_nil
+    end
+
+    it "mutes a base that aged out" do
+      icon = helper.ci_topic_icon(status(bucket: "wont_retry", reason: "base too old"))
+
+      expect([ icon.glyph, icon.tone ]).to eq([ "fa-plug-circle-exclamation", "muted" ])
+    end
+
+    it "flags a skipped row in purple" do
+      icon = helper.ci_topic_icon(status(bucket: "wont_retry", reason: "push failed: timeout"))
+
+      expect([ icon.glyph, icon.tone ]).to eq([ "fa-plug-circle-exclamation", "purple" ])
+    end
+
+    it "reds a patch that never applied" do
+      icon = helper.ci_topic_icon(status(bucket: "never_applied", status: "failed",
+                                         failure_stage: "apply"))
+
+      expect([ icon.glyph, icon.tone, icon.label ])
+        .to eq([ "fa-file-circle-xmark", "red", "apply failed" ])
+    end
+
+    # applied, produced nothing - most likely already upstream, so it must not
+    # shout like a broken patch
+    it "mutes an empty patchset" do
+      icon = helper.ci_topic_icon(status(bucket: "never_applied", status: "failed",
+                                         failure_stage: "empty"))
+
+      expect([ icon.glyph, icon.tone ]).to eq([ "fa-file-circle-xmark", "muted" ])
+    end
+
+    it "gives needs_rebase its own glyph" do
+      icon = helper.ci_topic_icon(status(bucket: "needs_rebase"))
+
+      expect([ icon.glyph, icon.tone ]).to eq([ "fa-code-merge", "amber" ])
+    end
+
+    it "shows a running run in blue" do
+      icon = helper.ci_topic_icon(status(bucket: "awaiting_ci", ci_status: "running"))
+
+      expect([ icon.glyph, icon.tone ]).to eq([ "fa-hourglass-half", "blue" ])
+    end
+
+    it "tells a never pushed row from one waiting on the runner" do
+      not_pushed = helper.ci_topic_icon(status(bucket: "awaiting_ci", pushed_at: nil))
+      waiting = helper.ci_topic_icon(status(bucket: "awaiting_ci", ci_status: "queued"))
+
+      expect(not_pushed.label).to eq("waiting to be pushed")
+      expect(waiting.label).to eq("waiting for CI")
+    end
+
+    {
+      "success" => [ "fa-circle-check", "green" ],
+      "tests_failed" => [ "fa-flask", "amber" ],
+      "tests_timeout" => [ "fa-flask", "amber" ],
+      "build_failed" => [ "fa-hammer", "red" ],
+      "build_timeout" => [ "fa-hammer", "red" ],
+      "infra_error" => [ "fa-plug-circle-exclamation", "purple" ],
+      "push_failed" => [ "fa-plug-circle-exclamation", "purple" ],
+      "cancelled" => [ "fa-plug-circle-exclamation", "muted" ]
+    }.each do |ci_status, (glyph, tone)|
+      it "maps an applying patch with #{ci_status} to #{glyph}" do
+        icon = helper.ci_topic_icon(status(bucket: "applies", ci_status: ci_status))
+
+        expect([ icon.glyph, icon.tone ]).to eq([ glyph, tone ])
+      end
+    end
+
+    it "falls back to pending when an applying patch has no result" do
+      icon = helper.ci_topic_icon(status(bucket: "applies"))
+
+      expect([ icon.glyph, icon.tone ]).to eq([ "fa-hourglass-half", "muted" ])
+    end
+
+    # a new terminal ci_status would otherwise render as a pending hourglass on
+    # every applying row, which reads as "still going" forever
+    it "has an icon for every terminal run status" do
+      expect(PatchCiRun::TERMINAL_STATUSES - CiHelper::CI_RUN_ICONS.keys).to eq([])
+    end
+  end
 end

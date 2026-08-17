@@ -33,6 +33,9 @@
                   - else
                     = entry[:name]
 
+    - if ci_thread_visible?(@ci_status)
+      = render "topics/ci_sidebar", status: @ci_status, topic: @topic
+
     - if @commitfest_sidebar_entries.present?
       details.sidebar-section open=true
         summary.sidebar-heading Commitfests
@@ -220,6 +223,9 @@
         = link_to new_admin_topic_merge_path(@topic), class: "button button-secondary button-small" do
           i.fas.fa-compress-arrows-alt
           |  Merge Topic
+
+- if ci_thread_visible?(@ci_status)
+  = render "topics/ci_banner", status: @ci_status, topic: @topic, message_numbers: @message_numbers
 
 - if user_signed_in?
   - thread_notes = @notes_by_message&.[](:thread) || []

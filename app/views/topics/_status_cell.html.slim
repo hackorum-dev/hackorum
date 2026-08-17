@@ -28,6 +28,9 @@
   - elsif topic.has_attachments?
     .topic-icon.slot-patch title="Attachments"
       i.fa-solid.fa-paperclip
+  - ci_branch = @ci_statuses&.dig(topic.id)
+  - if ci_branch
+    = render partial: "topics/ci_icon", locals: { branch: ci_branch, repo_state: @ci_repo_state }
 td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") data-label="Topic"
   - creator = topic.creator_display_alias
   - last_sender = topic.last_sender_person&.default_alias

@@ -1,0 +1,47 @@
+- row = status.row
+- run = row.latest_run_summary
+- failed = run ? run.failed_tests : []
+/ the sidebar is a narrow strip, not the CI page's wide table - both caps
+/ exist to keep it that width, not for any rule about the data itself
+- failed_cap = 10
+- conflicts_cap = 5
+details.sidebar-section.ci-thread-section.ci-badges open=true
+  summary.sidebar-heading CI
+  .sidebar-section
+    .ci-thread-row
+      span.ci-thread-label Applies
+      span.ci-thread-value
+        = ci_bucket_badge(row.health_bucket)
+        - if (behind = ci_behind_label(row.behind_days(status.repo_state)))
+          span.muted = "#{behind} behind master"
+    - if row.status == "failed"
+      .ci-thread-note = ci_patchset_outcome(row)
+      - if row.conflict_files.any?
+        - conflicts = row.conflict_files
+        .ci-thread-note.muted
+          = "conflicts: #{conflicts.first(conflicts_cap).join(', ')}"
+          - if conflicts.size > conflicts_cap
+            = " +#{conflicts.size - conflicts_cap} more"
+    .ci-thread-row
+      span.ci-thread-label Build
+      span.ci-thread-value
+        - if row.ci_status.present?
+          = ci_status_badge(row.ci_status, title: ci_skip_reason_for(row))
+        - else
+          = ci_muted_dash
+        - if run
+          = ci_duration_pair(run)
+    - if run&.tests_total
+      .ci-thread-row
+        span.ci-thread-label Tests
+        span.ci-thread-value = ci_tests_figure(run, hover: false)
+      - if failed.any?
+        ul.ci-thread-failed
+          - failed.first(failed_cap).each do |name|
+            li = name
+        - if failed.size > failed_cap
+          .ci-thread-note.muted = "+#{failed.size - failed_cap} more"
+    .ci-thread-links
+      - if run
+        = link_to "GitHub run", ci_github_run_url(run), target: "_blank", rel: "noopener"
+      = link_to "CI history", ci_topic_path(topic)

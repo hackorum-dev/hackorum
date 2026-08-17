@@ -60,8 +60,7 @@ html data-theme="light"
             .mobile-nav-menu data-action="click->sidebar#closeMenuOnNavigate"
               = render "shared/theme_control", extra_class: "mobile-nav-theme-control", show_label: true
               = link_to "Topics", topics_path, class: "nav-link"
-              - if current_admin?
-                = link_to "CI", ci_path, class: "nav-link"
+              = link_to "CI", ci_path, class: "nav-link"
               - if user_signed_in?
                 - icon_class = starred_active ? "fa-solid fa-star" : "fa-regular fa-star"
                 - link_classes = ["nav-link"]
@@ -98,8 +97,7 @@ html data-theme="light"
         .nav-menu
           .nav-links
             = link_to "Topics", topics_path, class: "nav-link"
-            - if current_admin?
-              = link_to "CI", ci_path, class: "nav-link"
+            = link_to "CI", ci_path, class: "nav-link"
             - search_link = content_for?(:search_sidebar) ? "#search" : topics_path(anchor: "search")
             = link_to "Search", search_link, class: "nav-link"
             = link_to "Reports", reports_path, class: "nav-link"

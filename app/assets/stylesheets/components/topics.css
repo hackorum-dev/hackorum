@@ -87,7 +87,7 @@
 }
 
 .topics-table {
-  --topic-icon-slots: [commit] 28px [patch] 28px;
+  --topic-icon-slots: [commit] 28px [patch] 28px [ci] 28px;
 
   & table {
     width: 100%;
@@ -146,11 +146,11 @@
 }
 
 .topics-table.has-personal-icons {
-  --topic-icon-slots: [reading] 28px [star] 28px [note] 28px [commit] 28px [patch] 28px;
+  --topic-icon-slots: [reading] 28px [star] 28px [note] 28px [commit] 28px [patch] 28px [ci] 28px;
 }
 
 .topics-table.has-personal-icons.has-team-icons {
-  --topic-icon-slots: [reading] 28px [star] 28px [note] 28px [team] 28px [commit] 28px [patch] 28px;
+  --topic-icon-slots: [reading] 28px [star] 28px [note] 28px [team] 28px [commit] 28px [patch] 28px [ci] 28px;
 }
 
 .topic-icon {
@@ -471,6 +471,14 @@ a.topic-icon {
   color: var(--color-success);
 }
 
+.ci-icon-green { color: var(--ci-green-fg); }
+.ci-icon-amber { color: var(--ci-amber-fg); }
+.ci-icon-red { color: var(--ci-red-fg); }
+.ci-icon-purple { color: var(--ci-purple-fg); }
+.ci-icon-blue { color: var(--ci-blue-fg); }
+.ci-icon-muted { color: var(--color-text-muted); }
+
+/* shared with _ci_icon.html.slim, not private to the commitfest icon */
 .commitfest-hover {
   display: flex;
   flex-direction: column;
@@ -1097,15 +1105,15 @@ a.topic-icon {
 @media (min-width: 1400px) {
   /* strip width = cell pad 8 + icons pad 8 + slots * 28 + gaps * 8 + icons pad 16 + 18 diagonal */
   .topics-table {
-    --topic-new-replies-strip-width: 114px;
+    --topic-new-replies-strip-width: 150px;
   }
 
   .topics-table.has-personal-icons {
-    --topic-new-replies-strip-width: 222px;
+    --topic-new-replies-strip-width: 258px;
   }
 
   .topics-table.has-personal-icons.has-team-icons {
-    --topic-new-replies-strip-width: 258px;
+    --topic-new-replies-strip-width: 294px;
   }
 
   .topic-title-icons {
@@ -1150,6 +1158,10 @@ a.topic-icon {
 
   .slot-patch {
     grid-column: patch;
+  }
+
+  .slot-ci {
+    grid-column: ci;
   }
 }
 

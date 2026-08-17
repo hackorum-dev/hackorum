@@ -1,0 +1,36 @@
+- icon = ci_topic_icon(branch)
+- if icon
+  div class="topic-icon ci-icon slot-ci ci-icon-#{icon.tone}" data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+    i.fa-solid class=icon.glyph
+    .topic-icon-hover data-hover-popover-target="popover" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+      .commitfest-hover
+        .commitfest-hover-title
+          = link_to "CI history", ci_topic_path(branch.topic_id), data: { turbo_frame: "_top" }
+          span.commitfest-hover-status = icon.label
+        .commitfest-hover-row
+          span.commitfest-hover-label Patchset
+          span.commitfest-hover-value = "v#{ci_patchset_index(branch) || '?'}"
+        .commitfest-hover-row
+          span.commitfest-hover-label State
+          span.commitfest-hover-value = ci_bucket_label(branch.health_bucket)
+        / on the applies bucket the headline above already IS the CI result, so
+        / this row would say the same words twice. On every other bucket the
+        / headline is about the apply, and this is the only place the CI outcome
+        / shows at all - a needs_rebase row can carry green CI on its own base.
+        - if branch.ci_status.present? && branch.health_bucket != "applies"
+          .commitfest-hover-row
+            span.commitfest-hover-label Result
+            span.commitfest-hover-value = ci_status_label(branch.ci_status)
+        - run = branch.latest_run_summary
+        - if run&.tests_total
+          .commitfest-hover-row
+            span.commitfest-hover-label Tests
+            span.commitfest-hover-value = ci_tests_figure(run, hover: false)
+        - if run && run.failed_tests.any?
+          .commitfest-hover-row
+            span.commitfest-hover-label Failed
+            span.commitfest-hover-value = run.failed_tests.first(5).join(", ")
+        - if (behind = ci_behind_label(branch.behind_days(repo_state)))
+          .commitfest-hover-row
+            span.commitfest-hover-label Base
+            span.commitfest-hover-value = "#{behind} behind master"

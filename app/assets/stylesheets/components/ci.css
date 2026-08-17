@@ -232,7 +232,7 @@
   font-weight: var(--font-weight-medium);
 }
 
-.ci-container .muted {
+:is(.ci-container, .ci-badges) .muted {
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
 }
@@ -265,8 +265,10 @@
   color: var(--color-success);
 }
 
-/* badges */
-.ci-container .badge {
+/* badges - two names, not a bare class: .b-success and friends read generic
+   enough to collide with something else on the site, so anything outside the
+   CI pages has to opt in by also carrying .ci-badges */
+:is(.ci-container, .ci-badges) .badge {
   display: inline-block;
   padding: 2px 9px;
   border-radius: 999px;
@@ -275,15 +277,15 @@
   white-space: nowrap;
 }
 
-.ci-container .b-running { background: var(--ci-blue-bg); color: var(--ci-blue-fg); }
-.ci-container .b-queued { background: var(--color-bg-button); color: var(--color-text-secondary); }
-.ci-container .b-success { background: var(--ci-green-bg); color: var(--ci-green-fg); }
-.ci-container .b-testsfail { background: var(--ci-amber-bg); color: var(--ci-amber-fg); }
-.ci-container .b-buildfail { background: var(--ci-red-bg); color: var(--ci-red-fg); }
-.ci-container .b-infra { background: var(--ci-purple-bg); color: var(--ci-purple-fg); }
-.ci-container .b-newver { background: var(--color-primary-100); color: var(--color-primary-900); }
-.ci-container .b-rebase { background: var(--ci-amber-bg); color: var(--ci-amber-fg); }
-.ci-container .b-backfill { background: var(--color-bg-button); color: var(--color-text-secondary); }
+:is(.ci-container, .ci-badges) .b-running { background: var(--ci-blue-bg); color: var(--ci-blue-fg); }
+:is(.ci-container, .ci-badges) .b-queued { background: var(--color-bg-button); color: var(--color-text-secondary); }
+:is(.ci-container, .ci-badges) .b-success { background: var(--ci-green-bg); color: var(--ci-green-fg); }
+:is(.ci-container, .ci-badges) .b-testsfail { background: var(--ci-amber-bg); color: var(--ci-amber-fg); }
+:is(.ci-container, .ci-badges) .b-buildfail { background: var(--ci-red-bg); color: var(--ci-red-fg); }
+:is(.ci-container, .ci-badges) .b-infra { background: var(--ci-purple-bg); color: var(--ci-purple-fg); }
+:is(.ci-container, .ci-badges) .b-newver { background: var(--color-primary-100); color: var(--color-primary-900); }
+:is(.ci-container, .ci-badges) .b-rebase { background: var(--ci-amber-bg); color: var(--ci-amber-fg); }
+:is(.ci-container, .ci-badges) .b-backfill { background: var(--color-bg-button); color: var(--color-text-secondary); }
 
 /* branch search */
 .ci-search {
@@ -612,4 +614,129 @@
   .ci-fact {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* thread page CI block */
+.ci-thread-row {
+  display: flex;
+  gap: var(--spacing-2);
+  align-items: baseline;
+  margin-bottom: var(--spacing-2);
+}
+
+.ci-thread-label {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-width: 4.5em;
+}
+
+.ci-thread-note {
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--spacing-2);
+}
+
+.ci-thread-failed {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--spacing-2) 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--ci-amber-fg);
+}
+
+.ci-thread-links {
+  display: flex;
+  gap: var(--spacing-3);
+  font-size: var(--font-size-sm);
+}
+
+/* shared by the thread sidebar block and the banner - a wrapping row of
+   badges/links at font-size-sm. Do not split this back into per-block copies. */
+.ci-thread-value,
+.ci-banner-status,
+.ci-banner-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--spacing-2);
+  font-size: var(--font-size-sm);
+}
+
+/* thread page CI banner. Tinted and accented rather than another card: it sits
+   directly above the messages and has to read as a notice about the site, not
+   as the first message in the thread. */
+.ci-banner {
+  border: var(--border-width) solid var(--color-border);
+  border-left: var(--border-width-reply) solid var(--color-primary-500);
+  border-radius: var(--border-radius-md);
+  background: var(--color-bg-hoverbox);
+  padding: var(--spacing-3);
+  margin-bottom: var(--spacing-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.ci-banner-lead {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  max-width: 80ch;
+}
+
+.ci-banner-tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--spacing-1);
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--ci-purple-bg);
+  color: var(--ci-purple-fg);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* the commands are the one thing here worth acting on, so they get a rule of
+   their own rather than sitting flush against the prose above them */
+.ci-banner-docker {
+  border-top: var(--border-width) solid var(--color-border);
+  padding-top: var(--spacing-2);
+}
+
+/* one scroll container per line: .ci-copy is inline-block and nowrap, and a
+   full ghcr ref is longer than a narrow thread column */
+.ci-banner-cmd-line {
+  margin-bottom: var(--spacing-1);
+  overflow-x: auto;
+}
+
+.ci-banner-cmd-text {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  padding: 2px 8px;
+}
+
+.ci-banner-docker-lead,
+.ci-banner-provenance {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.ci-banner-warning {
+  display: flex;
+  gap: var(--spacing-2);
+  align-items: baseline;
+  margin: 0;
+  padding: var(--spacing-2);
+  border-radius: var(--border-radius-sm);
+  background: var(--ci-amber-bg);
+  color: var(--ci-amber-fg);
+  font-size: var(--font-size-sm);
 }

@@ -53,20 +53,6 @@ RSpec.describe "CI dashboard", type: :request do
       expect(response.body).to include("Branch health")
     end
 
-    it "links CI from both nav menus for admins" do
-      sign_in_as(create(:user, admin: true))
-
-      get "/ci"
-
-      expect(response.body.scan(%r{<a[^>]+href="/ci"[^>]*>CI</a>}).size).to eq(2)
-    end
-
-    it "hides the CI nav link from non-admins" do
-      get "/ci"
-
-      expect(response.body).not_to match(%r{<a[^>]+href="/ci"[^>]*>CI</a>})
-    end
-
     it "shows the heartbeat as running while the repo state is fresh" do
       create(:patch_ci_repo_state, master_sha: "bf12ac9de" + "0" * 31, fetched_at: 10.seconds.ago)
 

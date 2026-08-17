@@ -16,6 +16,7 @@ class TopicsController < ApplicationController
     preload_topic_participants
     preload_commitfest_summaries
     preload_commit_summaries
+    preload_ci_statuses
     preload_topic_mailing_lists
     @new_topics_count = 0
 
@@ -66,6 +67,7 @@ class TopicsController < ApplicationController
     preload_topic_participants
     preload_commitfest_summaries
     preload_commit_summaries
+    preload_ci_statuses
     preload_topic_mailing_lists
     @personalization = TopicListPersonalization.new(user: current_user, topics: @topics)
 
@@ -95,6 +97,9 @@ class TopicsController < ApplicationController
     build_thread_outline(@messages)
     load_commitfest_sidebar
     load_commit_sidebar
+    # lazy object, not a load_* call like its neighbours - the view decides
+    # whether anything is needed, so this must not query on its own
+    @ci_status = PatchCi::TopicStatus.new(topic: @topic)
 
     @topic_mailing_lists = @topic.mailing_lists.to_a
     @topic_is_multi_list = @topic_mailing_lists.size > 1
@@ -408,6 +413,7 @@ class TopicsController < ApplicationController
     preload_topic_participants
     preload_commitfest_summaries
     preload_commit_summaries
+    preload_ci_statuses
     preload_topic_mailing_lists
     @personalization = TopicListPersonalization.new(user: current_user, topics: @topics) if user_signed_in?
     load_visible_tags if user_signed_in?
@@ -879,6 +885,12 @@ class TopicsController < ApplicationController
   def preload_commit_summaries
     topic_ids = @topics.select { |topic| topic.commit_count.to_i.positive? }.map(&:id)
     @commit_summaries = Topic.commit_summaries(topic_ids)
+  end
+
+  def preload_ci_statuses
+    @ci_repo_state = PatchCiRepoState.current
+    @ci_statuses = PatchCi::CurrentPatchsets.new(repo_state: @ci_repo_state)
+                                            .load(@topics.map(&:id))
   end
 
   def load_commitfest_sidebar

@@ -32,6 +32,11 @@ module PatchCi
     # tag to whichever run merely started later.
     # defined?, not ||=: nil is the answer for a topic that never built one,
     # and this is asked once per rendered run row
+    #
+    # TopicStatus#image_run picks the same run for the thread page, in SQL
+    # instead of Ruby - it wants a single row and this page already has every
+    # run loaded, so neither should switch to the other's approach. Deliberate
+    # duplicate: a change to the ordering rule has to land in both.
     def live_image_run_id
       return @live_image_run_id if defined?(@live_image_run_id)
       load!
