@@ -89,6 +89,10 @@
 .topics-table {
   --topic-icon-slots: [commit] 28px [patch] 28px [ci] 28px;
 
+  /* layout switches on available table width, not viewport: the sidebar eats a lot of it */
+  container-type: inline-size;
+  container-name: topics;
+
   & table {
     width: 100%;
     border-collapse: collapse;
@@ -1102,17 +1106,18 @@ a.topic-icon {
   color: var(--color-text-muted);
 }
 
-@media (min-width: 1400px) {
+/* 1385px = old 1400px viewport breakpoint minus a scrollbar, i.e. sidebar closed */
+@container topics (min-width: 1385px) {
   /* strip width = cell pad 8 + icons pad 8 + slots * 28 + gaps * 8 + icons pad 16 + 18 diagonal */
-  .topics-table {
+  .topics-table table {
     --topic-new-replies-strip-width: 150px;
   }
 
-  .topics-table.has-personal-icons {
+  .topics-table.has-personal-icons table {
     --topic-new-replies-strip-width: 258px;
   }
 
-  .topics-table.has-personal-icons.has-team-icons {
+  .topics-table.has-personal-icons.has-team-icons table {
     --topic-new-replies-strip-width: 294px;
   }
 
@@ -1165,39 +1170,42 @@ a.topic-icon {
   }
 }
 
-@media (min-width: 1025px) and (max-width: 1399px) {
-  .topic-title-main {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-1);
-  }
+/* media guard keeps the mobile card layout untouched below 1025px */
+@media (min-width: 1025px) {
+  @container topics (max-width: 1384.98px) {
+    .topic-title-main {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-1);
+    }
 
-  /* icons come first in the markup, push them below the title */
-  .topic-title-icons {
-    order: 2;
-    display: inline-flex;
-    flex-wrap: wrap;
-    gap: var(--spacing-2);
-    height: auto;
-    padding: 0;
-    align-self: flex-start;
-  }
+    /* icons come first in the markup, push them below the title */
+    .topic-title-icons {
+      order: 2;
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: var(--spacing-2);
+      height: auto;
+      padding: 0;
+      align-self: flex-start;
+    }
 
-  .topic-title-icons > * {
-    margin-right: 0;
-  }
+    .topic-title-icons > * {
+      margin-right: 0;
+    }
 
-  /* strip is sized for a left hand icon block */
-  .status-border.has-new-replies::before {
-    display: none;
-  }
+    /* strip is sized for a left hand icon block */
+    .status-border.has-new-replies::before {
+      display: none;
+    }
 
-  .topics-table th.mailing-lists-header,
-  .topics-table td.topic-mailing-lists {
-    display: none;
-  }
+    .topics-table th.mailing-lists-header,
+    .topics-table td.topic-mailing-lists {
+      display: none;
+    }
 
-  .topic-inline-lists {
-    display: inline-flex;
+    .topic-inline-lists {
+      display: inline-flex;
+    }
   }
 }
