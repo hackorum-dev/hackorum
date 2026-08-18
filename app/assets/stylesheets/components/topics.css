@@ -176,6 +176,10 @@ a.topic-icon {
   }
 }
 
+.topic-title-text {
+  padding-top: var(--spacing-2);
+}
+
 /* specificity beats the mobile .topic-icon margin reset */
 .topic-title-text .topic-title-ignore {
   margin: 0 var(--spacing-2) 0 0;
