@@ -161,6 +161,28 @@ RSpec.describe CommitImport::Importer do
 
       expect(Commit.count).to eq(2)
     end
+
+    it "records the newest linked commit date on the topic" do
+      topic = create(:topic)
+      create(:message, topic: topic, message_id: "abc-123@example.com")
+      body = "Discussion: https://postgr.es/m/abc-123@example.com\n"
+      fixture_repo.commit(subject: "first", body: body, date: "2026-03-01T10:00:00+00:00")
+      fixture_repo.commit(subject: "second", body: body, date: "2026-03-05T10:00:00+00:00")
+
+      importer.run!
+
+      expect(topic.reload.last_commit_at).to eq(Time.zone.parse("2026-03-05T10:00:00+00:00"))
+    end
+
+    it "leaves last_commit_at null for a topic no commit mentions" do
+      topic = create(:topic)
+      create(:message, topic: topic, message_id: "abc-123@example.com")
+      fixture_repo.commit(subject: "x", body: "")
+
+      importer.run!
+
+      expect(topic.reload.last_commit_at).to be_nil
+    end
   end
 
   describe "incremental runs" do
@@ -204,6 +226,18 @@ RSpec.describe CommitImport::Importer do
       expect(commit.topics).to eq([ topic ])
       expect(commit.unresolved_message_ids).to be_empty
       expect(topic.reload.commit_count).to eq(1)
+    end
+
+    it "sets last_commit_at when a message id resolves on a later run" do
+      fixture_repo.commit(subject: "x", body: "Discussion: https://postgr.es/m/late@example.com\n",
+                          date: "2026-03-07T10:00:00+00:00")
+      importer.run!
+
+      topic = create(:topic)
+      create(:message, topic: topic, message_id: "late@example.com")
+      importer.run!
+
+      expect(topic.reload.last_commit_at).to eq(Time.zone.parse("2026-03-07T10:00:00+00:00"))
     end
 
     it "resolves people for recent commits on a later run" do
@@ -293,6 +327,20 @@ RSpec.describe CommitImport::Importer do
       commit = Commit.find_by(sha: sha)
       expect(commit.commit_people.where(role: "reviewer").count).to eq(1)
       expect(commit.topics).to eq([ topic ])
+    end
+
+    it "drops last_commit_at back to null when the trailer is gone" do
+      topic = create(:topic)
+      create(:message, topic: topic, message_id: "abc-123@example.com")
+      fixture_repo.commit(subject: "x",
+                          body: "Discussion: https://postgr.es/m/abc-123@example.com\n")
+      importer.run!
+      expect(topic.reload.last_commit_at).to be_present
+
+      Commit.update_all(body: "")
+      importer.reparse!
+
+      expect(topic.reload.last_commit_at).to be_nil
     end
   end
 end

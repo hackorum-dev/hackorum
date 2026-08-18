@@ -60,11 +60,17 @@ module PatchCi
       end
     end
 
-    # every tier gates on this, not just one; committed topics read as
-    # wont_retry in BranchHealth. Thread activity is deliberately not part of
-    # it, see ACTIVE_THREAD_DAYS in config.rb.
-    def eligible_topics
-      Topic.active.where.not(id: CommitTopic.select(:topic_id))
+    # The two exclusions every tier shares: merged threads, whose patchsets
+    # belong to the thread they merged into, and patchsets the thread already
+    # landed. CommitCutoff owns the second one - read its comment before
+    # touching it, "the topic has a commit" is not the same question.
+    #
+    # Thread activity is deliberately not part of this, see ACTIVE_THREAD_DAYS
+    # in config.rb.
+    #
+    # The relation must already carry messages; every caller here does.
+    def eligible(relation)
+      CommitCutoff.live(relation.joins(:topic).where(topics: { merged_into_topic_id: nil }))
     end
 
     # latest patch message per topic with no row of its own yet.
@@ -84,23 +90,19 @@ module PatchCi
       # form loses the row fetch that made a hash join look cheap and collapses
       # into a nested loop rescanning every message (60s+ on dev). Semi and anti
       # joins keep their shape whether the outer select is rows or a count.
-      Message
-        .where(id: latest)
-        .where(topic_id: eligible_topics.select(:id))
+      eligible(Message.where(id: latest))
         .where("NOT EXISTS (SELECT 1 FROM patch_branches pb WHERE pb.message_id = messages.id)")
         .order(created_at: :desc, id: :desc)
     end
 
     def backfill_scope
-      PatchBranch.current.applied
+      eligible(PatchBranch.current.applied.joins(:message))
         .where(pushed_at: nil)
         # a push that just failed fails the same way a second later, and it
         # sits at the head of this queue; give it a rest before retrying
         # qualified: this scope joins messages, which carries both columns
         .where("patch_branches.ci_status IS NULL OR (patch_branches.ci_status = 'push_failed'" \
                " AND patch_branches.updated_at < ?)", Config::PUSH_RETRY_MINUTES.minutes.ago)
-        .where(topic_id: eligible_topics.select(:id))
-        .joins(:message)
         .order("messages.created_at DESC, messages.id DESC")
     end
 
@@ -136,11 +138,10 @@ module PatchCi
         )
       SQL
 
-      PatchBranch.current
-        .where(topic_id: eligible_topics.select(:id))
-        # base_detection failures have no base to age, so they retire on the
-        # submission date instead - joined for that one clause
-        .joins(:message)
+      # base_detection failures have no base to age, so they retire on the
+      # submission date instead - joined for that one clause, and now also for
+      # the cutoff, which reads messages.created_at
+      eligible(PatchBranch.current.joins(:message))
         # two clocks on purpose: base retirement runs off master_committed_at,
         # submission retirement off the wall clock, so a fetch broken for a week
         # freezes the first and not the second

@@ -46,6 +46,24 @@ RSpec.describe PatchCi::BranchHealth do
       expect(health.bucket_for(row)).to eq("wont_retry")
     end
 
+    it "a patchset newer than the thread's newest commit buckets on its apply state" do
+      row = branch(pushed_at: Time.current, ci_status: "success",
+                   base_committed_at: fresh_time)
+      create(:commit_topic, topic: row.topic, commit: create(:commit, committed_at: 3.days.ago))
+      row.message.update!(created_at: 1.day.ago)
+
+      expect(health.bucket_for(row)).to eq("applies")
+    end
+
+    it "a patchset older than the thread's newest commit is wont_retry" do
+      row = branch(pushed_at: Time.current, ci_status: "success",
+                   base_committed_at: fresh_time)
+      create(:commit_topic, topic: row.topic, commit: create(:commit, committed_at: 1.day.ago))
+      row.message.update!(created_at: 5.days.ago)
+
+      expect(health.bucket_for(row)).to eq("wont_retry")
+    end
+
     it "merged topic is wont_retry" do
       row = branch(pushed_at: Time.current, ci_status: "success", base_committed_at: fresh_time)
       row.topic.update_columns(merged_into_topic_id: create(:topic).id)

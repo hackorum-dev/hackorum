@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_08_16_214615) do
+ActiveRecord::Schema[8.0].define(version: 2026_08_18_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -888,6 +888,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_08_16_214615) do
     t.bigint "merged_into_topic_id"
     t.virtual "title_tsv", type: :tsvector, as: "to_tsvector('english'::regconfig, (COALESCE(title, ''::character varying))::text)", stored: true
     t.integer "commit_count", default: 0, null: false
+    t.datetime "last_commit_at"
     t.index ["created_at"], name: "index_topics_on_created_at"
     t.index ["creator_id"], name: "index_topics_on_creator_id"
     t.index ["creator_person_id"], name: "index_topics_on_creator_person_id"

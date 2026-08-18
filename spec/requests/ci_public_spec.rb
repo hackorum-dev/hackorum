@@ -48,10 +48,20 @@ RSpec.describe "Public CI", type: :request do
       expect(glyphs.first).to include("fa-file-circle-xmark")
     end
 
-    it "shows no CI icon on a committed thread" do
+    it "keeps the icon on a committed thread that already has a verdict" do
       repo_state
       topic = topic_with_patch(pushed_at: 1.hour.ago, ci_status: "success",
                                base_committed_at: 1.day.ago, base_commit_height: 10)
+      create(:commit_topic, topic: topic)
+
+      get topics_path
+
+      expect(glyphs.first).to include("fa-vial-circle-check")
+    end
+
+    it "shows no CI icon on a committed thread with no CI result" do
+      repo_state
+      topic = topic_with_patch(base_committed_at: 1.day.ago, base_commit_height: 10)
       create(:commit_topic, topic: topic)
 
       get topics_path
@@ -131,9 +141,24 @@ RSpec.describe "Public CI", type: :request do
       expect(response.body).not_to include("ci-thread-section")
     end
 
-    it "renders no block on a committed thread" do
+    it "keeps the sidebar on a committed thread that already has a verdict, marked final" do
       repo_state
       topic = thread_with_run({ ci_status: "success" }, { status: "success" })
+      create(:commit_topic, topic: topic)
+
+      get topic_path(topic)
+
+      expect(response).to have_http_status(:ok)
+      expect(sidebar).to include("ci-thread-section")
+      expect(sidebar).to include("committed")
+    end
+
+    it "renders no block on a committed thread with no CI result" do
+      repo_state
+      topic = create(:topic, last_message_at: Time.current)
+      message = create(:message, topic: topic, is_patch_submission: true)
+      create(:patch_branch, topic: topic, message: message, branch_name: "t#{topic.id}_1",
+             base_sha: repo_state.master_sha, base_committed_at: 1.day.ago, base_commit_height: 10)
       create(:commit_topic, topic: topic)
 
       get topic_path(topic)

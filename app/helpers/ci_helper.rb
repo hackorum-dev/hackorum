@@ -224,11 +224,14 @@ module CiHelper
   # grayscale.
   TopicIcon = Struct.new(:glyph, :tone, :label)
 
-  # retired for a reason that is not a verdict on the patch. The commit icon
-  # beside it already says the thread landed, and a merged thread's patchsets
-  # belong to the thread it merged into - an icon here would be a second, worse
-  # answer to a question already answered.
-  CI_QUIET_REASONS = [ "committed", "merged thread" ].freeze
+  # retired for a reason that is not a verdict on the patch. A merged thread's
+  # patchsets belong to the thread it merged into - an icon here would be a
+  # second, worse answer to a question already answered.
+  #
+  # A committed thread is only quiet while it has no verdict of its own, which
+  # is nearly all of them. Once CI actually ran, the result is worth showing
+  # even though nothing will update it again.
+  CI_QUIET_REASONS = [ "merged thread" ].freeze
 
   # this is the hover-card headline, not the badge chip - CI_BADGES owns that
   # register. The two are independent on purpose, so a label matching or
@@ -248,6 +251,13 @@ module CiHelper
     "push_failed" => [ "fa-plug-circle-exclamation", "purple", "push failed" ],
     "cancelled" => [ "fa-plug-circle-exclamation", "muted", "run cancelled" ]
   }.freeze
+
+  # which CI_RUN_ICONS statuses are an actual verdict on the patch, for wording
+  # only. Not PatchCiRun::TERMINAL_STATUSES: that one answers "is the run
+  # done" and lumps cancelled/infra_error in with the real verdicts, which is
+  # the wrong split for a sentence that must not call an aborted or broken run
+  # a finished judgement.
+  CI_VERDICT_STATUSES = %w[success build_failed build_timeout tests_failed tests_timeout].freeze
 
   # an applying row with no mapped status has no result at all rather than one
   # in progress: bucket_sql routes every in-flight status to awaiting_ci first,
@@ -502,6 +512,14 @@ module CiHelper
     end
   end
 
+  # one sentence, one owner: the banner and the sidebar both print it, and two
+  # copies would end up wording it two ways
+  def ci_frozen_note(row)
+    return nil unless row.health_bucket == "wont_retry" && row.wont_retry_reason == "committed"
+    "This thread has been committed, so CI has stopped here. " \
+      "Anything below is the last result it produced."
+  end
+
   # the thread blocks stay quiet on exactly the rows the index icon does - one
   # rule, so a thread cannot be worth an icon but not a block, or the reverse
   def ci_thread_visible?(status)
@@ -540,9 +558,27 @@ module CiHelper
   private
 
   def ci_retired_icon(row)
-    return nil if CI_QUIET_REASONS.include?(row.wont_retry_reason)
-    return TopicIcon.new("fa-plug-circle-exclamation", "muted", "retired, base too old") if row.wont_retry_reason == "base too old"
-    TopicIcon.new("fa-plug-circle-exclamation", "purple", "CI skipped: #{row.wont_retry_reason}")
+    reason = row.wont_retry_reason
+    return nil if CI_QUIET_REASONS.include?(reason)
+    return nil if reason == "committed" && row.ci_status.blank?
+    return TopicIcon.new("fa-plug-circle-exclamation", "muted", "retired, base too old") if reason == "base too old"
+    return ci_committed_icon(row) if reason == "committed"
+    TopicIcon.new("fa-plug-circle-exclamation", "purple", "CI skipped: #{reason}")
+  end
+
+  # the verdict stands, only the updating stopped. The in-flight arm is not
+  # hypothetical: BranchHealth tests the commit before either awaiting_ci arm,
+  # so a commit landing mid-run lands here with a queued or running status, and
+  # CI_RUN_ICONS has no entry for those. The run still finishes and still
+  # ingests - Ingestor does not consult eligibility.
+  def ci_committed_icon(row)
+    if PatchCiRun::IN_FLIGHT_BRANCH_STATUSES.include?(row.ci_status)
+      return TopicIcon.new("fa-hourglass-half", "muted", "CI running, thread committed")
+    end
+    glyph, tone, label = CI_RUN_ICONS.fetch(row.ci_status, CI_NO_RESULT_ICON)
+    suffix = CI_VERDICT_STATUSES.include?(row.ci_status) ? "final, thread committed" :
+             "thread committed, nothing further will run"
+    TopicIcon.new(glyph, tone, "#{label} - #{suffix}")
   end
 
   # empty is the one failure stage that is not a broken patch: the apply worked

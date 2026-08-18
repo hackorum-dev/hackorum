@@ -12,6 +12,8 @@
     - if row.ci_status.present?
       = ci_status_badge(row.ci_status, title: ci_skip_reason_for(row))
     = link_to "CI history", ci_topic_path(topic), class: "ci-banner-link"
+  - if (frozen_note = ci_frozen_note(row))
+    p.ci-banner-provenance = frozen_note
   - if image
     - command = ci_docker_command(image.image_ref)
     .ci-banner-docker

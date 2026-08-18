@@ -55,12 +55,31 @@ RSpec.describe PatchCi::Planner do
       expect(items_of(:new_version)).to be_empty
     end
 
-    it "does not emit topics that already have a commit" do
+    it "does not emit a patch message older than the thread's newest commit" do
       topic = create(:topic)
-      patch_message(topic)
-      create(:commit_topic, topic: topic)
+      patch_message(topic, created_at: 5.days.ago)
+      create(:commit_topic, topic: topic, commit: create(:commit, committed_at: 1.day.ago))
 
       expect(items_of(:new_version)).to be_empty
+    end
+
+    it "emits a patch message newer than the thread's newest commit" do
+      topic = create(:topic)
+      create(:commit_topic, topic: topic, commit: create(:commit, committed_at: 3.days.ago))
+      msg = patch_message(topic, created_at: 1.day.ago)
+
+      expect(items_of(:new_version).map(&:message)).to eq([ msg ])
+    end
+
+    # the follow-up is the topic's newest patch message, so the older one it
+    # replaced never comes back into the tier on its own
+    it "emits only the post-commit patchset when the thread has both" do
+      topic = create(:topic)
+      patch_message(topic, created_at: 5.days.ago)
+      create(:commit_topic, topic: topic, commit: create(:commit, committed_at: 3.days.ago))
+      followup = patch_message(topic, created_at: 1.day.ago)
+
+      expect(items_of(:new_version).map(&:message)).to eq([ followup ])
     end
 
     it "emits the topic when only an older message has a row" do
@@ -131,6 +150,16 @@ RSpec.describe PatchCi::Planner do
       create(:commit_topic, topic: topic)
 
       expect(items_of(:backfill)).to be_empty
+    end
+
+    it "emits rows whose message postdates the thread's newest commit" do
+      topic = create(:topic)
+      create(:commit_topic, topic: topic, commit: create(:commit, committed_at: 3.days.ago))
+      msg = create(:message, topic: topic, created_at: 1.day.ago, is_patch_submission: true)
+      row = create(:patch_branch, topic: topic, message: msg, status: "applied",
+                                  pushed_at: nil, ci_status: nil)
+
+      expect(items_of(:backfill).map(&:patch_branch)).to eq([ row ])
     end
 
     it "does not emit superseded rows" do
@@ -281,6 +310,15 @@ RSpec.describe PatchCi::Planner do
 
       expect(items_of(:rebase)).to be_empty
       expect(planner.counts[:rebase]).to eq(0)
+    end
+
+    it "emits rows whose message postdates the thread's newest commit" do
+      topic = create(:topic)
+      create(:commit_topic, topic: topic, commit: create(:commit, committed_at: 3.days.ago))
+      row = pushed_row(topic, base_committed_at: 5.days.ago)
+      row.message.update!(created_at: 1.day.ago)
+
+      expect(items_of(:rebase).map(&:patch_branch)).to eq([ row ])
     end
 
     it "does not emit rows on merged topics" do

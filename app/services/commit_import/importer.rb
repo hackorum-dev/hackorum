@@ -68,16 +68,16 @@ module CommitImport
           rewrite_people(commits, parsed)
 
           # Drop old links first: a topic that lost its only link during
-          # reparse still needs its count refreshed down to zero.
+          # reparse still needs its aggregates refreshed down.
           touched = CommitTopic.where(commit_id: id_by_sha.values).pluck(:topic_id).to_set
           CommitTopic.where(commit_id: id_by_sha.values).delete_all
           touched.merge(insert_topic_links(parsed, id_by_sha, topic_map))
           update_unresolved(parsed, id_by_sha, topic_map)
           update_cherry_picks(parsed, id_by_sha)
-          # count refresh commits with the rows that produced it, in the same
-          # batch transaction, so a crash later in the run cannot leave it
-          # short
-          refresh_commit_counts(touched)
+          # aggregate refresh commits with the rows that produced it, in the
+          # same batch transaction, so a crash later in the run cannot leave it
+          # stale
+          refresh_commit_aggregates(touched)
         end
       end
       # explicit trailer wins first, then the subject/author fallback refills
@@ -132,9 +132,9 @@ module CommitImport
         insert_files(records, id_by_sha)
         insert_people(records, parsed, id_by_sha)
         touched = insert_topic_links(parsed, id_by_sha, topic_map)
-        # count refresh commits with the commit_topics rows that produced it,
-        # so a crash later in run! cannot leave it permanently short
-        refresh_commit_counts(touched)
+        # aggregate refresh commits with the commit_topics rows that produced
+        # it, so a crash later in run! cannot leave it permanently short
+        refresh_commit_aggregates(touched)
       end
     end
 
@@ -259,14 +259,22 @@ module CommitImport
       MessageIdOverrides.apply(MessageIdNormalizer.normalize(CGI.unescapeURIComponent(raw)))
     end
 
-    def refresh_commit_counts(topic_ids)
+    # commit_count and last_commit_at are both derived from commit_topics, and
+    # every writer funnels through here, so one statement keeps the pair in
+    # step. last_commit_at is the thread's landing date, which is what decides
+    # whether a later patchset is new work - see PatchCi::CommitCutoff.
+    def refresh_commit_aggregates(topic_ids)
       topic_ids = topic_ids.to_a
       return if topic_ids.empty?
 
       sql = ApplicationRecord.sanitize_sql_array([ <<~SQL, topic_ids ])
-        UPDATE topics SET commit_count = sub.n
+        UPDATE topics SET commit_count = sub.n, last_commit_at = sub.last_at
         FROM (
-          SELECT t.id, (SELECT COUNT(*) FROM commit_topics ct WHERE ct.topic_id = t.id) AS n
+          SELECT t.id,
+                 (SELECT COUNT(*) FROM commit_topics ct WHERE ct.topic_id = t.id) AS n,
+                 (SELECT MAX(c.committed_at) FROM commit_topics ct
+                    JOIN commits c ON c.id = ct.commit_id
+                   WHERE ct.topic_id = t.id) AS last_at
           FROM topics t WHERE t.id IN (?)
         ) sub
         WHERE topics.id = sub.id
@@ -429,7 +437,7 @@ module CommitImport
           end
           CommitTopic.upsert_all(rows.uniq { |r| [ r[:commit_id], r[:topic_id] ] },
                                 unique_by: %i[commit_id topic_id])
-          refresh_commit_counts(touched)
+          refresh_commit_aggregates(touched)
         end
       end
     end

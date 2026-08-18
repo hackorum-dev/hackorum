@@ -51,7 +51,7 @@ module PatchCi
     def filter(relation, buckets)
       buckets = Array(buckets).map(&:to_s) & BUCKETS
       return relation if buckets.empty?
-      relation.joins(:topic).where("#{bucket_sql} IN (?)", buckets)
+      relation.joins(:topic, :message).where("#{bucket_sql} IN (?)", buckets)
     end
 
     # Narrows a relation - needs_rebase in practice - to the rows whose failure
@@ -75,19 +75,20 @@ module PatchCi
     # the shared table goes through here (/ci/branches and both /ci dashboard
     # sections, via BranchRows), so N rows do not cost N bucket_for round trips
     def with_bucket(relation = base_scope)
-      # bucket_sql references topics; joins is deduped when already present
-      relation.joins(:topic)
+      # bucket_sql references topics and messages; joins is deduped when
+      # already present
+      relation.joins(:topic, :message)
               .select(PatchBranch.arel_table[Arel.star], Arel.sql("(#{bucket_sql}) AS health_bucket"))
     end
 
     # rows plus why a retired row retired. Deliberately not folded into
     # with_bucket: the three pages that render the shared table never read it,
-    # and the CASE carries an EXISTS per row. The CASE resolves for every row
+    # so they should not pay for a second CASE. The CASE resolves for every row
     # though, ELSE and all - off the wont_retry bucket it would call a healthy
     # row "base too old". Naming the column for the bucket it is true of makes
     # that visibly wrong at the call site instead of silently wrong.
     def with_reason(relation = base_scope)
-      relation.joins(:topic)
+      relation.joins(:topic, :message)
               .select(PatchBranch.arel_table[Arel.star],
                       Arel.sql("(#{wont_retry_reason_sql}) AS wont_retry_reason"))
     end
@@ -126,11 +127,16 @@ module PatchCi
         # And wont_retry comes out of two arms meaning different things,
         # terminal-by-nature and retired-by-age; wont_retry_reason_sql is where
         # they are told apart.
+        #
+        # The committed arm is CommitCutoff's, not a local copy, and it is a
+        # question about the patchset rather than the thread: a fix mailed after
+        # the commit is live work, and Planner keeps scheduling it. The two
+        # still disagree about failed rows, on purpose - see the note above.
         ActiveRecord::Base.sanitize_sql_array(
           [ <<~SQL, stale_cutoff: stale_cutoff ])
           CASE
             WHEN patch_branches.ci_status = 'ci_none'
-              OR EXISTS (SELECT 1 FROM commit_topics ct WHERE ct.topic_id = patch_branches.topic_id)
+              OR (#{CommitCutoff::SUPERSEDED})
               OR topics.merged_into_topic_id IS NOT NULL
               THEN 'wont_retry'
             WHEN patch_branches.status = 'failed' THEN 'never_applied'
@@ -154,7 +160,7 @@ module PatchCi
     end
 
     def base_scope
-      PatchBranch.current.joins(:topic)
+      PatchBranch.current.joins(:topic, :message)
     end
 
     # literals from a frozen constant, never user input
@@ -169,8 +175,7 @@ module PatchCi
       <<~SQL
         CASE
           WHEN patch_branches.ci_status = 'ci_none' THEN coalesce(patch_branches.ci_skip_reason, 'ci_none')
-          WHEN EXISTS (SELECT 1 FROM commit_topics ct WHERE ct.topic_id = patch_branches.topic_id)
-            THEN 'committed'
+          WHEN #{CommitCutoff::SUPERSEDED} THEN 'committed'
           WHEN topics.merged_into_topic_id IS NOT NULL THEN 'merged thread'
           ELSE 'base too old'
         END

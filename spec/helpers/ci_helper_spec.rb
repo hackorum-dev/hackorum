@@ -721,5 +721,74 @@ RSpec.describe CiHelper, type: :helper do
     it "has an icon for every terminal run status" do
       expect(PatchCiRun::TERMINAL_STATUSES - CiHelper::CI_RUN_ICONS.keys).to eq([])
     end
+
+    it "keeps a verdict a committed thread already produced" do
+      icon = helper.ci_topic_icon(status(bucket: "wont_retry", reason: "committed",
+                                         ci_status: "success"))
+
+      expect([ icon.glyph, icon.tone, icon.label ])
+        .to eq([ "fa-vial-circle-check", "green", "CI passed - final, thread committed" ])
+    end
+
+    it "keeps a failing verdict in its own colour on a committed thread" do
+      icon = helper.ci_topic_icon(status(bucket: "wont_retry", reason: "committed",
+                                         ci_status: "tests_failed"))
+
+      expect([ icon.glyph, icon.tone ]).to eq([ "fa-flask", "amber" ])
+    end
+
+    # cancelled, infra_error and push_failed are terminal but never judged the
+    # patch, so the label must not call them "final" the way a real verdict is
+    {
+      "cancelled" => "run cancelled - thread committed, nothing further will run",
+      "infra_error" => "infrastructure error - thread committed, nothing further will run",
+      "push_failed" => "push failed - thread committed, nothing further will run"
+    }.each do |ci_status, label|
+      it "does not call #{ci_status} a verdict on a committed thread" do
+        icon = helper.ci_topic_icon(status(bucket: "wont_retry", reason: "committed",
+                                           ci_status: ci_status))
+
+        expect(icon.label).to eq(label)
+      end
+    end
+
+    # the commit test is the first arm of bucket_sql, ahead of both awaiting_ci
+    # arms, so a commit landing mid-run buckets the row here with a queued or
+    # running status. CI_RUN_ICONS has no entry for those.
+    it "says so when the run is still out there" do
+      icon = helper.ci_topic_icon(status(bucket: "wont_retry", reason: "committed",
+                                         ci_status: "running"))
+
+      expect([ icon.glyph, icon.tone, icon.label ])
+        .to eq([ "fa-hourglass-half", "muted", "CI running, thread committed" ])
+    end
+
+    it "stays quiet on a merged thread that did run CI" do
+      expect(helper.ci_topic_icon(status(bucket: "wont_retry", reason: "merged thread",
+                                         ci_status: "success"))).to be_nil
+    end
+  end
+
+  describe "#ci_frozen_note" do
+    def status(bucket:, reason:)
+      branch = build(:patch_branch)
+      branch.define_singleton_method(:health_bucket) { bucket }
+      branch.define_singleton_method(:wont_retry_reason) { reason }
+      branch
+    end
+
+    it "explains a thread that landed" do
+      expect(helper.ci_frozen_note(status(bucket: "wont_retry", reason: "committed")))
+        .to include("committed")
+    end
+
+    it "says nothing for a row that retired for another reason" do
+      expect(helper.ci_frozen_note(status(bucket: "wont_retry", reason: "base too old")))
+        .to be_nil
+    end
+
+    it "says nothing for a live row" do
+      expect(helper.ci_frozen_note(status(bucket: "applies", reason: nil))).to be_nil
+    end
   end
 end
