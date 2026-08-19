@@ -15,6 +15,8 @@ class User < ApplicationRecord
   has_many :starred_topics, through: :topic_stars, source: :topic
   has_many :saved_searches
   has_many :saved_search_preferences
+  has_one :default_saved_search_preference, -> { where(default: true) }, class_name: "SavedSearchPreference"
+  has_one :default_saved_search, through: :default_saved_search_preference, source: :saved_search
   has_many :outgoing_drafts, dependent: :destroy
   has_many :user_features, dependent: :destroy
 

@@ -61,7 +61,9 @@ Rails.application.routes.draw do
     resource :import, only: [ :show, :create ]
     resource :deletion, only: [ :show, :create ]
     resources :saved_searches
-    resources :saved_search_preferences, only: [ :create ]
+    resources :saved_search_preferences, only: [ :create ] do
+      post :set_default, on: :collection
+    end
 
     resources :teams, only: [ :index, :show, :create, :update, :destroy ] do
       resources :team_members, only: [ :create, :update, :destroy ]

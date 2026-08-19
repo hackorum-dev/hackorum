@@ -8,6 +8,11 @@ class TopicsController < ApplicationController
   ROW_STATES_LIMIT = 50
 
   def index
+    if user_signed_in? && request.format.html? && params[:cursor].blank? && params[:commit].blank?
+      default_search = current_user.default_saved_search
+      return redirect_to search_topics_path(saved_search_id: default_search.id) if default_search
+    end
+
     @search_query = nil
     base_query = Topic.includes(*TOPIC_LIST_PRELOADS)
     base_query = apply_default_ignore_filter(base_query) if user_signed_in?
