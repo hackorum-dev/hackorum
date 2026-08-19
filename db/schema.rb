@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_08_18_120000) do
+ActiveRecord::Schema[8.0].define(version: 2026_08_19_090534) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -570,8 +570,10 @@ ActiveRecord::Schema[8.0].define(version: 2026_08_18_120000) do
     t.boolean "hidden", default: false, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "default", default: false, null: false
     t.index ["saved_search_id", "user_id"], name: "idx_saved_search_prefs_unique", unique: true
     t.index ["saved_search_id"], name: "index_saved_search_preferences_on_saved_search_id"
+    t.index ["user_id"], name: "idx_one_default_saved_search_per_user", unique: true, where: "(\"default\" = true)"
     t.index ["user_id"], name: "index_saved_search_preferences_on_user_id"
   end
 

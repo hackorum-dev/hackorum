@@ -3,6 +3,7 @@
 module Settings
   class SavedSearchesController < Settings::BaseController
     before_action :set_saved_search, only: [ :edit, :update, :destroy ]
+    before_action :set_default_saved_search_id, only: [ :index ]
 
     def index
       @saved_searches = current_user.saved_searches.order(:position, :name)
@@ -64,6 +65,10 @@ module Settings
 
     def set_saved_search
       @saved_search = current_user.saved_searches.find(params[:id])
+    end
+
+    def set_default_saved_search_id
+      @default_saved_search_id = current_user.default_saved_search_preference&.saved_search_id
     end
 
     def saved_search_params
