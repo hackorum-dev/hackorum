@@ -23,8 +23,12 @@
                 td
                   code = ss.query
                 td
-                  = link_to "Edit", edit_settings_saved_search_path(ss), class: "button-secondary button-small"
-                  = button_to "Delete", settings_saved_search_path(ss), method: :delete, class: "button-danger-secondary button-small", data: { turbo_confirm: "Delete this saved search?" }
+                  details.row-actions data-controller="nav-dropdown"
+                    summary.row-actions-toggle aria-label="Actions"
+                      i.fa-solid.fa-ellipsis-vertical
+                    .row-actions-menu
+                      = link_to "Edit", edit_settings_saved_search_path(ss), class: "row-actions-item"
+                      = button_to "Delete", settings_saved_search_path(ss), method: :delete, class: "row-actions-item row-actions-item-danger", data: { turbo_confirm: "Delete this saved search?" }
 
     - if @global_searches.any?
       h2 Global Searches
