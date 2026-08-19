@@ -22,7 +22,7 @@ input[type=submit], input[type=button] {
 /* Flash messages */
 .flash {
   padding: var(--spacing-3) var(--spacing-4);
-  margin-bottom: var(--spacing-4);
+  margin: var(--spacing-1);
   border-radius: var(--border-radius-md);
   font-size: var(--font-size-base);
   line-height: var(--line-height-normal);
