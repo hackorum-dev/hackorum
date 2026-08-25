@@ -100,6 +100,7 @@ Rails.application.routes.draw do
   end
   resources :activities, only: [ :index ] do
     post :mark_all_read, on: :collection
+    post :read, on: :member
   end
   resources :notes, only: [ :create, :update, :destroy ]
   resources :note_mentions, only: [ :destroy ]
