@@ -8,7 +8,7 @@ class TopicsController < ApplicationController
   ROW_STATES_LIMIT = 50
 
   def index
-    if user_signed_in? && request.format.html? && params[:cursor].blank? && params[:commit].blank?
+    if user_signed_in? && request.path == root_path
       default_search = current_user.default_saved_search
       return redirect_to search_topics_path(saved_search_id: default_search.id) if default_search
     end
