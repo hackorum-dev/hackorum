@@ -8,4 +8,8 @@ class Activity < ApplicationRecord
   def mark_read!
     update!(read_at: Time.current)
   end
+
+  def self.mark_all_as_read!
+    self.where(read_at: nil).update_all(read_at: Time.current)
+  end
 end

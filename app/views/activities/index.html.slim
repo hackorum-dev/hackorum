@@ -24,7 +24,7 @@
           - if subject.is_a?(Note)
             .activity-body
               .activity-title
-                = link_to subject.topic.title, read_activity_path(activity), data: { turbo_method: :post }
+                = link_to subject.topic.title, read_activity_path(activity)
               .activity-snippet = truncate(subject.body, length: 160)
               - if subject.note_tags.any?
                 .activity-tags
@@ -36,7 +36,7 @@
           - elsif subject.is_a?(Message)
             .activity-body
               .activity-title
-                = link_to subject.topic.title, read_activity_path(activity), data: { turbo_method: :post }
+                = link_to subject.topic.title, read_activity_path(activity)
               .activity-snippet
                 strong> = subject.subject
                 = truncate(subject.body, length: 140)

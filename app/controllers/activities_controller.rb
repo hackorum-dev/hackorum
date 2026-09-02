@@ -20,7 +20,8 @@ class ActivitiesController < ApplicationController
 
   def read
     activity = base_scope.find(params[:id])
-    activity.mark_read! if activity.read_at.nil?
+    related_activities = base_scope.where(subject: activity.subject)
+    related_activities.mark_all_as_read!
     redirect_to path_for_subject(activity.subject)
   end
 
