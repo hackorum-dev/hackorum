@@ -18,8 +18,12 @@
               th Actions
           tbody
             - @saved_searches.each do |ss|
+              - is_default = @default_saved_search_id == ss.id
               tr
-                td = ss.name
+                td
+                  = ss.name
+                  - if is_default
+                    span.badge.badge-default Default
                 td
                   code = ss.query
                 td
@@ -28,6 +32,7 @@
                       i.fa-solid.fa-ellipsis-vertical
                     .row-actions-menu
                       = link_to "Edit", edit_settings_saved_search_path(ss), class: "row-actions-item"
+                      = button_to is_default ? "Remove default" : "Set as default", set_default_settings_saved_search_preferences_path(saved_search_id: ss.id, default: !is_default), method: :post, class: "row-actions-item"
                       = button_to "Delete", settings_saved_search_path(ss), method: :delete, class: "row-actions-item row-actions-item-danger", data: { turbo_confirm: "Delete this saved search?" }
 
     - if @global_searches.any?
@@ -39,16 +44,25 @@
             tr
               th Name
               th Query
-              th Visible
+              th Actions
           tbody
             - @global_searches.each do |ss|
-              tr
-                td = ss.name
+              - hidden = @hidden_ids.include?(ss.id)
+              - is_default = @default_saved_search_id == ss.id
+              tr class=("saved-search-hidden" if hidden)
+                td
+                  = ss.name
+                  - if is_default
+                    span.badge.badge-default Default
                 td
                   code = ss.query
                 td
-                  - hidden = @hidden_ids.include?(ss.id)
-                  = button_to hidden ? "Show" : "Hide", settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: !hidden), method: :post, class: "button-secondary button-small"
+                  details.row-actions data-controller="nav-dropdown"
+                    summary.row-actions-toggle aria-label="Actions"
+                      i.fa-solid.fa-ellipsis-vertical
+                    .row-actions-menu
+                      = button_to hidden ? "Show" : "Hide", settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: !hidden), method: :post, class: "row-actions-item"
+                      = button_to is_default ? "Remove default" : "Set as default", set_default_settings_saved_search_preferences_path(saved_search_id: ss.id, default: !is_default), method: :post, class: "row-actions-item"
 
     - if @system_searches.any?
       h2 Default Searches
@@ -59,13 +73,22 @@
             tr
               th Name
               th Query
-              th Visible
+              th Actions
           tbody
             - @system_searches.each do |ss|
-              tr
-                td = ss.name
+              - hidden = @hidden_ids.include?(ss.id)
+              - is_default = @default_saved_search_id == ss.id
+              tr class=("saved-search-hidden" if hidden)
+                td
+                  = ss.name
+                  - if is_default
+                    span.badge.badge-default Default
                 td
                   code = ss.query
                 td
-                  - hidden = @hidden_ids.include?(ss.id)
-                  = button_to hidden ? "Show" : "Hide", settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: !hidden), method: :post, class: "button-secondary button-small"
+                  details.row-actions data-controller="nav-dropdown"
+                    summary.row-actions-toggle aria-label="Actions"
+                      i.fa-solid.fa-ellipsis-vertical
+                    .row-actions-menu
+                      = button_to hidden ? "Show" : "Hide", settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: !hidden), method: :post, class: "row-actions-item"
+                      = button_to is_default ? "Remove default" : "Set as default", set_default_settings_saved_search_preferences_path(saved_search_id: ss.id, default: !is_default), method: :post, class: "row-actions-item"

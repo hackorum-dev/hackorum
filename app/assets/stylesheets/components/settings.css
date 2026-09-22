@@ -313,6 +313,14 @@
   background-color: var(--color-bg-hover);
 }
 
+.settings-page .email-table tbody tr.saved-search-hidden td:not(:last-child) {
+  opacity: 0.55;
+}
+
+.settings-page .email-table tbody tr.saved-search-hidden td:first-child {
+  font-style: italic;
+}
+
 .settings-page .email-table td:last-child {
   display: flex;
   gap: var(--spacing-2);
@@ -730,6 +738,12 @@
 .settings-page .badge-draft {
   background: var(--color-bg-hover);
   color: var(--color-text-secondary);
+}
+
+.settings-page .badge-default {
+  background: var(--color-primary-100);
+  color: var(--color-primary-700);
+  margin-left: var(--spacing-2);
 }
 
 .sent-header {

@@ -10,7 +10,7 @@
     span
       |  Saved search:
       strong<>  #{@saved_search.name}
-    = link_to root_path, class: "saved-search-clear", title: "Clear filter"
+    = link_to topics_path, class: "saved-search-clear", title: "Clear filter"
       i.fa-solid.fa-xmark
 - elsif @search_query.present? && user_signed_in?
   .save-search-prompt data-controller="save-search" data-save-search-url-value=settings_saved_searches_path
