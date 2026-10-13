@@ -22,7 +22,7 @@ class NoteBuilder
   end
 
   def update!(note:, body:)
-    raise Error, "You do not have permission to edit this note" unless note.author_id == author.id
+    raise Error, "You do not have permission to edit this note" unless note.editable_by?(author)
     body_text = body.to_s.strip
     raise Error, "Note cannot be blank" if body_text.blank?
 
@@ -42,8 +42,15 @@ class NoteBuilder
 
   def rebuild_mentions_and_tags!(note, body_text)
     mention_names = extract_mentions(body_text)
-    mentionables = resolve_mentions(mention_names)
+    global = mention_names.delete(Note::GLOBAL_MENTION).present?
+    mentionables = resolve_mentions(mention_names, owner: note.author)
     tags = extract_tags(body_text)
+
+    if global
+      previous = note.global? ? note.note_tags.pluck(:tag) : []
+      validate_global_tags!(tags, previous:)
+    end
+    note.update!(global:) if note.global != global
 
     note.note_mentions.delete_all
     mentionables.each do |mentionable|
@@ -59,7 +66,7 @@ class NoteBuilder
   end
 
   def extract_mentions(text)
-    text.to_s.scan(/(?:^|[^@\w])@([A-Za-z0-9_.-]+)/)
+    text.to_s.scan(Note::MENTION_PATTERN)
         .flatten
         .map { |m| NameReservation.normalize(m) }
         .reject(&:blank?)
@@ -67,14 +74,21 @@ class NoteBuilder
   end
 
   def extract_tags(text)
-    text.to_s.scan(/(?:^|[^#\w])#([A-Za-z0-9_.-]+)/)
+    text.to_s.scan(Note::TAG_PATTERN)
         .flatten
         .map { |t| t.to_s.strip.downcase }
         .select { |tag| tag.match?(NoteTag::TAG_FORMAT) }
         .uniq
   end
 
-  def resolve_mentions(names)
+  def validate_global_tags!(tags, previous:)
+    raise Error, "Global notes need at least one global tag" if tags.empty?
+    allowed = GlobalTag.active.where(name: tags).pluck(:name) + previous
+    unknown = tags - allowed
+    raise Error, "Unknown global tag ##{unknown.first}" if unknown.any?
+  end
+
+  def resolve_mentions(names, owner:)
     return [] if names.empty?
 
     reservations = NameReservation.where(name: names).index_by(&:name)
@@ -103,21 +117,21 @@ class NoteBuilder
       when "Team" then teams[reservation.owner_id]
       end
       raise Error, "Unknown mention: @#{name}" unless record
-      validate_mention_permission!(record, name)
+      validate_mention_permission!(record, name, owner:)
       record
     end
 
     mentionables.compact.uniq
   end
 
-  def validate_mention_permission!(mentionable, name)
+  def validate_mention_permission!(mentionable, name, owner:)
     case mentionable
     when User
-      unless mentionable.mentionable_by?(author)
+      unless mentionable.mentionable_by?(owner)
         raise Error, "You cannot mention @#{name} (only their teammates can mention them)"
       end
     when Team
-      unless mentionable.mentionable_by?(author)
+      unless mentionable.mentionable_by?(owner)
         raise Error, "You cannot mention @#{name} (only team members can mention this team)"
       end
     end

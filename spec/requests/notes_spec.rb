@@ -42,4 +42,21 @@ RSpec.describe "Notes", type: :request do
       expect(note.reload.deleted_at).to be_nil
     end
   end
+
+  describe "admin moderation" do
+    let!(:admin) { create(:user, admin: true) }
+    let!(:global_note) { Note.create!(topic: topic, author: author, body: "@global", global: true) }
+
+    before { sign_in_as(admin) }
+
+    it "lets admins delete global notes" do
+      delete note_path(global_note)
+      expect(global_note.reload.deleted_at).to be_present
+    end
+
+    it "does not let admins edit private notes" do
+      patch note_path(note), params: { note: { body: "Changed" } }
+      expect(note.reload.body).to eq("Original note")
+    end
+  end
 end

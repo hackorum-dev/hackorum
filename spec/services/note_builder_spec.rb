@@ -107,4 +107,95 @@ RSpec.describe NoteBuilder do
       end
     end
   end
+
+  it "does not include a trailing dot in tags or mentions" do
+    create(:user, username: "bob")
+    note = described_class.new(author:).create!(topic:, body: "Ask @bob. See #foo.bar.")
+
+    expect(note.note_tags.pluck(:tag)).to eq([ "foo.bar" ])
+    expect(note.note_mentions.map(&:mentionable).map(&:username)).to eq([ "bob" ])
+  end
+
+  describe "@global" do
+    let!(:review_tag) { create(:global_tag, name: "needs-review") }
+    let(:admin) { create(:user, username: "boss", admin: true) }
+    let(:other) { create(:user, username: "other") }
+
+    it "marks the note global without a mention row or extra activities" do
+      note = described_class.new(author:).create!(topic:, body: "@global #needs-review")
+
+      expect(note.global).to be(true)
+      expect(note.note_tags.pluck(:tag)).to eq(%w[needs-review])
+      expect(note.note_mentions).to be_empty
+      expect(Activity.where(subject: note).pluck(:user_id)).to eq([ author.id ])
+    end
+
+    it "rejects unknown and retired tags" do
+      create(:global_tag, name: "old").retire!
+
+      expect {
+        described_class.new(author:).create!(topic:, body: "@global #nope")
+      }.to raise_error(NoteBuilder::Error, "Unknown global tag #nope")
+      expect {
+        described_class.new(author:).create!(topic:, body: "@global #old")
+      }.to raise_error(NoteBuilder::Error, "Unknown global tag #old")
+    end
+
+    it "keeps a retired tag already on the note" do
+      old = create(:global_tag, name: "old")
+      note = described_class.new(author:).create!(topic:, body: "@global #old")
+      old.retire!
+
+      described_class.new(author:).update!(note:, body: "@global #old #needs-review")
+      expect(note.reload.note_tags.pluck(:tag)).to match_array(%w[old needs-review])
+    end
+
+    it "does not carry private tags into a global note" do
+      note = described_class.new(author:).create!(topic:, body: "#mine")
+
+      expect {
+        described_class.new(author:).update!(note:, body: "@global #mine")
+      }.to raise_error(NoteBuilder::Error, "Unknown global tag #mine")
+    end
+
+    it "clears the flag when @global is removed" do
+      note = described_class.new(author:).create!(topic:, body: "@global #needs-review")
+      described_class.new(author:).update!(note:, body: "#needs-review")
+
+      expect(note.reload.global).to be(false)
+    end
+
+    it "rejects a global note without tags" do
+      expect {
+        described_class.new(author:).create!(topic:, body: "@global hello")
+      }.to raise_error(NoteBuilder::Error, "Global notes need at least one global tag")
+    end
+
+    it "checks mentions as the note owner on admin edits" do
+      team = create(:team, name: "core")
+      create(:team_member, team:, user: author)
+      bob = create(:user, username: "bob", mention_restriction: :teammates_only)
+      create(:team_member, team:, user: bob)
+      note = described_class.new(author:).create!(topic:, body: "@global #needs-review")
+
+      described_class.new(author: admin).update!(note:, body: "@global #needs-review @bob")
+
+      expect(note.reload.note_mentions.map(&:mentionable)).to eq([ bob ])
+    end
+
+    it "lets admins edit global notes only" do
+      global_note = described_class.new(author:).create!(topic:, body: "@global #needs-review")
+      private_note = described_class.new(author:).create!(topic:, body: "mine")
+
+      described_class.new(author: admin).update!(note: global_note, body: "@global #needs-review ok")
+      expect(global_note.reload.last_editor).to eq(admin)
+
+      expect {
+        described_class.new(author: admin).update!(note: private_note, body: "x")
+      }.to raise_error(NoteBuilder::Error)
+      expect {
+        described_class.new(author: other).update!(note: global_note, body: "x")
+      }.to raise_error(NoteBuilder::Error)
+    end
+  end
 end

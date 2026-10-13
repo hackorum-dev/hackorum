@@ -1,21 +1,39 @@
 - notes ||= []
-- note_dom_id = message ? "notes-message-#{message.id}" : "thread-notes"
-- notes ||= []
 - note_error = flash[:note_error]&.with_indifferent_access
 - open_form = note_error && note_error[:topic_id].to_i == topic.id && note_error[:message_id].to_s == message&.id.to_s
 - show_full = notes.any? || open_form
 - note_dom_id = message ? "notes-message-#{message.id}" : "thread-notes"
+- title_text = message ? "Notes on this message" : "Thread notes"
+- count_text = "#{notes.size} note#{'s' if notes.size != 1}"
+- all_compact = notes.any? && !open_form && notes.all?(&:tag_only?)
 
-- if show_full
+- if all_compact
+  - block_tags = notes.flat_map { |n| n.note_tags.map(&:tag) }.uniq
+  details.notes-block.notes-collapsed id=note_dom_id
+    summary.notes-header
+      h4 = title_text
+      span.notes-count = count_text
+      - block_tags.each do |t|
+        span.note-tag ##{t}
+    .notes-list
+      - notes.each do |note|
+        = render "notes/note_compact", note: note
+    - if user_signed_in? && topic
+      details.note-form-toggle
+        summary Add note
+        = render "notes/form", topic: topic, message: message
+- elsif show_full
   .notes-block id=note_dom_id
     - if notes.any?
       .notes-header
-        - title_text = message ? "Notes on this message" : "Thread notes"
         h4 = title_text
-        span.notes-count = "#{notes.size} note#{'s' if notes.size != 1}"
+        span.notes-count = count_text
       .notes-list
         - notes.each do |note|
-          = render "notes/note", note: note
+          - if note.tag_only?
+            = render "notes/note_compact", note: note
+          - else
+            = render "notes/note", note: note
     - if user_signed_in? && topic
       details.note-form-toggle open=(open_form ? true : nil)
         summary Add note

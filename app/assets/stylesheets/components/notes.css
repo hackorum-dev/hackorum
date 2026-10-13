@@ -13,6 +13,7 @@
 .notes-header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--spacing-2);
   margin-bottom: var(--spacing-2);
 }
@@ -185,4 +186,54 @@
   cursor: pointer;
   color: var(--color-text-link);
   font-weight: var(--font-weight-medium);
+}
+
+.note-global-badge {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.note-hint {
+  margin-top: var(--spacing-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.notes-collapsed > summary,
+.note-compact > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.notes-collapsed > summary::-webkit-details-marker,
+.note-compact > summary::-webkit-details-marker {
+  display: none;
+}
+
+.notes-collapsed > summary::before,
+.note-compact > summary::before {
+  content: "\25B8";
+  color: var(--color-text-muted);
+}
+
+.notes-collapsed[open] > summary::before,
+.note-compact[open] > summary::before {
+  content: "\25BE";
+}
+
+.notes-collapsed:not([open]) > summary.notes-header {
+  margin-bottom: 0;
+}
+
+.note-compact-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.note-compact[open] > .note-card {
+  margin-top: var(--spacing-2);
 }

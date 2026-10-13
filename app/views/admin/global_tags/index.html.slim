@@ -1,0 +1,39 @@
+- content_for :title, "Admin — Global Tags"
+
+.settings-page
+  h1
+    | Global Tags
+    span.settings-page-count = "(#{@global_tags.size})"
+
+  .saved-searches-actions
+    = link_to "New global tag", new_admin_global_tag_path, class: "button-primary"
+
+  - if @global_tags.any?
+    .email-table-wrap
+      table.email-table
+        thead
+          tr
+            th Name
+            th Description
+            th Topics
+            th Status
+            th Actions
+        tbody
+          - @global_tags.each do |gt|
+            - count = @usage_counts[gt.name].to_i
+            tr
+              td
+                code = "##{gt.name}"
+              td = gt.description.presence || "-"
+              td = count
+              td = gt.retired? ? "Retired" : "Active"
+              td
+                = link_to "Edit", edit_admin_global_tag_path(gt), class: "button-secondary button-small"
+                - if gt.retired?
+                  = button_to "Restore", unretire_admin_global_tag_path(gt), method: :post, class: "button-secondary button-small"
+                - else
+                  = button_to "Retire", retire_admin_global_tag_path(gt), method: :post, class: "button-secondary button-small"
+                - if count.zero?
+                  = button_to "Delete", admin_global_tag_path(gt), method: :delete, class: "button-danger-secondary button-small", form: { data: { turbo_confirm: "Delete ##{gt.name}?" } }
+  - else
+    p No global tags yet.

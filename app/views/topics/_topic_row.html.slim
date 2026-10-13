@@ -4,7 +4,7 @@
 - top_participants = tp_data[:top] || []
 - contributor_participants = tp_data[:contributors] || []
 - state = personalization ? personalization.state_for(topic) : {}
-- note_count = personalization ? personalization.note_count_for(topic) : 0
+- note_count = personalization ? personalization.note_count_for(topic) : @guest_note_counts&.dig(topic.id).to_i
 - participation = personalization ? personalization.participation_for(topic) : {}
 - team_readers = personalization ? personalization.team_readers_for(topic) : []
 - star_data = personalization ? personalization.star_data_for(topic) : {}

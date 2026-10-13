@@ -180,7 +180,7 @@ starred:review-team        # Topics starred by any team member
 
 ### Tag Selectors
 
-Search for topics by tags added to notes. Tags are private to the note author and mentioned users/teams.
+Search for topics by tags added to notes. Tags are private to the note author and mentioned users/teams, except global tags: a note that mentions `@global` is visible to everyone, including visitors who are not signed in. Global tags are defined by admins and listed in the sidebar; any signed-in user can add them with a note like `@global #needs-review`.
 
 | Selector | Description | Example |
 |----------|-------------|---------|

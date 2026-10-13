@@ -28,6 +28,12 @@ Rails.application.routes.draw do
     resources :page_load_stats, only: [ :index ]
     resources :outgoing_messages, only: [ :index ]
     resources :mailing_lists, only: [ :index, :new, :create, :edit, :update ]
+    resources :global_tags, only: [ :index, :new, :create, :edit, :update, :destroy ] do
+      member do
+        post :retire
+        post :unretire
+      end
+    end
     resources :saved_searches
     resources :features, only: [ :index, :show ], param: :name do
       resources :enrollments, only: [ :create, :destroy ], param: :user_id, controller: "feature_enrollments"

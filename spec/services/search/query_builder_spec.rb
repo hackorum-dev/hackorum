@@ -342,6 +342,42 @@ RSpec.describe Search::QueryBuilder, type: :service do
           end
         end
 
+        context 'with global notes' do
+          let!(:global_topic) { create(:topic) }
+          let!(:private_topic) { create(:topic) }
+          let(:other_user) { create(:user) }
+
+          before do
+            g = create(:note, topic: global_topic, author: other_user, body: '@global #needs-review', global: true)
+            create(:note_tag, note: g, tag: 'needs-review')
+            priv = create(:note, topic: private_topic, author: other_user, body: '#needs-review')
+            create(:note_tag, note: priv, tag: 'needs-review')
+          end
+
+          def guest_query(q)
+            validated = Search::QueryValidator.new(parser.parse(q)).validate
+            described_class.new(ast: validated.ast, user: nil).build
+          end
+
+          it 'shows guests topics with global tags only' do
+            result = guest_query('tag:needs-review')
+            expect(result.relation).to include(global_topic)
+            expect(result.relation).not_to include(private_topic)
+          end
+
+          it 'includes global notes for signed-in users' do
+            result = build_query('tag:needs-review')
+            expect(result.relation).to include(global_topic)
+            expect(result.relation).not_to include(private_topic)
+          end
+
+          it 'warns guests using from:me' do
+            result = guest_query('tag:needs-review[from:me]')
+            expect(result.relation.count).to eq(0)
+            expect(result.warnings).to include('Must be signed in to use from:me')
+          end
+        end
+
         context 'when not signed in' do
           it 'returns empty result with warning' do
             ast = parser.parse('tag:important')

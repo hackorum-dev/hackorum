@@ -48,6 +48,11 @@ class Team < ApplicationRecord
   def name_available_in_reservations
     return if name.blank? || !will_save_change_to_name?
 
+    if NameReservation.reserved?(name)
+      errors.add(:name, "is reserved")
+      return
+    end
+
     normalized = NameReservation.normalize(name)
     existing = NameReservation.find_by(name: normalized)
     return unless existing

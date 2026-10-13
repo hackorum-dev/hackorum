@@ -70,8 +70,8 @@
             - @commitfest_committers.each do |committer|
               li = committer
 
-    - if user_signed_in?
-      - note_map = @notes_by_message || {}
+    - if @notes_by_message.present?
+      - note_map = @notes_by_message
       - message_note_entries = note_map.keys.filter_map do |key|
         - next unless key.is_a?(Integer)
         - notes = note_map[key]
@@ -227,7 +227,7 @@
 - if ci_thread_visible?(@ci_status)
   = render "topics/ci_banner", status: @ci_status, topic: @topic, message_numbers: @message_numbers
 
-- if user_signed_in?
+- if user_signed_in? || @notes_by_message&.[](:thread).present?
   - thread_notes = @notes_by_message&.[](:thread) || []
   .thread-notes-container
     = render "notes/note_stack", topic: @topic, message: nil, notes: thread_notes

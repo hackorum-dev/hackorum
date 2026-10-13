@@ -1,0 +1,13 @@
+- note_error = flash[:note_error]&.with_indifferent_access
+- edit_failed = note_error.present? && note_error[:note_id].to_i == note.id
+details.note-compact open=(edit_failed ? true : nil)
+  summary.note-compact-summary
+    span.note-author = display_name_for_user(note.author)
+    - if note.global?
+      span.note-global-badge title="Visible to everyone"
+        i.fa-solid.fa-globe
+    - note.note_tags.each do |tag|
+      span.note-tag ##{tag.tag}
+    - note.note_mentions.each do |mention|
+      span.note-mention = note_mention_label(mention)
+  = render "notes/note", note: note

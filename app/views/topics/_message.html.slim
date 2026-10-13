@@ -89,7 +89,7 @@
           .skeleton-line.skeleton-line-medium
           .skeleton-line.skeleton-line-long
           .skeleton-line.skeleton-line-short
-    - if user_signed_in?
+    - if user_signed_in? || @notes_by_message&.[](message.id).present?
       - notes_for_message = @notes_by_message&.[](message.id) || []
       = render "notes/note_stack", topic: @topic, message: message, notes: notes_for_message
 

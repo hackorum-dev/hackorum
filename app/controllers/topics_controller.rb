@@ -28,7 +28,10 @@ class TopicsController < ApplicationController
     if user_signed_in?
       @personalization = TopicListPersonalization.new(user: current_user, topics: @topics)
       load_visible_tags
+    else
+      load_guest_note_counts
     end
+    load_global_tags unless request.format.turbo_stream?
 
     load_saved_searches
     @all_mailing_lists = MailingList.order(:display_name)
@@ -116,8 +119,8 @@ class TopicsController < ApplicationController
                                                .transform_values { |mmls| mmls.map(&:mailing_list) }
     end
 
+    load_notes
     if user_signed_in?
-      load_notes
       load_star_state
       @drafts_by_parent = current_user.outgoing_drafts
                                        .where.not(status: OutgoingDraft::STATUS_SENT)
@@ -425,8 +428,13 @@ class TopicsController < ApplicationController
     preload_commit_summaries
     preload_ci_statuses
     preload_topic_mailing_lists
-    @personalization = TopicListPersonalization.new(user: current_user, topics: @topics) if user_signed_in?
-    load_visible_tags if user_signed_in?
+    if user_signed_in?
+      @personalization = TopicListPersonalization.new(user: current_user, topics: @topics)
+      load_visible_tags
+    else
+      load_guest_note_counts
+    end
+    load_global_tags unless request.format.turbo_stream?
     load_saved_searches
     @all_mailing_lists = MailingList.order(:display_name)
 
@@ -729,10 +737,21 @@ class TopicsController < ApplicationController
   def load_visible_tags
     @available_note_tags = NoteTag.joins(:note)
                                   .merge(Note.active.visible_to(current_user))
+                                  .where(notes: { global: false })
                                   .group(:tag)
                                   .order(Arel.sql("COUNT(*) DESC"))
                                   .limit(20)
                                   .count
+  end
+
+  def load_global_tags
+    @global_tag_counts = GlobalTag.usage_counts
+    @global_tags = GlobalTag.active.to_a.sort_by { |t| [ -@global_tag_counts[t.name].to_i, t.name ] }
+  end
+
+  def load_guest_note_counts
+    ids = @topics.map(&:id)
+    @guest_note_counts = ids.empty? ? {} : Note.global_visible.where(topic_id: ids).group(:topic_id).count
   end
 
   def load_saved_searches

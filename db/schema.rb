@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_08_19_090534) do
+ActiveRecord::Schema[8.0].define(version: 2026_10_13_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -226,6 +226,17 @@ ActiveRecord::Schema[8.0].define(version: 2026_08_19_090534) do
     t.index ["person_id"], name: "index_contributor_memberships_on_person_id"
   end
 
+  create_table "global_tags", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "description"
+    t.datetime "retired_at"
+    t.bigint "created_by_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_by_id"], name: "index_global_tags_on_created_by_id"
+    t.index ["name"], name: "index_global_tags_on_name", unique: true
+  end
+
   create_table "identities", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.string "provider", null: false
@@ -410,10 +421,12 @@ ActiveRecord::Schema[8.0].define(version: 2026_08_19_090534) do
     t.datetime "deleted_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "global", default: false, null: false
     t.index ["author_id"], name: "index_notes_on_author_id"
     t.index ["last_editor_id"], name: "index_notes_on_last_editor_id"
     t.index ["message_id"], name: "index_notes_on_message_id"
     t.index ["topic_id"], name: "index_notes_on_topic_id"
+    t.index ["topic_id"], name: "index_notes_on_topic_id_global", where: "global"
   end
 
   create_table "outgoing_drafts", force: :cascade do |t|
@@ -963,6 +976,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_08_19_090534) do
   add_foreign_key "commitfest_patch_topics", "commitfest_patches"
   add_foreign_key "commitfest_patch_topics", "topics"
   add_foreign_key "contributor_memberships", "people"
+  add_foreign_key "global_tags", "users", column: "created_by_id"
   add_foreign_key "identities", "users"
   add_foreign_key "mentions", "aliases"
   add_foreign_key "mentions", "messages"

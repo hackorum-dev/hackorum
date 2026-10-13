@@ -1,0 +1,6 @@
+- content_for :title, "Admin — Edit Global Tag"
+
+.settings-page
+  h1 Edit Global Tag
+
+  = render "form", global_tag: @global_tag, url: admin_global_tag_path(@global_tag), method: :patch

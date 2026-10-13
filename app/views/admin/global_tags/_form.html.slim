@@ -1,0 +1,17 @@
+= form_with model: global_tag, url: url, method: method, local: true do |f|
+  - if global_tag.errors.any?
+    .flash-alert
+      ul
+        - global_tag.errors.full_messages.each do |msg|
+          li = msg
+
+  .form-group
+    = f.label :name
+    = f.text_field :name, required: true, disabled: global_tag.persisted?, placeholder: "e.g. needs-review", class: "form-input"
+    small.form-hint Lowercase letters, digits, "_", "." and "-". Cannot be changed later.
+
+  .form-group
+    = f.label :description
+    = f.text_field :description, placeholder: "Optional, shown as tooltip", class: "form-input"
+
+  = f.submit "Save", class: "button-primary"

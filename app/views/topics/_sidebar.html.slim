@@ -78,6 +78,13 @@
                         = button_to settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: true), method: :post, form_class: "quick-filter-action-form", data: { turbo_confirm: "Hide this search?" } do
                           i.fa-solid.fa-eye-slash aria-hidden="true"
 
+    - if @global_tags.present?
+      .sidebar-section
+        h3.sidebar-heading Global tags
+        ul.quick-filters.tags-list
+          - @global_tags.each do |gt|
+            li = link_to "##{gt.name} (#{@global_tag_counts[gt.name].to_i})", search_topics_path(q: "tag:#{gt.name}"), title: gt.description.presence, class: ("quick-filter-link is-active" if params[:q] == "tag:#{gt.name}")
+
     - if user_signed_in? && @available_note_tags.present?
       .sidebar-section
         h3.sidebar-heading My tags

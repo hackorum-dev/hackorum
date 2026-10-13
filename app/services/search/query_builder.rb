@@ -646,12 +646,7 @@ module Search
     end
 
     def apply_tag_with_conditions(tag_name, relation, negated:, conditions:)
-      unless @user
-        @warnings << "Must be signed in to search by tags"
-        return relation.none
-      end
-
-      # Start with notes visible to the current user
+      # Notes visible to the current user (global notes for guests)
       notes = Note.active.visible_to(@user).joins(:note_tags)
 
       # Filter by tag name if provided
@@ -668,12 +663,17 @@ module Search
       if from_cond
         from_value = from_cond[:value]
         if from_value == "me"
+          unless @user
+            @warnings << "Must be signed in to use from:me"
+            return relation.none
+          end
           notes = notes.where(author_id: @user.id)
         else
-          # Try to resolve as team or username
-          team = Team.joins(:team_members)
-                     .where(team_members: { user_id: @user.id })
-                     .find_by("LOWER(teams.name) = LOWER(?)", from_value)
+          team = if @user
+            Team.joins(:team_members)
+                .where(team_members: { user_id: @user.id })
+                .find_by("LOWER(teams.name) = LOWER(?)", from_value)
+          end
           if team
             user_ids = TeamMember.where(team_id: team.id).pluck(:user_id)
             notes = notes.where(author_id: user_ids)

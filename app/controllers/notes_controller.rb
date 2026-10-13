@@ -60,7 +60,7 @@ class NotesController < ApplicationController
       redirect_back fallback_location: topic_path(@note.topic), alert: "Note has been deleted"
       return
     end
-    unless @note.author_id == current_user.id
+    unless @note.editable_by?(current_user)
       redirect_back fallback_location: topic_path(@note.topic), alert: "You can edit or delete your own notes"
       nil
     end

@@ -19,6 +19,8 @@
     = note_icon_html(topic: topic, count: note_count.to_i)
     - if current_user.team_ids.any?
       = team_readers_icon_html(topic: topic, readers: team_readers)
+  - elsif note_count.to_i.positive?
+    = note_icon_html(topic: topic, count: note_count.to_i)
   - commit_summary = @commit_summaries&.dig(topic.id)
   - if commit_summary
     = render partial: "topics/commit_icon", locals: { summary: commit_summary }

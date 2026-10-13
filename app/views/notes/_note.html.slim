@@ -2,6 +2,9 @@
 .note-card
   .note-meta
     .note-author = author_name
+    - if note.global?
+      span.note-global-badge title="Visible to everyone"
+        i.fa-solid.fa-globe
     span.note-time = smart_time_display(note.updated_at || note.created_at)
     - if note.last_editor && note.last_editor_id != note.author_id
       span.note-edit-info = "edited by #{display_name_for_user(note.last_editor)}"
@@ -22,9 +25,10 @@
             = button_to note_mention_path(mention), method: :delete, class: "mention-remove-button", title: "Remove this mention", form: { data: { turbo_confirm: "Remove yourself from this note's mentions?" } } do
               i.fa-solid.fa-xmark
 
-  - if current_user&.id == note.author_id
+  - if note.editable_by?(current_user)
     .note-actions-row
-      details.note-edit-toggle
+      - edit_failed = flash[:note_error].present? && flash[:note_error].with_indifferent_access[:note_id].to_i == note.id
+      details.note-edit-toggle open=(edit_failed ? true : nil)
         summary Edit
         = render "notes/form", note: note, topic: note.topic, message: note.message, submit_text: "Update note"
       = button_to "Delete", note_path(note), method: :delete, class: "note-delete-button", form: { data: { turbo_confirm: "Delete this note?" } }

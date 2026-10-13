@@ -9,10 +9,15 @@ class Note < ApplicationRecord
   has_many :note_edits, dependent: :destroy
   has_many :activities, as: :subject, dependent: :destroy
 
+  MENTION_PATTERN = /(?:^|[^@\w])@([A-Za-z0-9_.-]*[A-Za-z0-9_-])/
+  TAG_PATTERN = /(?:^|[^#\w])#([A-Za-z0-9_.-]*[A-Za-z0-9_-])/
+  GLOBAL_MENTION = "global"
+
   scope :active, -> { where(deleted_at: nil) }
   scope :for_topic, ->(topic) { where(topic:) }
+  scope :global_visible, -> { active.where(global: true) }
   scope :visible_to, ->(user) {
-    return none unless user
+    return global_visible unless user
 
     uid = user.id
     joins(
@@ -32,7 +37,7 @@ class Note < ApplicationRecord
       ])
     ).where(
       sanitize_sql_array([
-        "notes.author_id = :uid OR nm_user.id IS NOT NULL OR tm.id IS NOT NULL",
+        "notes.global OR notes.author_id = :uid OR nm_user.id IS NOT NULL OR tm.id IS NOT NULL",
         uid: uid
       ])
     ).where(deleted_at: nil).distinct
@@ -47,6 +52,15 @@ class Note < ApplicationRecord
 
   def thread_key
     message_id || :thread
+  end
+
+  def tag_only?
+    body.to_s.gsub(MENTION_PATTERN, "").gsub(TAG_PATTERN, "").strip.empty?
+  end
+
+  def editable_by?(user)
+    return false unless user
+    author_id == user.id || (global? && user.admin?)
   end
 
   private

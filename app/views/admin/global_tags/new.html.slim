@@ -1,0 +1,6 @@
+- content_for :title, "Admin — New Global Tag"
+
+.settings-page
+  h1 New Global Tag
+
+  = render "form", global_tag: @global_tag, url: admin_global_tags_path, method: :post
