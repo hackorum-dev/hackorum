@@ -17,9 +17,10 @@ class PatchsetArchive
         tar.add_file_simple("hackorum.json", 0644, metadata.bytesize) do |io|
           io.write(metadata)
         end
-        patches.each do |patch|
+        used = Set["hackorum.json"]
+        patches.each_with_index do |patch, idx|
           content = patch.decoded_body
-          tar.add_file_simple(patch.file_name, 0644, content.bytesize) do |io|
+          tar.add_file_simple(entry_name(patch.file_name, idx, used), 0644, content.bytesize) do |io|
             io.write(content)
           end
         end
@@ -49,5 +50,28 @@ class PatchsetArchive
     }.compact.to_json
   end
 
-  private_class_method :build_metadata
+  # tar entry names come from mail: no paths, at most 100 bytes (ustar
+  # without prefix), unique so extraction does not overwrite
+  def self.entry_name(file_name, idx, used)
+    name = File.basename(file_name.to_s.tr("\\", "/")).delete("\0")
+    name = "patch-#{idx + 1}.patch" if [ "", ".", ".." ].include?(name)
+    name = truncate_name(name)
+    candidate = name
+    n = 1
+    while used.include?(candidate)
+      candidate = truncate_name("#{n}-#{name}")
+      n += 1
+    end
+    used << candidate
+    candidate
+  end
+
+  def self.truncate_name(name)
+    return name if name.bytesize <= 100
+    ext = File.extname(name).byteslice(0, 20).to_s.scrub("")
+    base = name.delete_suffix(File.extname(name))
+    base.byteslice(0, 100 - ext.bytesize).scrub("") + ext
+  end
+
+  private_class_method :build_metadata, :entry_name, :truncate_name
 end

@@ -53,6 +53,21 @@ RSpec.describe PatchsetArchive do
       expect(metadata["upstream_url"]).to include("first%40example.com")
     end
 
+    it "strips paths, truncates long names and dedupes entries" do
+      create(:attachment, :patch_file, message: patch_message, file_name: "../../evil/.git/config.patch")
+      create(:attachment, :patch_file, message: patch_message, file_name: "0001-foo.patch")
+      create(:attachment, :patch_file, message: patch_message, file_name: "#{'x' * 150}.patch")
+
+      names = []
+      Zlib::GzipReader.wrap(StringIO.new(result[:data])) do |gz|
+        Gem::Package::TarReader.new(gz) { |tar| tar.each { |e| names << e.full_name } }
+      end
+
+      expect(names).to include("config.patch", "0001-foo.patch", "1-0001-foo.patch")
+      expect(names).to all(satisfy { |n| !n.include?("/") && n.bytesize <= 100 })
+      expect(names.uniq.size).to eq(names.size)
+    end
+
     it "returns nil when the message has no patch attachments" do
       bare = create(:message, topic: topic, sender: creator)
       expect(described_class.build(message: bare, attachment_number: 1)).to be_nil
