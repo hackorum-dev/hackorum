@@ -21,7 +21,7 @@ RSpec.describe PatchCi::Ingestor do
       head_sha: "a" * 40, base_sha: "b" * 40, pg_major: 20, status: status,
       build: { ok: true, seconds: 100 },
       tests: tests,
-      image: { ref: "ghcr.io/x/postgres-patch:t1", digest: "sha256:d" },
+      image: { ref: "ghcr.io/x/postgres-patch:t1", digest: "sha256:#{"d" * 64}" },
       ccache: { hit: 10, miss: 2 }
     }.to_json
   end

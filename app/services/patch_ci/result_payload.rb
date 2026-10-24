@@ -37,8 +37,12 @@ module PatchCi
     def pg_major = int(@data["pg_major"])
     def build_seconds = int(section("build")["seconds"])
     def test_seconds = int(section("tests")["seconds"])
-    def image_ref = string(section("image")["ref"])
-    def image_digest = string(section("image")["digest"])
+    # both end up in a copy-paste docker command: nothing a shell would read
+    IMAGE_REF = %r{\Aghcr\.io/[a-z0-9][a-z0-9._/-]{0,200}:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}\z}
+    IMAGE_DIGEST = /\Asha256:[0-9a-f]{64}\z/
+
+    def image_ref = string(section("image")["ref"]).then { |ref| ref.match?(IMAGE_REF) ? ref : "" }
+    def image_digest = string(section("image")["digest"]).then { |d| d.match?(IMAGE_DIGEST) ? d : "" }
     def ccache_hit = int(section("ccache")["hit"])
     def ccache_miss = int(section("ccache")["miss"])
 

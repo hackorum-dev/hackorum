@@ -421,7 +421,7 @@ module CiHelper
   end
 
   def ci_docker_command(image_ref)
-    "docker run --rm -p 5432:5432 #{image_ref}"
+    "docker run --rm -p 5432:5432 #{Shellwords.escape(image_ref)}"
   end
 
   # rpartition, not split: a registry host may carry a port, and only the
