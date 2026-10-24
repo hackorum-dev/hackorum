@@ -152,48 +152,71 @@ class QuotedEmailFormatter
 
   def linkify_line(line, quoted: false)
     if quoted
-      return auto_link_html(ERB::Util.h(line))
+      return auto_link_html(line)
     end
 
     if (m = line.strip.match(/^\[(\d+)\]\s*[:\-]?\s*(.*)$/))
       num = m[1]
       rest = @reference_map[num] || m[2]
       label = ERB::Util.h("[#{num}]:")
-      body = auto_link_html(ERB::Util.h(rest.strip))
+      body = auto_link_html(rest.strip)
       return %(#{label} <span class="reference-definition" id="ref-#{num}">#{body}</span>)
     end
 
-    escaped = ERB::Util.h(line)
-    escaped = auto_link_html(escaped)
-
-    escaped = escaped.gsub(/\[(\d+)\]/) do
-      ref_num = Regexp.last_match(1)
-      if (ref_text = @reference_map[ref_num])
-        inline_reference_html(ref_num, ref_text)
-      else
-        "[#{ref_num}]"
+    # [N] only outside links, inside one it would land in the href
+    auto_link_html(line) do |segment|
+      segment.gsub(/\[(\d+)\]/) do
+        ref_num = Regexp.last_match(1)
+        if (ref_text = @reference_map[ref_num])
+          inline_reference_html(ref_num, ref_text)
+        else
+          "[#{ref_num}]"
+        end
       end
     end
-
-    escaped
   end
 
   def inline_reference_html(num, ref_text)
-    tooltip = auto_link_html(ERB::Util.h(ref_text))
+    tooltip = auto_link_html(ref_text)
     %(<span class="inline-reference">[#{num}]<span class="reference-hover">#{tooltip}</span></span>)
   end
 
-  def auto_link_html(text)
-    text.gsub(%r{https?://[^\s<]+}) do |url|
-      if (mid = extract_message_id_from_url(url))
-        href = Rails.application.routes.url_helpers.message_by_id_path(message_id: mid)
-      else
-        href = url
-      end
+  URL_RE = %r{https?://[^\s<>"]+}
+  URL_TRAILING_RE = /[.,;:!?']+\z/
 
-      escaped_href = ERB::Util.h(href)
-      %(<a href="#{escaped_href}" target="_blank" rel="noopener">#{escaped_href}</a>)
+  # Takes raw text, escapes it exactly once. The block gets each escaped
+  # non-link segment.
+  def auto_link_html(text, &segment_filter)
+    out = +""
+    pos = 0
+    text.to_s.scan(URL_RE) do
+      match = Regexp.last_match
+      url = match[0]
+      url = url.sub(URL_TRAILING_RE, "")
+      url = url.delete_suffix(")") if url.end_with?(")") && url.count("(") < url.count(")")
+      url = url.delete_suffix("]") if url.end_with?("]") && url.count("[") < url.count("]")
+      url = url.sub(URL_TRAILING_RE, "")
+      out << escaped_segment(text[pos...match.begin(0)], segment_filter)
+      out << link_html(url)
+      pos = match.begin(0) + url.length
     end
+    out << escaped_segment(text.to_s[pos..], segment_filter)
+  end
+
+  def escaped_segment(raw, filter)
+    escaped = ERB::Util.h(raw.to_s)
+    filter ? filter.call(escaped) : escaped
+  end
+
+  def link_html(url)
+    href = if (mid = extract_message_id_from_url(url))
+      Rails.application.routes.url_helpers.message_by_id_path(message_id: mid)
+    else
+      url
+    end
+
+    escaped_href = ERB::Util.h(href)
+    %(<a href="#{escaped_href}" target="_blank" rel="noopener">#{escaped_href}</a>)
   end
 
   def leading_depth(line)

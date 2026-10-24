@@ -102,5 +102,29 @@ RSpec.describe QuotedEmailFormatter do
 
       expect(html).to include(resolver_path)
     end
+
+    it "escapes link urls once and leaves wrapping punctuation outside" do
+      body = "See <https://example.com/a?x=1&y=2> and (https://example.com/b).\n"
+      html = described_class.new(body).to_html
+
+      expect(html).to include(%q(href="https://example.com/a?x=1&amp;y=2"))
+      expect(html).to include(%q(href="https://example.com/b"))
+      expect(html).to include("&lt;<a ")
+      expect(html).to include("</a>&gt;")
+      expect(html).not_to include("&amp;amp;")
+    end
+
+    it "does not put reference markup inside a link" do
+      body = <<~BODY
+        Look at https://example.com/x[1]y and [1]
+
+        [1]: https://example.com/ref
+      BODY
+      html = described_class.new(body).to_html
+      doc = Nokogiri::HTML.fragment(html)
+
+      expect(doc.css("a").map { |a| a["href"] }).to include("https://example.com/x[1]y")
+      expect(html.scan(/inline-reference/).size).to eq(1)
+    end
   end
 end
