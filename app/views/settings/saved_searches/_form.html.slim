@@ -11,6 +11,6 @@
 
   .form-group
     = f.label :query
-    = f.text_area :query, required: true, placeholder: "e.g. unread:true starred:true", rows: 3
+    = f.text_area :query, required: true, placeholder: "e.g. unread:me starred:me", rows: 3
 
   = f.submit "Save", class: "button-primary"

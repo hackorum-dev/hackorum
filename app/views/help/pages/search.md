@@ -113,8 +113,8 @@ Search for topics by commitfest.
 | Selector | Description | Example |
 |----------|-------------|---------|
 | `commitfest:name` | Topics from commitfest with this name | `commitfest:PG19-Final` |
-| `commitfest:[name:name]` | Topics from commitfest with this name | `commitfest:[name:PG19-Draft]` |
-| `commitfest:[status:status]` | Topics from commitfest with this status | `commitfest:[status:commited]` |
+| `commitfest:[name:name]` | Topics from commitfest with this name | `commitfest:[name:PG19-Drafts]` |
+| `commitfest:[status:status]` | Topics from commitfest with this status | `commitfest:[status:committed]` |
 | `commitfest:[tag:tag]` | Topics from commitfest with this tag | `commitfest:[tag:bugfix]` |
 
 
@@ -150,6 +150,7 @@ The `has:` selector checks for the presence of specific attributes:
 | `has:contributor` | Topics with PostgreSQL contributor activity |
 | `has:committer` | Topics with committer activity |
 | `has:core_team` | Topics with core team activity |
+| `has:commitfest` | Topics linked to a commitfest entry |
 
 ```
 has:patch first_after:1m         # Recent topics with patches
@@ -168,6 +169,7 @@ These require being signed in and filter based on your reading state:
 | `new:me` | Topics you've never seen |
 | `starred:me` | Topics you've starred |
 | `notes:me` | Topics where you've added notes |
+| `ignored:me` | Topics you've ignored (they are hidden from results unless the query uses `ignored:`) |
 
 #### Team State Selectors
 
@@ -286,13 +288,13 @@ Filter patch files by author or count:
 | Condition | Description | Example |
 |-----------|-------------|---------|
 | `from:` | Patches from author | `has:patch[from:michael]` |
-| `count:` | Number of patches | `has:patch[count:>=2]` |
+| `count:` | Number of attachments on patch messages | `has:patch[count:>=2]` |
 
 #### Examples
 
 ```
 has:patch[from:michael]                # Patches from Michael
-has:patch[count:>=3]                   # 3+ patch files
+has:patch[count:>=3]                   # 3+ attachments on patch messages
 has:patch[from:committer]              # Patches from any committer
 ```
 
@@ -506,8 +508,9 @@ Topics you tagged "needs-review" in the last week that you haven't fully read.
 | **Author** | `from:`*, `starter:`, `last_from:` |
 | **Dates** | `first_after:`, `first_before:`, `messages_after:`, `messages_before:`, `last_after:`, `last_before:` |
 | **Counts** | `messages:`, `participants:`, `contributors:` |
-| **Presence** | `has:attachment`*, `has:patch`*, `has:contributor`, `has:committer`, `has:core_team` |
-| **State** | `unread:`, `read:`, `reading:`, `new:`, `starred:`, `notes:` |
+| **Presence** | `has:attachment`*, `has:patch`*, `has:contributor`, `has:committer`, `has:core_team`, `has:commitfest` |
+| **State** | `unread:`, `read:`, `reading:`, `new:`, `starred:`, `notes:`, `ignored:` |
+| **Lists** | `list:` (mailing list display name, e.g. `list:hackers`) |
 | **Tags** | `tag:tagname`*, `tag:[from:source]` |
 
 *Supports [dependent conditions](#dependent-conditions-advanced)

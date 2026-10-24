@@ -11,7 +11,7 @@
 
   .form-group
     = f.label :query
-    = f.text_area :query, required: true, placeholder: "e.g. from:{{team_name}} unread:true", rows: 3
+    = f.text_area :query, required: true, placeholder: "e.g. from:{{team_name}} unread:me", rows: 3
     p.settings-hint Use {{team_name}} as a placeholder for this team's name.
 
   = f.submit "Save", class: "button-primary"
