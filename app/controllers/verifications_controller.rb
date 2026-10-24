@@ -59,9 +59,7 @@ class VerificationsController < ApplicationController
       end
     end
 
-    reset_session
-    session[:user_id] = user.id
-    user.update_columns(last_login_at: Time.current)
+    sign_in(user)
     redirect_to root_path, notice: "Registration complete. You are signed in."
   rescue UserToken::AlreadyConsumed
     redirect_to root_path, alert: "Invalid or expired token"

@@ -19,9 +19,7 @@ class SessionsController < ApplicationController
       flash.now[:alert] = "Please verify your email before signing in."
       render :new, status: :forbidden
     else
-      reset_session
-      session[:user_id] = user.id
-      user.update_columns(last_login_at: Time.current)
+      sign_in(user)
       redirect_to root_path, notice: "Signed in successfully"
     end
   end

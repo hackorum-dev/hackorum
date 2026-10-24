@@ -89,6 +89,19 @@ class User < ApplicationRecord
     verified_at.present?
   end
 
+  # password changes invalidate sessions created before them
+  def self.from_session(session)
+    uid = session[:user_id]
+    user = uid && active.find_by(id: uid)
+    return nil unless user
+    return nil unless ActiveSupport::SecurityUtils.secure_compare(session[:auth_fp].to_s, user.session_fingerprint)
+    user
+  end
+
+  def session_fingerprint
+    OpenSSL::HMAC.hexdigest("SHA256", Rails.application.secret_key_base, "session:#{id}:#{password_digest}")[0, 32]
+  end
+
   def self.cleanup_unverified!(older_than: UNVERIFIED_TTL)
     unverified.where(deleted_at: nil).where("created_at < ?", older_than.ago).find_each do |user|
       transaction do

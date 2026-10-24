@@ -92,9 +92,7 @@ class OmniauthCallbacksController < ApplicationController
 
     identity.update!(last_used_at: Time.current)
 
-    reset_session
-    session[:user_id] = identity.user_id
-    identity.user.update_columns(last_login_at: Time.current)
+    sign_in(identity.user)
     redirect_to root_path, notice: "Signed in with Google"
   rescue => e
     Rails.logger.error("OIDC error: #{e.class}: #{e.message}")

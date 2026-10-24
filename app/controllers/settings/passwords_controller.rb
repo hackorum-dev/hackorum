@@ -15,6 +15,7 @@ module Settings
 
       user.assign_attributes(password: params[:password], password_confirmation: params[:password_confirmation])
       if user.save(context: :password_change)
+        session[:auth_fp] = user.session_fingerprint
         redirect_to settings_password_path, notice: "Password updated."
       else
         redirect_to settings_password_path, alert: user.errors.full_messages.to_sentence

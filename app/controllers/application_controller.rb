@@ -15,8 +15,14 @@ class ApplicationController < ActionController::Base
 
   def current_user
     return @current_user if defined?(@current_user)
-    uid = session[:user_id]
-    @current_user = uid && User.active.find_by(id: uid)
+    @current_user = User.from_session(session)
+  end
+
+  def sign_in(user)
+    reset_session
+    session[:user_id] = user.id
+    session[:auth_fp] = user.session_fingerprint
+    user.update_columns(last_login_at: Time.current)
   end
 
   def user_signed_in?
