@@ -8,7 +8,7 @@
     span.note-time = smart_time_display(note.updated_at || note.created_at)
     - if note.last_editor && note.last_editor_id != note.author_id
       span.note-edit-info = "edited by #{display_name_for_user(note.last_editor)}"
-  .note-body = simple_format(note.body)
+  .note-body = simple_format(h(note.body))
 
   - if note.note_tags.any?
     .note-tags

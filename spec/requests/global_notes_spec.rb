@@ -21,6 +21,14 @@ RSpec.describe "Global notes", type: :request do
       expect(response.body).not_to include("Add note")
     end
 
+    it "escapes html in note bodies" do
+      NoteBuilder.new(author:).create!(topic:, body: "@global #needs-review <img src=\"https://evil.example/x.png\"> <b>hi</b>")
+      get topic_path(topic)
+      expect(response.body).not_to include("<img src=\"https://evil.example")
+      expect(response.body).to include("&lt;img src=")
+      expect(response.body).to include("&lt;b&gt;hi&lt;/b&gt;")
+    end
+
     it "lists global tags in the sidebar" do
       create(:global_tag, name: "unused-tag")
       create(:global_tag, name: "gone").retire!
