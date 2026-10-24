@@ -24,6 +24,7 @@ class TopicMergeService
       merge_awareness!
       merge_read_ranges!
       move_commitfest_links!
+      copy_mailing_lists!
       mark_source_merged!
       recalculate_target_stats!
 
@@ -137,6 +138,17 @@ class TopicMergeService
         link.update!(topic: target_topic)
       end
     end
+  end
+
+  def copy_mailing_lists!
+    list_ids = TopicMailingList.where(topic: source_topic).pluck(:mailing_list_id)
+    return if list_ids.empty?
+
+    now = Time.current
+    TopicMailingList.upsert_all(
+      list_ids.map { |id| { topic_id: target_topic.id, mailing_list_id: id, created_at: now, updated_at: now } },
+      unique_by: :idx_topic_mailing_lists_unique, on_duplicate: :skip
+    )
   end
 
   # the slug follows the thread unless the target has its own. Cleared on the

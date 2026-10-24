@@ -15,6 +15,15 @@ RSpec.describe TopicMergeService do
       )
     end
 
+    it "copies the source mailing lists to the target" do
+      list = create(:mailing_list)
+      TopicMailingList.create!(topic: source_topic, mailing_list: list)
+
+      service.call
+
+      expect(target_topic.reload.mailing_lists).to include(list)
+    end
+
     it "moves the source slug to a target without one" do
       source_topic.update!(slug: "my-feature")
 
