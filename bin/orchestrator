@@ -70,7 +70,7 @@ worktree = PatchBranches::GitRepo.new(options[:worktree])
 orchestrator = PatchCi::Orchestrator.new(
   client: PatchCi::GithubClient.new(repo: options[:github_repo]),
   pusher: PatchCi::Pusher.new(repo: repo, worktree: worktree, remote: options[:remote]),
-  guard: PatchCi::PushGuard.new(repo),
+  guard: PatchCi::PushGuard.new(repo, upstream_remote: options[:upstream_remote]),
   apply_one: PatchBranches::ApplyOne.new(repo: repo, worktree: worktree),
   result_refs: PatchCi::ResultRefs.new(repo, remote: options[:remote]),
   pruner: PatchCi::ResultRefPruner.new(repo, remote: options[:remote]),

@@ -68,6 +68,17 @@ module PatchBranches
       end
     end
 
+    # reachable from master, an upstream branch or a tag; anything else
+    # (rejected patch branches, fetched CI refs) is local and untrusted
+    def upstream_commit?(sha, remote: "postgres")
+      return false unless sha.to_s.match?(/\A[0-9a-f]{40}\z/)
+      return true if run("merge-base", "--is-ancestor", sha, "refs/heads/master").success?
+
+      result = run("for-each-ref", "--count=1", "--contains", sha, "--format=%(refname)",
+                   "refs/remotes/#{remote}/", "refs/tags/")
+      result.success? && result.stdout.strip.present?
+    end
+
     # committer time of a commit, nil when the sha is unknown
     def commit_time(sha)
       result = run("show", "-s", "--format=%cI", "#{sha}^{commit}")

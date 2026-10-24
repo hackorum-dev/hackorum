@@ -34,6 +34,19 @@ RSpec.describe PatchBranches::BaseCommitDetector do
     expect(detection).to be_nil
   end
 
+  it "ignores base-commit trailers pointing at commits off upstream history" do
+    fixture.commit(subject: "base", files: { "a.c" => "v1\n" })
+    fixture.create_branch("t1_1")
+    fixture.checkout("t1_1")
+    local = fixture.commit(subject: "local only", files: { ".github/x.yml" => "x\n" })
+    fixture.checkout("master")
+    patch = File.join(@patch_dir, "0001-x.patch")
+    File.write(patch, "base-commit: #{local}\n")
+
+    detection = described_class.new(repo, [ patch ]).detect
+    expect(detection).to be_nil
+  end
+
   it "matches blob hashes against master head" do
     head = fixture.commit(subject: "base", files: { "a.c" => "v1\n" })
     patch = generate_patch(fixture.path, head, "a.c", "v2\n", @patch_dir)

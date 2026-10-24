@@ -63,6 +63,25 @@ RSpec.describe PatchCi::PushGuard do
     expect(guard.check(row)).to eq("patchset touches .github/")
   end
 
+  it "rejects a .github path git would quote" do
+    base = branch_with_commit("t3_2", files: { ".github/workflows/\u00e9vil.yml" => "x\n" })
+    row = record("t3_2", base)
+
+    expect(guard.check(row)).to eq("patchset touches .github/")
+  end
+
+  it "rejects a base that is not on upstream history" do
+    fixture.commit(subject: "base", files: { "configure.ac" => ac_init })
+    fixture.create_branch("t3_3")
+    fixture.checkout("t3_3")
+    local_base = fixture.commit(subject: "local", files: { ".github/workflows/evil.yml" => "x\n" })
+    fixture.commit(subject: "patch", files: { "a.c" => "v2\n" })
+    fixture.checkout("master")
+    row = record("t3_3", local_base)
+
+    expect(guard.check(row)).to eq("base not on upstream history")
+  end
+
   it "rejects when the diff against base cannot be computed" do
     branch_with_commit("t8_1")
     row = record("t8_1", "1234567890abcdef1234567890abcdef12345678")

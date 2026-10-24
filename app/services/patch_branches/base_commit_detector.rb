@@ -25,7 +25,7 @@ module PatchBranches
         next unless content =~ /^base-commit:\s*([0-9a-f]{40})\s*$/
 
         sha = @repo.rev_parse($1)
-        return Detection.new(sha: sha, source: "base_line") if sha
+        return Detection.new(sha: sha, source: "base_line") if sha && @repo.upstream_commit?(sha)
       end
       nil
     end

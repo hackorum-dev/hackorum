@@ -6,8 +6,9 @@ module PatchCi
     # matching the moment either side was reworded
     def self.no_era_image_reason(major) = "no era image for pg#{major}"
 
-    def initialize(repo)
+    def initialize(repo, upstream_remote: "postgres")
       @repo = repo
+      @upstream_remote = upstream_remote
       @detector = EraDetector.new(repo)
     end
 
@@ -27,6 +28,9 @@ module PatchCi
       changed = changed_paths(row.base_sha, head)
       return "cannot inspect changed paths" if changed.nil?
       return "patchset touches .github/" if changed.any? { |p| p.start_with?(".github/") }
+      # the diff only covers base..head, a base outside upstream could carry
+      # anything
+      return "base not on upstream history" unless @repo.upstream_commit?(row.base_sha, remote: @upstream_remote)
 
       major = @detector.major_for(row.base_sha)
       return "cannot determine pg major of base" unless major
@@ -38,9 +42,12 @@ module PatchCi
     private
 
     def changed_paths(base, head)
-      result = @repo.run("diff", "--name-only", "#{base}..#{head}")
+      # -z and quotePath off: quoted names would dodge the prefix check.
+      # no renames: a rename out of .github must show the old path too
+      result = @repo.run("-c", "core.quotePath=false", "diff", "--name-only", "--no-renames", "-z",
+                         "#{base}..#{head}")
       return nil unless result.success?
-      result.stdout.split("\n")
+      result.stdout.split("\0")
     end
   end
 end
