@@ -285,4 +285,10 @@ RSpec.describe Search::QueryValidator, type: :service do
       end
     end
   end
+
+  it 'keeps the negation when a negated group collapses to one child' do
+    ast = parser.parse('-(has:xyz foo)')
+    result = described_class.new(ast).validate
+    expect(result.ast).to include(type: :text, value: 'foo', negated: true)
+  end
 end

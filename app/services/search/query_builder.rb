@@ -49,6 +49,11 @@ module Search
       end
     end
 
+    # a selector naming nobody matches nothing, its negation everything
+    def unresolved(relation, negated)
+      negated ? relation : relation.none
+    end
+
     def negate_relation(inner_relation, outer_relation)
       # Exclude topics that match the inner relation
       outer_relation.where.not(id: inner_relation.select(:id))
@@ -197,7 +202,7 @@ module Search
       @warnings.concat(result.warnings)
 
       person_ids = result.person_ids
-      return relation if person_ids.empty?
+      return unresolved(relation, negated) if person_ids.empty?
 
       if conditions.blank?
         # Original behavior - any message from these persons
@@ -300,7 +305,7 @@ module Search
       @warnings.concat(result.warnings)
 
       person_ids = result.person_ids
-      return relation if person_ids.empty?
+      return unresolved(relation, negated) if person_ids.empty?
 
       if negated
         relation.where.not(creator_person_id: person_ids)
@@ -314,7 +319,7 @@ module Search
       @warnings.concat(result.warnings)
 
       person_ids = result.person_ids
-      return relation if person_ids.empty?
+      return unresolved(relation, negated) if person_ids.empty?
 
       if negated
         relation.where.not(last_sender_person_id: person_ids)
@@ -372,7 +377,7 @@ module Search
       @warnings.concat(result.warnings)
 
       user_ids = result.user_ids
-      return relation if user_ids.empty?
+      return unresolved(relation, negated) if user_ids.empty?
 
       # Topics where any of these users have unread messages
       # A topic is unread if max_message_id > max_read_range_end
@@ -426,7 +431,7 @@ module Search
       @warnings.concat(result.warnings)
 
       user_ids = result.user_ids
-      return relation if user_ids.empty?
+      return unresolved(relation, negated) if user_ids.empty?
 
       # Topics that are fully read
       if user_ids.size == 1
@@ -477,7 +482,7 @@ module Search
       @warnings.concat(result.warnings)
 
       user_ids = result.user_ids
-      return relation if user_ids.empty?
+      return unresolved(relation, negated) if user_ids.empty?
 
       # Topics partially read (some read, but not all)
       sanitized_ids = user_ids.map(&:to_i).join(",")
@@ -504,7 +509,7 @@ module Search
       @warnings.concat(result.warnings)
 
       user_ids = result.user_ids
-      return relation if user_ids.empty?
+      return unresolved(relation, negated) if user_ids.empty?
 
       # New: never seen (no awareness, no read ranges, after user's aware_before)
       if user_ids.size == 1
@@ -575,7 +580,7 @@ module Search
       @warnings.concat(result.warnings)
 
       user_ids = result.user_ids
-      return relation if user_ids.empty?
+      return unresolved(relation, negated) if user_ids.empty?
 
       starred_topic_ids = TopicStar.where(user_id: user_ids).select(:topic_id)
 
@@ -591,7 +596,7 @@ module Search
       @warnings.concat(result.warnings)
 
       user_ids = result.user_ids
-      return relation if user_ids.empty?
+      return unresolved(relation, negated) if user_ids.empty?
 
       ignored_topic_ids = TopicIgnore.where(user_id: user_ids).select(:topic_id)
 
@@ -629,9 +634,9 @@ module Search
       @warnings.concat(result.warnings)
 
       user_ids = result.user_ids
-      return relation if user_ids.empty?
+      return unresolved(relation, negated) if user_ids.empty?
 
-      note_topic_ids = Note.where(author_id: user_ids, deleted_at: nil).select(:topic_id)
+      note_topic_ids = Note.active.visible_to(@user).where(author_id: user_ids).select(:topic_id)
 
       if negated
         relation.where.not(id: note_topic_ids)
@@ -683,7 +688,7 @@ module Search
               notes = notes.where(author_id: user.id)
             else
               @warnings << "Unknown source '#{from_value}' for tag condition"
-              return relation
+              return unresolved(relation, negated)
             end
           end
         end
@@ -743,6 +748,9 @@ module Search
         core_person_ids = ContributorMembership.where(contributor_type: "core_team").select(:person_id)
         topic_ids_subquery = TopicParticipant.where(person_id: core_person_ids).select(:topic_id).distinct
         negated ? relation.where.not(id: topic_ids_subquery) : relation.where(id: topic_ids_subquery)
+      when "commitfest"
+        topic_ids_subquery = CommitfestPatchTopic.select(:topic_id).distinct
+        negated ? relation.where.not(id: topic_ids_subquery) : relation.where(id: topic_ids_subquery)
       else
         @warnings << "Unknown has: value '#{value}'"
         relation
@@ -766,9 +774,7 @@ module Search
       if from_cond
         result = @value_resolver.resolve_author(from_cond[:value], quoted: from_cond[:quoted])
         @warnings.concat(result.warnings)
-        if result.person_ids.any?
-          base = base.where(messages: { sender_person_id: result.person_ids })
-        end
+        base = result.person_ids.any? ? base.where(messages: { sender_person_id: result.person_ids }) : base.none
       end
 
       # Apply name: condition
@@ -856,18 +862,10 @@ module Search
       date = DateParser.new(value).parse
       return relation unless date
 
-      actual_operator = if negated
-        case operator
-        when :>= then :<
-        when :< then :>=
-        else operator
-        end
-      else
-        operator
-      end
-
-      message_topic_ids = Message.where("messages.created_at #{actual_operator} ?", date).select(:topic_id)
-      relation.where(id: message_topic_ids)
+      # "has a message after X" negates to "has none after X", not to
+      # "has one before X"
+      message_topic_ids = Message.where("messages.created_at #{operator} ?", date).select(:topic_id)
+      negated ? relation.where.not(id: message_topic_ids) : relation.where(id: message_topic_ids)
     end
 
     def apply_last_date_selector(operator, value, relation, negated:)
@@ -888,51 +886,33 @@ module Search
       relation.where("topics.last_message_at #{actual_operator} ?", date)
     end
 
+    # topic id subquery rather than joining the outer relation: a join made
+    # negation drop topics without commitfests and made two commitfest:
+    # selectors test the same row
     def apply_commitfest_selector(value, relation, negated:, conditions:)
-      relation = relation.left_joins(
-        commitfest_patch_topics: {
-          commitfest_patch: [
-            :commitfest_tags,
-            { commitfest_patch_commitfests: :commitfest }
-          ]
-        }
+      links = CommitfestPatchTopic.left_joins(
+        commitfest_patch: [
+          :commitfest_tags,
+          { commitfest_patch_commitfests: :commitfest }
+        ]
       )
+      links = commitfest_filter(links, Commitfest.arel_table[:name], value) if value.present?
 
-      if value.present?
-        if negated
-          relation = relation.where.not(commitfest: { name: value })
-        else
-          relation = relation.where(commitfest: { name: value })
+      (conditions || []).each do |condition|
+        column = case condition[:key]
+        when :name then Commitfest.arel_table[:name]
+        when :status then CommitfestPatchCommitfest.arel_table[:status]
+        when :tag then CommitfestTag.arel_table[:name]
         end
+        links = commitfest_filter(links, column, condition[:value]) if column
       end
 
-      apply_commitfest_with_conditions(relation, negated: negated, conditions: conditions || [])
+      topic_ids = links.select(:topic_id)
+      negated ? relation.where.not(id: topic_ids) : relation.where(id: topic_ids)
     end
 
-    def apply_commitfest_with_conditions(relation, negated:, conditions:)
-      conditions.each do |condition|
-        value = condition[:value]
-
-        relation = case condition[:key]
-        when :name
-          column = Commitfest.arel_table[:name]
-          apply_commitfest_filter(relation, column, value, negated:)
-        when :status
-          column = CommitfestPatchCommitfest.arel_table[:status]
-          apply_commitfest_filter(relation, column, value, negated:)
-        when :tag
-          column = CommitfestTag.arel_table[:name]
-          apply_commitfest_filter(relation, column, value, negated:)
-        end
-      end
-
-      relation
-    end
-
-    def apply_commitfest_filter(relation, column, value, negated:)
-      predicate = column.lower.eq(value.downcase)
-      predicate = predicate.not if negated
-      relation.where(predicate)
+    def commitfest_filter(scope, column, value)
+      scope.where(column.lower.eq(value.to_s.downcase))
     end
 
     # === List Selector ===

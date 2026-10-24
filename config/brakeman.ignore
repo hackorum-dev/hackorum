@@ -103,22 +103,25 @@
     {
       "warning_type": "SQL Injection",
       "warning_code": 0,
-      "fingerprint": "266136db2a0fcda4efe07563a4b2905ee5bd5e6320b6c32f4258eed50051a142",
+      "fingerprint": "739db16db05c15589f33713cd2e6a80a172a1d05d5d021e7cab2bd8a5baf231a",
       "check_name": "SQL",
       "message": "Possible SQL injection",
       "file": "app/services/search/query_builder.rb",
-      "line": 824,
+      "line": 867,
       "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
-      "code": "Message.where(\"messages.created_at #{(case operator\nwhen :>= then\n  :<\nwhen :< then\n  :>=\nelse\n  operator\nend or operator)} ?\", DateParser.new(value).parse)",
+      "code": "Message.where(\"messages.created_at #{operator} ?\", DateParser.new(value).parse)",
       "render_path": null,
       "location": {
         "type": "method",
         "class": "Search::QueryBuilder",
         "method": "apply_messages_date_selector"
       },
-      "user_input": "case operator\nwhen :>= then\n  :<\nwhen :< then\n  :>=\nelse\n  operator\nend",
+      "user_input": "operator",
       "confidence": "Medium",
-      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i"
+      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i",
+      "cwe_id": [
+        89
+      ]
     },
     {
       "warning_type": "Cross-Site Scripting",
@@ -574,13 +577,13 @@
     {
       "warning_type": "SQL Injection",
       "warning_code": 0,
-      "fingerprint": "f8712aa8d6d53f433789b699a439dab1565c8c5dffc7ac986f415c054203e7de",
+      "fingerprint": "4ad0ec59d9c640c3a53385972a3c5b47abce553f62991655bac1711b1485b7b1",
       "check_name": "SQL",
       "message": "Possible SQL injection",
       "file": "app/services/search/query_builder.rb",
-      "line": 740,
+      "line": 791,
       "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
-      "code": "Attachment.joins(:message).where(:messages => ({ :is_patch_submission => true })).where(:messages => ({ :sender_person_id => ValueResolver.new(:user => user).resolve_author(conditions.find do\n (c[:key] == :from)\n end[:value], :quoted => conditions.find do\n (c[:key] == :from)\n end[:quoted]).person_ids })).where(\"attachments.file_name ILIKE ?\", \"%#{sanitize_like(conditions.find do\n (c[:key] == :name)\n end[:value])}%\").group(\"messages.topic_id\").having(\"COUNT(*) #{op} ?\", num)",
+      "code": "(Attachment.joins(:message).where(:messages => ({ :is_patch_submission => true })) or (Attachment.joins(:message).where(:messages => ({ :is_patch_submission => true })).where(:messages => ({ :sender_person_id => ValueResolver.new(:user => user).resolve_author(conditions.find do\n (c[:key] == :from)\n end[:value], :quoted => conditions.find do\n (c[:key] == :from)\n end[:quoted]).person_ids })) or Attachment.joins(:message).where(:messages => ({ :is_patch_submission => true })).none)).where(\"attachments.file_name ILIKE ?\", \"%#{sanitize_like(conditions.find do\n (c[:key] == :name)\n end[:value])}%\").group(\"messages.topic_id\").having(\"COUNT(*) #{op} ?\", num)",
       "render_path": null,
       "location": {
         "type": "method",
@@ -588,8 +591,11 @@
         "method": "build_has_condition_query"
       },
       "user_input": "op",
-      "confidence": "Medium",
-      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i"
+      "confidence": "Weak",
+      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i",
+      "cwe_id": [
+        89
+      ]
     }
   ],
   "updated": "2026-07-10",

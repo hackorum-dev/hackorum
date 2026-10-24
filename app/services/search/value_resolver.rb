@@ -50,7 +50,7 @@ module Search
       return Result.empty(warning: "Empty author value") if value.blank?
 
       # Check special values in order of priority
-      return resolve_me_author if value == "me"
+      return resolve_me_author if value.casecmp?("me")
       return resolve_contributor_type(value) if contributor_type?(value)
 
       team_result = resolve_team_author(value)
@@ -65,7 +65,7 @@ module Search
     def resolve_state_subject(value)
       return Result.empty(warning: "Empty state value") if value.blank?
 
-      if value == "me"
+      if value.casecmp?("me")
         return Result.empty(warning: "Must be signed in to use 'me'") unless @user
         return Result.users([ @user.id ])
       end

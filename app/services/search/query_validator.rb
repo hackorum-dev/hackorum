@@ -81,7 +81,10 @@ module Search
     def validate_compound(node)
       children = node[:children].map { |c| validate_node(c) }.compact
       return nil if children.empty?
-      return children.first if children.size == 1
+      if children.size == 1
+        child = children.first
+        return node[:negated] ? child.merge(negated: !child[:negated]) : child
+      end
 
       node.merge(children: children)
     end

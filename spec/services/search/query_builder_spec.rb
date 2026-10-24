@@ -473,6 +473,24 @@ RSpec.describe Search::QueryBuilder, type: :service do
           expect(result.relation).to include(topic_first)
           expect(result.relation).not_to include(topic_second)
         end
+
+        it 'keeps topics without commitfests in a negated commitfest selector' do
+          bare = create(:topic)
+          result = build_query('-commitfest:PGX-Final')
+          expect(result.relation).to include(bare, topic_second)
+          expect(result.relation).not_to include(topic_first)
+        end
+
+        it 'matches commitfest names case-insensitively' do
+          expect(build_query('commitfest:pgx-final').relation).to include(topic_first)
+        end
+
+        it 'supports has:commitfest' do
+          bare = create(:topic)
+          expect(build_query('has:commitfest').relation).to include(topic_first, topic_second)
+          expect(build_query('has:commitfest').relation).not_to include(bare)
+          expect(build_query('-has:commitfest').relation).to include(bare)
+        end
       end
     end
 
@@ -965,6 +983,54 @@ RSpec.describe Search::QueryBuilder, type: :service do
         expect(result.relation).to include(topic_vacuum)
         expect(result.relation).not_to include(topic_other)
       end
+    end
+  end
+
+  describe 'unresolvable values' do
+    let!(:topic) { create(:topic, title: 'vacuum things') }
+    let!(:other) { create(:topic, title: 'unrelated') }
+
+    before do
+      create(:message, topic: topic, body: 'x')
+      create(:message, topic: other, body: 'y')
+    end
+
+    it 'does not widen an OR to everything' do
+      result = build_query('from:zzqqxxnobody OR title:vacuum')
+      expect(result.relation).to include(topic)
+      expect(result.relation).not_to include(other)
+    end
+
+    it 'matches nothing for a guest state selector' do
+      ast = parser.parse('starred:me')
+      result = described_class.new(ast: Search::QueryValidator.new(ast).validate.ast, user: nil).build
+      expect(result.relation).to be_empty
+    end
+
+    it 'matches everything when negated' do
+      expect(build_query('-from:zzqqxxnobody').relation).to include(topic, other)
+    end
+
+    it 'treats an unknown attachment author as no match' do
+      create(:attachment, message: topic.messages.first)
+      expect(build_query('-has:attachment[from:zzqqnobody]').relation).to include(topic)
+    end
+  end
+
+  describe 'negated message date selectors' do
+    let!(:old_only) { create(:topic) }
+    let!(:both) { create(:topic) }
+
+    before do
+      create(:message, topic: old_only, created_at: Time.zone.parse('2020-01-01'))
+      create(:message, topic: both, created_at: Time.zone.parse('2020-01-01'))
+      create(:message, topic: both, created_at: Time.zone.parse('2025-01-01'))
+    end
+
+    it 'means no message after the date' do
+      result = build_query('-messages_after:2024-01-01')
+      expect(result.relation).to include(old_only)
+      expect(result.relation).not_to include(both)
     end
   end
 end

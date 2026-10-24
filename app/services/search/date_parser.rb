@@ -20,7 +20,11 @@ module Search
     def parse
       return nil if @value.blank?
 
-      parse_relative || parse_absolute
+      time = parse_relative || parse_absolute
+      # postgres rejects far out timestamps instead of comparing them
+      time if time.nil? || time.year.between?(1000, 9999)
+    rescue RangeError
+      nil
     end
 
     def valid?

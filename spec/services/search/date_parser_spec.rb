@@ -94,4 +94,9 @@ RSpec.describe Search::DateParser, type: :service do
       expect(described_class.new('notadate').valid?).to be false
     end
   end
+
+  it 'rejects dates postgres cannot store' do
+    expect(described_class.new('9999999y').parse).to be_nil
+    expect(described_class.new('99999999999999999999d').parse).to be_nil
+  end
 end
