@@ -49,7 +49,7 @@ class TopicsController < ApplicationController
       base_scope = SavedSearch.visible_to(user_signed_in? ? current_user : nil)
       saved_search = base_scope.find(params[:saved_search_id])
       if params[:team_id].present? && saved_search.scope_team?
-        saved_search.resolve_query(team: Team.find(params[:team_id]))
+        saved_search.resolve_query(team: find_accessible_team(params[:team_id]))
       else
         saved_search.resolve_query
       end
@@ -379,7 +379,7 @@ class TopicsController < ApplicationController
       base_scope = SavedSearch.visible_to(user_signed_in? ? current_user : nil)
       @saved_search = base_scope.find(params[:saved_search_id])
       if params[:team_id].present? && @saved_search.scope_team?
-        @saved_search_team = Team.find(params[:team_id])
+        @saved_search_team = find_accessible_team(params[:team_id])
         @search_query = @saved_search.resolve_query(team: @saved_search_team)
       else
         @search_query = @saved_search.resolve_query
@@ -445,6 +445,12 @@ class TopicsController < ApplicationController
   end
 
   private
+
+  def find_accessible_team(id)
+    team = Team.find(id)
+    raise ActiveRecord::RecordNotFound unless team.accessible_to?(current_user)
+    team
+  end
 
   def parse_time_param(value)
     return nil if value.blank?
@@ -732,7 +738,14 @@ class TopicsController < ApplicationController
     return [ nil, nil ] if cursor.blank?
 
     cursor_time, cursor_id = cursor.split("_")
-    [ Time.zone.parse(cursor_time), cursor_id.to_i ]
+    time = parse_time_param(cursor_time)
+    time ? [ time, cursor_id.to_i ] : [ nil, nil ]
+  end
+
+  def parse_time_param(value)
+    Time.zone.parse(value.to_s)
+  rescue ArgumentError
+    nil
   end
 
   def load_visible_tags
@@ -817,11 +830,7 @@ class TopicsController < ApplicationController
   end
 
   def viewing_since_param
-    if params[:viewing_since].present?
-      Time.zone.parse(params[:viewing_since])
-    else
-      Time.current
-    end
+    parse_time_param(params[:viewing_since]) || Time.current
   end
 
   # A topic has a message newer than viewing_since exactly when its latest
@@ -857,10 +866,11 @@ class TopicsController < ApplicationController
   end
 
   SEARCH_PAGE_SIZE = 1000
+  MAX_LONGPAGE = 20
 
   def load_search_results(base_relation)
     @viewing_since = viewing_since_param
-    longpage = params[:longpage].to_i
+    longpage = params[:longpage].to_i.clamp(0, MAX_LONGPAGE)
 
     entries = execute_search_query(base_relation, longpage)
     sliced = slice_cached_entries(entries, params[:cursor])
@@ -989,7 +999,8 @@ class TopicsController < ApplicationController
     return { entries: entries.first(25) } unless cursor_param.present?
 
     cursor_time_str, cursor_id_str = cursor_param.split("_")
-    cursor_time = Time.zone.parse(cursor_time_str)
+    cursor_time = parse_time_param(cursor_time_str)
+    return { entries: entries.first(25) } unless cursor_time
     cursor_id = cursor_id_str.to_i
 
     start_index = entries.find_index do |entry|

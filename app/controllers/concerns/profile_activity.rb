@@ -220,7 +220,9 @@ module ProfileActivity
   end
 
   def parse_activity_filters
-    return ALL_ACTIVITY_FILTERS.dup unless params[:filters].present?
-    params[:filters].select { |f| ALL_ACTIVITY_FILTERS.include?(f) }
+    filters = params[:filters]
+    filters = [ filters ] if filters.is_a?(String)
+    return ALL_ACTIVITY_FILTERS.dup unless filters.is_a?(Array) && filters.any?
+    filters.select { |f| ALL_ACTIVITY_FILTERS.include?(f) }
   end
 end

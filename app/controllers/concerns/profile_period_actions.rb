@@ -2,6 +2,11 @@ module ProfilePeriodActions
   extend ActiveSupport::Concern
   include ProfilePeriodParams
 
+  included do
+    # month 13, week 54 and friends from the url
+    rescue_from Date::Error, with: :render_404
+  end
+
   # Requires from the includer: #default_activity_period returning a
   # ProfilePeriod, and #load_activity_data(period:) from whichever activity
   # concern the controller includes. Exactly one of those may be included.

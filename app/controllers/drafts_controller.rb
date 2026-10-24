@@ -20,7 +20,7 @@ class DraftsController < ApplicationController
     @drafts = @drafts
                 .includes(:topic, :reply_to_message, :sender_alias, :sent_message)
                 .order(Arel.sql("COALESCE(sent_at, updated_at) DESC"))
-                .page(params[:page]).per(50)
+                .page(params[:page].to_s[/\A\d{1,6}\z/] || 1).per(50)
   end
 
   def show

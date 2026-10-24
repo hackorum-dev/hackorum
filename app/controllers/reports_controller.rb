@@ -5,6 +5,8 @@ class ReportsController < ApplicationController
   ACTIVE_THREADS_LIMIT = 10
   NEWCOMERS_LIMIT = 5
 
+  rescue_from Date::Error, with: :render_404
+
   LiveStats = Struct.new(:messages_total, :participants_active, :topics_new, :participants_new)
 
   def index
@@ -83,6 +85,8 @@ class ReportsController < ApplicationController
 
   def load_period
     @year = params[:year].to_i
+    # every valid period is an uncached pile of aggregates, keep crawlers in range
+    raise Date::Error unless @year.between?(1990, Date.current.year + 1)
     if @period_type == "weekly"
       @week = params[:week].to_i
       @period_start = Date.commercial(@year, @week, 1)
