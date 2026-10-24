@@ -8,7 +8,7 @@ RSpec.describe 'OmniAuth Google', type: :request do
 
   def sign_in_with_google(link: false)
     path = link ? "/auth/google_oauth2?link=1" : "/auth/google_oauth2"
-    get path
+    post path
     follow_redirect!
   end
 
@@ -31,6 +31,11 @@ RSpec.describe 'OmniAuth Google', type: :request do
 
     expect { sign_in_with_google }.not_to change(User, :count)
     expect(response).to redirect_to(new_session_path)
+  end
+
+  it 'does not start google sign-in over GET' do
+    get '/auth/google_oauth2'
+    expect(response).to have_http_status(:not_found)
   end
 
   it 'refuses google sign-in without an email' do

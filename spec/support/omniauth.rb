@@ -26,6 +26,8 @@ RSpec.configure do |config|
 
   config.before(:each, type: :request) do
     OmniAuth.config.test_mode = true
+    @omniauth_request_validation = OmniAuth.config.request_validation_phase
+    OmniAuth.config.request_validation_phase = nil
   end
 
   config.after(:each, type: :request) do
@@ -33,5 +35,6 @@ RSpec.configure do |config|
     @omniauth_auth_hash = nil
     Rails.application.env_config['omniauth.auth'] = nil
     Rails.application.env_config['omniauth.params'] = nil
+    OmniAuth.config.request_validation_phase = @omniauth_request_validation
   end
 end

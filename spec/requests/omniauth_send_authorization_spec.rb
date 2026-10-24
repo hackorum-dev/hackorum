@@ -24,7 +24,7 @@ RSpec.describe 'Send authorization callback', type: :request do
   end
 
   def trigger_callback
-    get '/auth/google_oauth2?send=1'
+    post '/auth/google_oauth2?send=1'
     follow_redirect!
   end
 
@@ -83,7 +83,7 @@ RSpec.describe 'Send authorization callback', type: :request do
   end
 
   it 'does not store the refresh_token in raw_info' do
-    get '/auth/google_oauth2?send=1'
+    post '/auth/google_oauth2?send=1'
     follow_redirect!
     identity = user.reload.identities.find_by(uid: 'g-uid-1')
     expect(identity.raw_info).not_to include('r-tok')
