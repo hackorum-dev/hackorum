@@ -22,7 +22,9 @@ module Settings
     end
 
     def perform_deletion!(user)
+      Identity.where(user_id: user.id).find_each(&:revoke_remotely)
       Identity.where(user_id: user.id).delete_all
+      TeamMember.where(user_id: user.id).delete_all
       UserToken.where(user_id: user.id).delete_all
       user.aliases.update_all(user_id: nil, verified_at: nil)
       user.update!(password_digest: nil, deleted_at: Time.current)

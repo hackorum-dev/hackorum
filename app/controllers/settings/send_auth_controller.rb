@@ -1,14 +1,12 @@
 # frozen_string_literal: true
 
-require "net/http"
-
 module Settings
   class SendAuthController < Settings::BaseController
     before_action :require_email_sending_feature
 
     def destroy
       identity = current_user.identities.find(params[:identity_id])
-      revoke_remotely(identity)
+      identity.revoke_remotely
       identity.update!(
         refresh_token: nil,
         access_token: nil,
@@ -22,14 +20,6 @@ module Settings
 
     def require_email_sending_feature
       redirect_to settings_account_path, alert: "Not authorized." unless current_user&.has_feature?(:email_sending)
-    end
-
-    def revoke_remotely(identity)
-      return if identity.refresh_token.blank?
-      Net::HTTP.post_form(URI("https://oauth2.googleapis.com/revoke"),
-                          token: identity.refresh_token)
-    rescue StandardError => e
-      Rails.logger.warn("Google revoke failed: #{e.class}: #{e.message}")
     end
   end
 end
