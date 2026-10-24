@@ -1,3 +1,4 @@
+# deliver_now only: deliver_later would log and persist the raw token as job args
 class UserMailer < ApplicationMailer
   def verification_email(token, raw)
     @token_url = verification_url(token: raw)

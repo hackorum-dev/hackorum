@@ -20,7 +20,7 @@ class RegistrationsController < ApplicationController
       ttl = user.created_at + User::UNVERIFIED_TTL - Time.current
       if ttl.positive?
         token, raw = UserToken.issue!(purpose: "register", user: user, email: email, ttl: ttl, metadata: pending.metadata)
-        UserMailer.verification_email(token, raw).deliver_later
+        UserMailer.verification_email(token, raw).deliver_now
       end
     end
 
@@ -58,7 +58,7 @@ class RegistrationsController < ApplicationController
       return redirect_to registration_path, alert: "Username is already taken."
     end
 
-    UserMailer.verification_email(token, raw).deliver_later
+    UserMailer.verification_email(token, raw).deliver_now
     redirect_to root_path, notice: "Verification email sent. Please check your inbox."
   end
 end

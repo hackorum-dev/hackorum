@@ -31,7 +31,7 @@ module Settings
       # Case 3: Email exists in DB but not associated with user - send verification
       metadata = { name: name }.to_json if name.present?
       token, raw = UserToken.issue!(purpose: "add_alias", user: current_user, email: email, ttl: 1.hour, metadata: metadata)
-      UserMailer.verification_email(token, raw).deliver_later
+      UserMailer.verification_email(token, raw).deliver_now
       redirect_to settings_account_path, notice: "Verification email sent."
     end
 

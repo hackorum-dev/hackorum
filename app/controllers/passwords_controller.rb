@@ -8,7 +8,7 @@ class PasswordsController < ApplicationController
     user = Alias.by_email(email).includes(:user).map(&:user).compact.uniq.select { |u| u.deleted_at.nil? }.first
     if user
       token, raw = UserToken.issue!(purpose: "reset_password", user: user, email: email, ttl: 30.minutes)
-      UserMailer.password_reset(token, raw).deliver_later
+      UserMailer.password_reset(token, raw).deliver_now
     end
     redirect_to new_session_path, notice: "If your email exists, a reset link has been sent."
   end
