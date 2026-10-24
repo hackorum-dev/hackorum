@@ -38,7 +38,11 @@ Rails.application.routes.draw do
     resources :features, only: [ :index, :show ], param: :name do
       resources :enrollments, only: [ :create, :destroy ], param: :user_id, controller: "feature_enrollments"
     end
-    mount PgHero::Engine, at: "/pghero" if defined?(PgHero)
+    if defined?(PgHero)
+      constraints AdminConstraint.new do
+        mount PgHero::Engine, at: "/pghero"
+      end
+    end
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
