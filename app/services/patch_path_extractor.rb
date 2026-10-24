@@ -94,7 +94,10 @@ class PatchPathExtractor
   def decode(att)
     raw = att.decoded_body
     return nil if raw.nil?
-    raw = Zlib.gunzip(raw) if att.file_name.to_s.match?(GZIP_NAME_RE)
+    if att.file_name.to_s.match?(GZIP_NAME_RE)
+      raw = Zlib::GzipReader.new(StringIO.new(raw)).read(PatchBranches::PatchsetExtractor::MAX_DECOMPRESSED + 1).to_s
+      return nil if raw.bytesize > PatchBranches::PatchsetExtractor::MAX_DECOMPRESSED
+    end
     raw.force_encoding(Encoding::BINARY)
   rescue StandardError => e
     Rails.logger.warn("PatchPathExtractor: attachment #{att.id} undecodable: #{e.class}")

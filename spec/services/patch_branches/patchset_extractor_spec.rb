@@ -37,6 +37,33 @@ RSpec.describe PatchBranches::PatchsetExtractor do
     expect(extract).to eq([ [ "fix.patch", "patched" ] ])
   end
 
+  it "refuses gzip output above the cap" do
+    stub_const("#{described_class}::MAX_DECOMPRESSED", 100)
+    gz = StringIO.new
+    Zlib::GzipWriter.wrap(gz) { |w| w.write("x" * 1000) }
+    add_attachment("bomb.patch.gz", gz.string)
+    Dir.mktmpdir do |dir|
+      expect { described_class.new(message.reload).extract(dir) }
+        .to raise_error(described_class::Error, /exceeds/)
+    end
+  end
+
+  it "bunzips .bz2 attachments and caps their output" do
+    require "open3"
+    compress = "import sys,bz2; sys.stdout.buffer.write(bz2.compress(sys.stdin.buffer.read()))"
+    small, = Open3.capture2("python3", "-c", compress, stdin_data: "patched", binmode: true)
+    add_attachment("fix.patch.bz2", small)
+    expect(extract).to eq([ [ "fix.patch", "patched" ] ])
+
+    stub_const("#{described_class}::MAX_DECOMPRESSED", 100)
+    big, = Open3.capture2("python3", "-c", compress, stdin_data: "x" * 100_000, binmode: true)
+    add_attachment("bomb.patch.bz2", big)
+    Dir.mktmpdir do |dir|
+      expect { described_class.new(message.reload).extract(dir) }
+        .to raise_error(described_class::Error, /exceeds/)
+    end
+  end
+
   it "strips .txt wrappers" do
     add_attachment("fix.patch.txt", "content")
     expect(extract).to eq([ [ "fix.patch", "content" ] ])

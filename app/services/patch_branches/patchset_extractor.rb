@@ -16,6 +16,9 @@ module PatchBranches
     SERIES_VERSION = /\Av(\d+)(?=[-._])/i
     LOOSE_VERSION = /(?:\A|[-._])v(\d+)(?=[-._]|\z)/i
 
+    # compressed attachments come from list mail, a bomb must not eat the worker
+    MAX_DECOMPRESSED = 64 * 1024 * 1024
+
     PYTHON_BZ2_DECOMPRESS =
       "import sys,bz2; sys.stdout.buffer.write(bz2.decompress(sys.stdin.buffer.read()))"
 
@@ -111,7 +114,8 @@ module PatchBranches
       loop do
         case name
         when /\.gz\z/i
-          content = Zlib::GzipReader.new(StringIO.new(content)).read
+          content = Zlib::GzipReader.new(StringIO.new(content)).read(MAX_DECOMPRESSED + 1).to_s
+          check_size!(content, name)
           name = name.sub(/\.gz\z/i, "")
         when /\.bz2\z/i
           content = bunzip2(content)
@@ -126,8 +130,35 @@ module PatchBranches
       raise Error, "decompression failed for #{name}: #{e.message}"
     end
 
+    def check_size!(content, name)
+      raise Error, "decompressed #{name} exceeds #{MAX_DECOMPRESSED} bytes" if content.bytesize > MAX_DECOMPRESSED
+    end
+
+    # capture2 with an output cap: kills the decompressor once it is exceeded
+    def capped_capture(*cmd, input)
+      Open3.popen2(*cmd) do |stdin, stdout, wait|
+        stdin.binmode
+        stdout.binmode
+        writer = Thread.new do
+          stdin.write(input)
+        rescue Errno::EPIPE, IOError
+        ensure
+          stdin.close unless stdin.closed?
+        end
+        out = stdout.read(MAX_DECOMPRESSED + 1).to_s
+        if out.bytesize > MAX_DECOMPRESSED
+          Process.kill("KILL", wait.pid) rescue nil
+          writer.join
+          wait.value
+          raise Error, "decompressed output exceeds #{MAX_DECOMPRESSED} bytes"
+        end
+        writer.join
+        [ out, wait.value ]
+      end
+    end
+
     def bunzip2(content)
-      out, status = Open3.capture2("bzip2", "-dc", stdin_data: content, binmode: true)
+      out, status = capped_capture("bzip2", "-dc", content)
       raise Error, "bzip2 -dc failed" unless status.success?
       out
     rescue Errno::ENOENT
@@ -137,8 +168,7 @@ module PatchBranches
     end
 
     def bunzip2_python(content)
-      out, status = Open3.capture2("python3", "-c", PYTHON_BZ2_DECOMPRESS,
-                                    stdin_data: content, binmode: true)
+      out, status = capped_capture("python3", "-c", PYTHON_BZ2_DECOMPRESS, content)
       raise Error, "python3 bz2 fallback failed" unless status.success?
       out
     rescue Errno::ENOENT
