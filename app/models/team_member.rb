@@ -4,7 +4,7 @@ class TeamMember < ApplicationRecord
   enum :role, {
     member: "member",
     admin: "admin"
-  }, prefix: true
+  }, prefix: true, validate: true
 
   belongs_to :team
   belongs_to :user

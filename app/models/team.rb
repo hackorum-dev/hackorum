@@ -3,13 +3,14 @@
 class Team < ApplicationRecord
   has_many :team_members, dependent: :destroy
   has_many :users, through: :team_members
-  has_many :saved_searches
+  has_many :saved_searches, dependent: :destroy
+  has_many :note_mentions, as: :mentionable, dependent: :destroy
 
   # Visibility levels:
   # - private: only members can see/access the team, only members can mention
   # - visible: anyone can see/access the team, only members can mention
   # - open: anyone can see/access the team, anyone can mention
-  enum :visibility, { private: "private", visible: "visible", open: "open" }, default: :private, prefix: true
+  enum :visibility, { private: "private", visible: "visible", open: "open" }, default: :private, prefix: true, validate: true
 
   validates :name, presence: true
   validates :name, format: { with: /\A[a-zA-Z0-9_\-\.]+\z/ }

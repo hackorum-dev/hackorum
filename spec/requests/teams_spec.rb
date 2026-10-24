@@ -144,5 +144,24 @@ RSpec.describe "Teams", type: :request do
         delete settings_team_path(team)
       }.to change(Team, :count).by(-1)
     end
+
+    it "deletes teams that have saved searches" do
+      create(:saved_search, scope: "team", team: team, query: "unread:me")
+      attach_verified_alias(admin, email: "admin@example.com")
+      sign_in(email: "admin@example.com")
+
+      expect {
+        delete settings_team_path(team)
+      }.to change(Team, :count).by(-1).and change(SavedSearch, :count).by(-1)
+    end
+
+    it "rejects an unknown visibility without a 500" do
+      attach_verified_alias(admin, email: "admin@example.com")
+      sign_in(email: "admin@example.com")
+
+      patch settings_team_path(team), params: { team: { visibility: "bogus" } }
+      expect(response).to redirect_to(settings_team_path(team))
+      expect(team.reload.visibility).to eq("private")
+    end
   end
 end
