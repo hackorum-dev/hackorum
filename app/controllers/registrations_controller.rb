@@ -1,6 +1,8 @@
 class RegistrationsController < ApplicationController
-  rate_limit to: 5, within: 1.hour, only: :resend,
+  rate_limit to: 5, within: 1.hour, only: :resend, name: "resend",
     with: -> { redirect_to resend_verification_path, alert: "Too many requests. Try again later." }
+  rate_limit to: 5, within: 1.hour, only: :create, name: "create",
+    with: -> { redirect_to new_registration_path, alert: "Too many requests. Try again later." }
 
   def new
   end

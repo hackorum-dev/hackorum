@@ -1,4 +1,9 @@
 class PasswordsController < ApplicationController
+  rate_limit to: 5, within: 1.hour, only: :create, name: "create",
+    with: -> { redirect_to new_password_path, alert: "Too many requests. Try again later." }
+  rate_limit to: 10, within: 3.minutes, only: :update, name: "update",
+    with: -> { redirect_to new_password_path, alert: "Too many attempts. Try again later." }
+
   def new
   end
 

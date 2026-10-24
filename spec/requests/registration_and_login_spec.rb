@@ -10,7 +10,7 @@ RSpec.describe 'Registration and Login', type: :request do
       al = create(:alias, email: 'user@example.com', user: nil)
 
       perform_enqueued_jobs do
-        post registration_path, params: { email: 'user@example.com', username: 'newuser', password: 'secret', password_confirmation: 'secret' }
+        post registration_path, params: { email: 'user@example.com', username: 'newuser', password: 'secret123', password_confirmation: 'secret123' }
         expect(response).to redirect_to(root_path)
       end
 
@@ -29,7 +29,7 @@ RSpec.describe 'Registration and Login', type: :request do
       owner = create(:user, username: 'owner')
       merged = create(:alias, email: 'old@example.com', person: owner.person, user: nil)
 
-      post registration_path, params: { email: 'old@example.com', username: 'intruder', password: 'secret', password_confirmation: 'secret' }
+      post registration_path, params: { email: 'old@example.com', username: 'intruder', password: 'secret123', password_confirmation: 'secret123' }
       raw = extract_raw_token_from_mailer
       get verification_path(token: raw)
 
@@ -43,7 +43,7 @@ RSpec.describe 'Registration and Login', type: :request do
   describe 'registration via new alias' do
     it 'creates user and alias on verification' do
       perform_enqueued_jobs do
-        post registration_path, params: { email: 'new@example.com', name: 'New Person', username: 'newperson', password: 'secret', password_confirmation: 'secret' }
+        post registration_path, params: { email: 'new@example.com', name: 'New Person', username: 'newperson', password: 'secret123', password_confirmation: 'secret123' }
         expect(response).to redirect_to(root_path)
       end
 
@@ -61,7 +61,7 @@ RSpec.describe 'Registration and Login', type: :request do
 
     it 'creates an unverified user with username reservation on registration' do
       perform_enqueued_jobs do
-        post registration_path, params: { email: 'new@example.com', name: 'New Person', username: 'reserved', password: 'secret', password_confirmation: 'secret' }
+        post registration_path, params: { email: 'new@example.com', name: 'New Person', username: 'reserved', password: 'secret123', password_confirmation: 'secret123' }
         expect(response).to redirect_to(root_path)
       end
 
@@ -77,7 +77,7 @@ RSpec.describe 'Registration and Login', type: :request do
 
     it 'verifies the user on token use' do
       perform_enqueued_jobs do
-        post registration_path, params: { email: 'new@example.com', username: 'verifyme', password: 'secret', password_confirmation: 'secret' }
+        post registration_path, params: { email: 'new@example.com', username: 'verifyme', password: 'secret123', password_confirmation: 'secret123' }
       end
 
       get verification_path(token: extract_raw_token_from_mailer)
@@ -93,7 +93,7 @@ RSpec.describe 'Registration and Login', type: :request do
       archive_person = al.person
 
       perform_enqueued_jobs do
-        post registration_path, params: { email: 'archived@example.com', username: 'archived', password: 'secret', password_confirmation: 'secret' }
+        post registration_path, params: { email: 'archived@example.com', username: 'archived', password: 'secret123', password_confirmation: 'secret123' }
       end
       placeholder_id = User.find_by(username: 'archived').person_id
       expect(placeholder_id).not_to eq(archive_person.id)
@@ -107,7 +107,7 @@ RSpec.describe 'Registration and Login', type: :request do
 
     it 'rejects verification when email got claimed meanwhile' do
       perform_enqueued_jobs do
-        post registration_path, params: { email: 'claimed@example.com', username: 'late', password: 'secret', password_confirmation: 'secret' }
+        post registration_path, params: { email: 'claimed@example.com', username: 'late', password: 'secret123', password_confirmation: 'secret123' }
       end
       owner = create(:user)
       create(:alias, email: 'claimed@example.com', user: owner, person: owner.person)
@@ -119,12 +119,12 @@ RSpec.describe 'Registration and Login', type: :request do
 
     it 'rejects a username held by a pending registration' do
       perform_enqueued_jobs do
-        post registration_path, params: { email: 'first@example.com', username: 'racetest', password: 'secret', password_confirmation: 'secret' }
+        post registration_path, params: { email: 'first@example.com', username: 'racetest', password: 'secret123', password_confirmation: 'secret123' }
         expect(response).to redirect_to(root_path)
       end
 
       perform_enqueued_jobs do
-        post registration_path, params: { email: 'second@example.com', username: 'RaceTest', password: 'secret', password_confirmation: 'secret' }
+        post registration_path, params: { email: 'second@example.com', username: 'RaceTest', password: 'secret123', password_confirmation: 'secret123' }
         expect(response).to redirect_to(registration_path)
         expect(flash[:alert]).to match(/taken/i)
       end
@@ -133,13 +133,14 @@ RSpec.describe 'Registration and Login', type: :request do
     [
       [ 'password mismatch', { password_confirmation: 'other' }, /confirmation/i ],
       [ 'blank password', { password: '', password_confirmation: '' }, /password can't be blank/i ],
+      [ 'short password', { password: 'short', password_confirmation: 'short' }, /too short/i ],
       [ 'blank username', { username: '' }, /username can't be blank/i ],
       [ 'invalid username', { username: 'bad name!' }, /username is invalid/i ],
       [ 'reserved username', { username: 'global' }, /reserved/i ],
       [ 'invalid email', { email: 'nope' }, /valid email/i ]
     ].each do |label, override, message|
       it "rejects #{label} without creating records" do
-        params = { email: 'x@example.com', username: 'someone', password: 'secret', password_confirmation: 'secret' }.merge(override)
+        params = { email: 'x@example.com', username: 'someone', password: 'secret123', password_confirmation: 'secret123' }.merge(override)
         expect {
           post registration_path, params: params
         }.not_to change { [ User.count, Person.count, UserToken.count, NameReservation.count ] }
@@ -150,7 +151,7 @@ RSpec.describe 'Registration and Login', type: :request do
 
     it 'does not treat unverified users as signed in' do
       perform_enqueued_jobs do
-        post registration_path, params: { email: 'pending@example.com', username: 'pending', password: 'secret', password_confirmation: 'secret' }
+        post registration_path, params: { email: 'pending@example.com', username: 'pending', password: 'secret123', password_confirmation: 'secret123' }
       end
       expect(User.active.find_by(username: 'pending')).to be_nil
       expect(Person.registered.where(id: User.find_by(username: 'pending').person_id)).to be_empty
@@ -160,7 +161,7 @@ RSpec.describe 'Registration and Login', type: :request do
   describe 'token lifetime' do
     def register(email:, username:)
       perform_enqueued_jobs do
-        post registration_path, params: { email: email, username: username, password: 'secret', password_confirmation: 'secret' }
+        post registration_path, params: { email: email, username: username, password: 'secret123', password_confirmation: 'secret123' }
       end
       extract_raw_token_from_mailer
     end
@@ -191,7 +192,7 @@ RSpec.describe 'Registration and Login', type: :request do
   describe 'resend verification' do
     before do
       perform_enqueued_jobs do
-        post registration_path, params: { email: 'resend@example.com', username: 'resender', password: 'secret', password_confirmation: 'secret' }
+        post registration_path, params: { email: 'resend@example.com', username: 'resender', password: 'secret123', password_confirmation: 'secret123' }
       end
       @first_raw = extract_raw_token_from_mailer
       ActionMailer::Base.deliveries.clear

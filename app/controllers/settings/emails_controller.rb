@@ -2,6 +2,9 @@
 
 module Settings
   class EmailsController < Settings::BaseController
+    rate_limit to: 10, within: 1.hour, only: :create,
+      with: -> { redirect_to settings_account_path, alert: "Too many requests. Try again later." }
+
     def create
       email = EmailNormalizer.normalize(params[:email])
       name = params[:name].presence
