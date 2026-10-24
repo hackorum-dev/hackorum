@@ -37,7 +37,7 @@ class Admin::UsersController < Admin::BaseController
     end
 
     @existing_aliases = Alias.by_email(@email)
-    @owned_by_other = @existing_aliases.where.not(user_id: [ nil, @user.id ]).exists?
+    @owned_by_other = Alias.claimed_by_other?(@email, @user)
   end
 
   def add_email
@@ -51,7 +51,7 @@ class Admin::UsersController < Admin::BaseController
 
     aliases = Alias.by_email(email)
 
-    if aliases.where.not(user_id: [ nil, @user.id ]).exists?
+    if Alias.claimed_by_other?(email, @user)
       return redirect_to admin_users_path, alert: "Email is linked to another account. Cannot associate."
     end
 

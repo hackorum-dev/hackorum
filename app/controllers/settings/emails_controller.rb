@@ -6,7 +6,7 @@ module Settings
       email = EmailNormalizer.normalize(params[:email])
       name = params[:name].presence
 
-      if Alias.by_email(email).where.not(user_id: [ nil, current_user.id ]).exists?
+      if Alias.claimed_by_other?(email, current_user)
         return redirect_to settings_account_path, alert: "Email is linked to another account. Delete that account first to release it."
       end
 

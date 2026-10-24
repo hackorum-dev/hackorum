@@ -17,6 +17,14 @@ class Alias < ApplicationRecord
     where("lower(trim(email)) = lower(trim(?))", email)
   }
 
+  # person merges move aliases without setting user_id, so the person's
+  # owner counts too, not just alias.user_id
+  def self.claimed_by_other?(email, user)
+    scope = by_email(email)
+    scope.where.not(user_id: [ nil, user&.id ]).exists? ||
+      scope.where(person_id: User.active.where.not(id: user&.id).select(:person_id)).exists?
+  end
+
   scope :with_sent_messages, -> { where("sender_count > 0") }
   scope :mention_only, -> { where(sender_count: 0) }
 

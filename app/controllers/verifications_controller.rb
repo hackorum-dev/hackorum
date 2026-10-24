@@ -26,7 +26,7 @@ class VerificationsController < ApplicationController
     end
 
     existing_aliases = Alias.by_email(token.email)
-    if existing_aliases.where.not(user_id: nil).exists?
+    if Alias.claimed_by_other?(token.email, user)
       return redirect_to new_session_path, alert: "This email is already claimed. Please sign in."
     end
 
@@ -81,7 +81,7 @@ class VerificationsController < ApplicationController
     end
 
     email = token.email
-    if Alias.by_email(email).where.not(user_id: [ nil, user.id ]).exists?
+    if Alias.claimed_by_other?(email, user)
       return redirect_to settings_account_path, alert: "Email is linked to another account. Delete that account first to release it."
     end
 

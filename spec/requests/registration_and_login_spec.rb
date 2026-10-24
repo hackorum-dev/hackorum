@@ -24,6 +24,22 @@ RSpec.describe 'Registration and Login', type: :request do
     end
   end
 
+  describe 'registration for an email merged into another user' do
+    it 'refuses to attach to the owning person' do
+      owner = create(:user, username: 'owner')
+      merged = create(:alias, email: 'old@example.com', person: owner.person, user: nil)
+
+      post registration_path, params: { email: 'old@example.com', username: 'intruder', password: 'secret', password_confirmation: 'secret' }
+      raw = extract_raw_token_from_mailer
+      get verification_path(token: raw)
+
+      expect(response).to redirect_to(new_session_path)
+      expect(User.find_by(username: 'intruder')).not_to be_verified
+      expect(merged.reload.person_id).to eq(owner.person_id)
+      expect(merged.user_id).to be_nil
+    end
+  end
+
   describe 'registration via new alias' do
     it 'creates user and alias on verification' do
       perform_enqueued_jobs do

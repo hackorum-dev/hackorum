@@ -15,13 +15,16 @@ class OmniauthCallbacksController < ApplicationController
       current_user.update!(person_id: current_person.id)
     end
 
+    # omniauth-google-oauth2 leaves email nil when google has not verified it
+    return redirect_to new_session_path, alert: "Google did not provide a verified email." if email.blank?
+
     identity = Identity.find_by(provider: provider, uid: uid)
 
     if sending
       return redirect_to new_session_path, alert: "Sign in first." unless current_user
       return redirect_to settings_account_path, alert: "Not authorized." unless current_user&.has_feature?(:email_sending)
 
-      if Alias.by_email(email).where.not(user_id: [ nil, current_user.id ]).exists?
+      if Alias.claimed_by_other?(email, current_user)
         return redirect_to settings_account_path, alert: "Email is linked to another account. Delete that account first to release it."
       end
 
@@ -57,7 +60,7 @@ class OmniauthCallbacksController < ApplicationController
         end
         return redirect_to settings_account_path, notice: "That Google account is already linked to your account."
       else
-        if Alias.by_email(email).where.not(user_id: [ nil, current_user.id ]).exists?
+        if Alias.claimed_by_other?(email, current_user)
           return redirect_to settings_account_path, alert: "Email is linked to another account. Delete that account first to release it."
         end
 
@@ -74,16 +77,17 @@ class OmniauthCallbacksController < ApplicationController
       user = identity.user
     else
       # Do not attach to existing users from the login flow.
-      alias_user = Alias.by_email(email).where.not(user_id: nil).includes(:user).first&.user
-      if alias_user
+      if Alias.claimed_by_other?(email, nil)
         return redirect_to new_session_path, alert: "That Google account is already associated with an existing user. Link it from Settings instead."
       end
-      person = Person.find_or_create_by_email(email)
-      user = User.create!(person_id: person.id, verified_at: Time.current)
+      ActiveRecord::Base.transaction do
+        person = Person.find_or_create_by_email(email)
+        user = User.create!(person_id: person.id, verified_at: Time.current)
 
-      ensure_alias_verified(person, user, email, info["name"])
+        ensure_alias_verified(person, user, email, info["name"])
 
-      identity = Identity.create!(user: user, provider: provider, uid: uid, email: email, raw_info: scrub_credentials(auth).to_json, last_used_at: Time.current)
+        identity = Identity.create!(user: user, provider: provider, uid: uid, email: email, raw_info: scrub_credentials(auth).to_json, last_used_at: Time.current)
+      end
     end
 
     identity.update!(last_used_at: Time.current)

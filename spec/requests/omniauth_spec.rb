@@ -24,6 +24,22 @@ RSpec.describe 'OmniAuth Google', type: :request do
     Alias.by_email(email).update_all(verified_at: Time.current)
   end
 
+  it 'refuses google sign-in for an email merged into another user' do
+    owner = create(:user, username: 'owner')
+    create(:alias, email: 'old@example.com', person: owner.person, user: nil)
+    mock_google_oauth(uid: 'uid-old', email: 'old@example.com')
+
+    expect { sign_in_with_google }.not_to change(User, :count)
+    expect(response).to redirect_to(new_session_path)
+  end
+
+  it 'refuses google sign-in without an email' do
+    mock_google_oauth(uid: 'uid-noemail', email: nil)
+
+    expect { sign_in_with_google }.not_to change(User, :count)
+    expect(response).to redirect_to(new_session_path)
+  end
+
   it 'creates a new user on google sign-in with a new email' do
     mock_google_oauth(uid: 'uid-new', email: 'new@example.com')
 
