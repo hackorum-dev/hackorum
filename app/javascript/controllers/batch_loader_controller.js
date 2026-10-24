@@ -10,31 +10,40 @@ export default class extends Controller {
   static targets = ["skeleton"]
 
   connect() {
+    this.abortController = new AbortController()
     this.loadAllBatches()
+  }
+
+  disconnect() {
+    this.abortController?.abort()
   }
 
   async loadAllBatches() {
     const skeletons = this.skeletonTargets
     if (skeletons.length === 0) return
+    // a reconnect replaces abortController, this loop keeps its own
+    const signal = this.abortController.signal
 
     const allIds = skeletons.map(el => {
       return el.closest(".message-card").dataset.messageId
     })
 
     for (let i = 0; i < allIds.length; i += this.batchSizeValue) {
+      if (signal.aborted) return
       const batchIds = allIds.slice(i, i + this.batchSizeValue)
-      await this.fetchAndInjectBatch(batchIds)
+      await this.fetchAndInjectBatch(batchIds, signal)
     }
   }
 
-  async fetchAndInjectBatch(ids) {
+  async fetchAndInjectBatch(ids, signal) {
     const url = `${this.urlValue}?ids=${ids.join(",")}`
     try {
-      const response = await fetch(url)
+      const response = await fetch(url, { signal })
       if (!response.ok) return
       const html = await response.text()
       this.injectBatch(html)
     } catch (e) {
+      if (e.name === "AbortError") return
       console.warn("batch load failed", e)
     }
   }
