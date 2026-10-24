@@ -22,7 +22,11 @@ class User < ApplicationRecord
 
   enum :mention_restriction, { anyone: "anyone", teammates_only: "teammates_only" }, default: :anyone
 
-  scope :active, -> { where(deleted_at: nil) }
+  UNVERIFIED_TTL = 3.days
+
+  scope :verified, -> { where.not(verified_at: nil) }
+  scope :unverified, -> { where(verified_at: nil) }
+  scope :active, -> { verified.where(deleted_at: nil) }
 
   scope :matching, ->(query) {
     like = "%#{ActiveRecord::Base.sanitize_sql_like(query.to_s.strip)}%"
@@ -71,21 +75,37 @@ class User < ApplicationRecord
     team_ids.intersect?(other_user.team_ids)
   end
 
-  attr_accessor :skip_name_reservation
-
   validates :username, format: { with: /\A[a-zA-Z0-9_\-\.]+\z/, allow_blank: true }
   validates :username, uniqueness: { allow_blank: true, case_sensitive: false }
   validates :username, presence: true, on: :registration
+  validates :password, presence: true, confirmation: true, on: :registration
   validate :username_available_in_reservations
 
   before_save :release_old_username_reservation
   after_save :reserve_username
   after_destroy :release_name_reservation
 
+  def verified?
+    verified_at.present?
+  end
+
+  def self.cleanup_unverified!(older_than: UNVERIFIED_TTL)
+    unverified.where(deleted_at: nil).where("created_at < ?", older_than.ago).find_each do |user|
+      transaction do
+        person = user.person
+        UserToken.where(user_id: user.id).delete_all
+        user.destroy!
+        person.destroy! if person && !person.aliases.exists? && !User.where(person_id: person.id).exists?
+      end
+    rescue ActiveRecord::InvalidForeignKey => e
+      Rails.logger.warn("Unverified user #{user.id} cleanup failed: #{e.message}")
+    end
+  end
+
   private
 
   def username_available_in_reservations
-    return if username.blank? || !will_save_change_to_username? || skip_name_reservation
+    return if username.blank? || !will_save_change_to_username?
 
     if NameReservation.reserved?(username)
       errors.add(:username, "is reserved")
@@ -106,7 +126,7 @@ class User < ApplicationRecord
   end
 
   def reserve_username
-    return if username.blank? || skip_name_reservation
+    return if username.blank?
     NameReservation.reserve!(name: username, owner: self)
   end
 

@@ -17,6 +17,7 @@ namespace :dev do
       user.assign_attributes(
         admin: true,
         deleted_at: nil,
+        verified_at: user.verified_at || Time.current,
         password: password,
         password_confirmation: password
       )

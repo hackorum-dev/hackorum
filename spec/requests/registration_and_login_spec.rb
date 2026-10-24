@@ -43,62 +43,101 @@ RSpec.describe 'Registration and Login', type: :request do
       expect(al.verified_at).to be_present
     end
 
-    it 'reserves username during registration request' do
+    it 'creates an unverified user with username reservation on registration' do
       perform_enqueued_jobs do
         post registration_path, params: { email: 'new@example.com', name: 'New Person', username: 'reserved', password: 'secret', password_confirmation: 'secret' }
         expect(response).to redirect_to(root_path)
       end
 
-      # Username should be reserved for the token
-      token = UserToken.order(:created_at).last
+      user = User.find_by(username: 'reserved')
+      expect(user).to be_present
+      expect(user).not_to be_verified
+      expect(user.aliases).to be_empty
       reservation = NameReservation.find_by(name: 'reserved')
-      expect(reservation).to be_present
-      expect(reservation.owner_type).to eq('UserToken')
-      expect(reservation.owner_id).to eq(token.id)
-    end
-
-    it 'transfers username reservation to user on verification' do
-      perform_enqueued_jobs do
-        post registration_path, params: { email: 'new@example.com', name: 'New Person', username: 'transfer', password: 'secret', password_confirmation: 'secret' }
-        expect(response).to redirect_to(root_path)
-      end
-
-      raw = extract_raw_token_from_mailer
-      get verification_path(token: raw)
-      expect(response).to redirect_to(root_path)
-
-      user = User.order(:created_at).last
-      reservation = NameReservation.find_by(name: 'transfer')
-      expect(reservation).to be_present
       expect(reservation.owner_type).to eq('User')
       expect(reservation.owner_id).to eq(user.id)
+      expect(UserToken.find_by(user_id: user.id, purpose: 'register').email).to eq('new@example.com')
     end
 
-    it 'prevents race condition where username is taken during verification' do
+    it 'verifies the user on token use' do
+      perform_enqueued_jobs do
+        post registration_path, params: { email: 'new@example.com', username: 'verifyme', password: 'secret', password_confirmation: 'secret' }
+      end
+
+      get verification_path(token: extract_raw_token_from_mailer)
+      expect(response).to redirect_to(root_path)
+
+      user = User.find_by(username: 'verifyme')
+      expect(user).to be_verified
+      expect(user.aliases.first.name).to eq('new@example.com')
+    end
+
+    it 'moves the user onto the archive person and drops the placeholder' do
+      al = create(:alias, email: 'archived@example.com', user: nil)
+      archive_person = al.person
+
+      perform_enqueued_jobs do
+        post registration_path, params: { email: 'archived@example.com', username: 'archived', password: 'secret', password_confirmation: 'secret' }
+      end
+      placeholder_id = User.find_by(username: 'archived').person_id
+      expect(placeholder_id).not_to eq(archive_person.id)
+
+      get verification_path(token: extract_raw_token_from_mailer)
+
+      user = User.find_by(username: 'archived')
+      expect(user.person_id).to eq(archive_person.id)
+      expect(Person.exists?(placeholder_id)).to be(false)
+    end
+
+    it 'rejects verification when email got claimed meanwhile' do
+      perform_enqueued_jobs do
+        post registration_path, params: { email: 'claimed@example.com', username: 'late', password: 'secret', password_confirmation: 'secret' }
+      end
+      owner = create(:user)
+      create(:alias, email: 'claimed@example.com', user: owner, person: owner.person)
+
+      get verification_path(token: extract_raw_token_from_mailer)
+      expect(response).to redirect_to(new_session_path)
+      expect(User.find_by(username: 'late')).not_to be_verified
+    end
+
+    it 'rejects a username held by a pending registration' do
       perform_enqueued_jobs do
         post registration_path, params: { email: 'first@example.com', username: 'racetest', password: 'secret', password_confirmation: 'secret' }
         expect(response).to redirect_to(root_path)
       end
 
-      # Try to register with same username from different email - should fail
       perform_enqueued_jobs do
-        post registration_path, params: { email: 'second@example.com', username: 'racetest', password: 'secret', password_confirmation: 'secret' }
+        post registration_path, params: { email: 'second@example.com', username: 'RaceTest', password: 'secret', password_confirmation: 'secret' }
         expect(response).to redirect_to(registration_path)
-        expect(flash[:alert]).to match(/already taken/i)
+        expect(flash[:alert]).to match(/taken/i)
       end
     end
 
-    it 'releases username reservation when token is destroyed' do
-      perform_enqueued_jobs do
-        post registration_path, params: { email: 'cleanup@example.com', username: 'cleanup', password: 'secret', password_confirmation: 'secret' }
-        expect(response).to redirect_to(root_path)
+    [
+      [ 'password mismatch', { password_confirmation: 'other' }, /confirmation/i ],
+      [ 'blank password', { password: '', password_confirmation: '' }, /password can't be blank/i ],
+      [ 'blank username', { username: '' }, /username can't be blank/i ],
+      [ 'invalid username', { username: 'bad name!' }, /username is invalid/i ],
+      [ 'reserved username', { username: 'global' }, /reserved/i ],
+      [ 'invalid email', { email: 'nope' }, /valid email/i ]
+    ].each do |label, override, message|
+      it "rejects #{label} without creating records" do
+        params = { email: 'x@example.com', username: 'someone', password: 'secret', password_confirmation: 'secret' }.merge(override)
+        expect {
+          post registration_path, params: params
+        }.not_to change { [ User.count, Person.count, UserToken.count, NameReservation.count ] }
+        expect(response).to redirect_to(registration_path)
+        expect(flash[:alert]).to match(message)
       end
+    end
 
-      token = UserToken.order(:created_at).last
-      expect(NameReservation.find_by(name: 'cleanup')).to be_present
-
-      token.destroy
-      expect(NameReservation.find_by(name: 'cleanup')).to be_nil
+    it 'does not treat unverified users as signed in' do
+      perform_enqueued_jobs do
+        post registration_path, params: { email: 'pending@example.com', username: 'pending', password: 'secret', password_confirmation: 'secret' }
+      end
+      expect(User.active.find_by(username: 'pending')).to be_nil
+      expect(Person.registered.where(id: User.find_by(username: 'pending').person_id)).to be_empty
     end
   end
 

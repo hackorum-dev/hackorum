@@ -19,11 +19,11 @@ class Person < ApplicationRecord
   }
 
   scope :registered, -> {
-    where("EXISTS (SELECT 1 FROM users WHERE users.person_id = people.id AND users.deleted_at IS NULL)")
+    where("EXISTS (SELECT 1 FROM users WHERE users.person_id = people.id AND users.deleted_at IS NULL AND users.verified_at IS NOT NULL)")
   }
 
   scope :unregistered, -> {
-    where("NOT EXISTS (SELECT 1 FROM users WHERE users.person_id = people.id AND users.deleted_at IS NULL)")
+    where("NOT EXISTS (SELECT 1 FROM users WHERE users.person_id = people.id AND users.deleted_at IS NULL AND users.verified_at IS NOT NULL)")
   }
 
   scope :with_senders, -> {

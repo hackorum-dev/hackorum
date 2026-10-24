@@ -8,7 +8,7 @@ module Settings
       authorize_invite!
       return if performed?
       username = params[:username].to_s.strip
-      user = User.find_by(username: username)
+      user = User.active.find_by(username: username)
       return redirect_to settings_team_path(@team), alert: "User not found" unless user
 
       TeamMember.add_member(team: @team, user:, role: :member)

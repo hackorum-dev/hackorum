@@ -20,53 +20,42 @@ class VerificationsController < ApplicationController
   private
 
   def handle_register(token)
+    user = token.user
+    if user.nil? || user.verified? || user.deleted_at.present?
+      return redirect_to root_path, alert: "Invalid or expired token"
+    end
+
     existing_aliases = Alias.by_email(token.email)
     if existing_aliases.where.not(user_id: nil).exists?
       return redirect_to new_session_path, alert: "This email is already claimed. Please sign in."
     end
 
-    person = Person.find_or_create_by_email(token.email)
-    user = User.new(person_id: person.id)
     metadata = JSON.parse(token.metadata || "{}") rescue {}
-    desired_username = metadata["username"]
-    user.username = desired_username
-    user.skip_name_reservation = true
-    if metadata["password_digest"].present?
-      user.password_digest = metadata["password_digest"]
-    end
 
     ActiveRecord::Base.transaction do
-      user.save!(context: :registration)
+      archive_person = Person.find_by_email(token.email)
+      if archive_person && archive_person.id != user.person_id
+        placeholder = user.person
+        user.update!(person: archive_person)
+        placeholder.destroy! unless placeholder.aliases.exists?
+      end
+      person = user.person
+      user.update!(verified_at: Time.current)
 
-      reservation = NameReservation.find_by(
-        owner_type: "UserToken",
-        owner_id: token.id,
-        name: NameReservation.normalize(desired_username)
-      )
-      if reservation
-        reservation.update!(owner_type: "User", owner_id: user.id)
-      else
-        begin
-          NameReservation.reserve!(name: desired_username, owner: user)
-        rescue ActiveRecord::RecordInvalid
-          raise ActiveRecord::RecordInvalid.new(user), "Username is already taken."
+      if existing_aliases.exists?
+        existing_aliases.find_each do |al|
+          person.attach_alias!(al, user: user)
+          al.update_columns(verified_at: Time.current)
         end
+        if person.default_alias_id.nil?
+          primary = existing_aliases.find_by(primary_alias: true) || existing_aliases.first
+          person.update!(default_alias_id: primary.id) if primary
+        end
+      else
+        name = metadata["name"].presence || token.email
+        al = Alias.create!(person: person, user: user, name: name, email: token.email, verified_at: Time.current)
+        person.update!(default_alias_id: al.id) if person.default_alias_id.nil?
       end
-    end
-
-    if existing_aliases.exists?
-      existing_aliases.find_each do |al|
-        person.attach_alias!(al, user: user)
-        al.update_columns(verified_at: Time.current)
-      end
-      if person.default_alias_id.nil?
-        primary = existing_aliases.find_by(primary_alias: true) || existing_aliases.first
-        person.update!(default_alias_id: primary.id) if primary
-      end
-    else
-      name = metadata["name"] || token.email
-      al = Alias.create!(person: person, user: user, name: name, email: token.email, verified_at: Time.current)
-      person.update!(default_alias_id: al.id) if person.default_alias_id.nil?
     end
 
     reset_session

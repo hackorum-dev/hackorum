@@ -79,7 +79,7 @@ class OmniauthCallbacksController < ApplicationController
         return redirect_to new_session_path, alert: "That Google account is already associated with an existing user. Link it from Settings instead."
       end
       person = Person.find_or_create_by_email(email)
-      user = User.create!(person_id: person.id)
+      user = User.create!(person_id: person.id, verified_at: Time.current)
 
       ensure_alias_verified(person, user, email, info["name"])
 
