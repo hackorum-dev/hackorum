@@ -374,4 +374,32 @@ RSpec.describe Search::QueryParser, type: :service do
       # Note: 'from:john OR OR' is valid - the second OR is parsed as plain text
     end
   end
+
+  describe 'regressions' do
+    it 'treats words starting with or as plain words' do
+      result = parser.parse('postgres oracle')
+      expect(result[:type]).to eq(:and)
+      expect(result[:children].map { |c| c[:value] }).to eq(%w[postgres oracle])
+    end
+
+    it 'keeps negation on nested groups of the same type' do
+      result = parser.parse('x OR -(y OR z)')
+      expect(result[:children].size).to eq(2)
+      expect(result[:children].last).to include(type: :or, negated: true)
+
+      result = parser.parse('a -(b c)')
+      expect(result[:children].last).to include(type: :and, negated: true)
+    end
+
+    it 'accepts pasted text with colons and commas' do
+      expect(parser.parse('ERROR: deadlock detected')[:children].first[:value]).to eq('ERROR:')
+      expect { parser.parse('foo, bar') }.not_to raise_error
+      expect { parser.parse('Re: foo') }.not_to raise_error
+    end
+
+    it 'rejects deep nesting and huge input without blowing the stack' do
+      expect { parser.parse('(' * 1000 + 'a' + ')' * 1000) }.to raise_error(Search::QueryParser::TooComplex)
+      expect { parser.parse('a ' * 2000) }.to raise_error(Search::QueryParser::TooComplex)
+    end
+  end
 end

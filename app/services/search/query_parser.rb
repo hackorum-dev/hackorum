@@ -20,11 +20,11 @@ module Search
       end
 
       # Word characters (no spaces, parens, quotes, colons at end, no brackets for dependent conditions)
-      rule(:word_char) { match('[^\s()":,\[\]]') }
+      rule(:word_char) { match('[^\s()":\[\]]') }
 
-      # A word - sequence of word chars, may contain internal colons (like URLs)
+      # A word - sequence of word chars, may contain colons (URLs, "Re:", "ERROR:")
       rule(:word) do
-        (word_char >> (word_char | str(":") >> word_char.present?).repeat).as(:word)
+        (word_char >> (word_char | str(":")).repeat).as(:word)
       end
 
       # Bracketed text (treated as plain text, not dependent conditions)
@@ -118,7 +118,8 @@ module Search
       # AND operator (explicit only - implicit handled separately)
       # Case-insensitive matching for boolean operators
       rule(:and_keyword) { (str("A") | str("a")) >> (str("N") | str("n")) >> (str("D") | str("d")) }
-      rule(:or_keyword) { (str("O") | str("o")) >> (str("R") | str("r")) }
+      # whole word only: "oracle" or "order" is a plain word
+      rule(:or_keyword) { (str("O") | str("o")) >> (str("R") | str("r")) >> (space | any.absent?).present? }
 
       # AND expression: terms joined by AND or space (implicit AND)
       rule(:and_expression) do
@@ -275,6 +276,11 @@ module Search
       end
     end
 
+    # recursive descent: deep nesting overflows the stack, long input is slow
+    class TooComplex < Parslet::ParseFailed; end
+    MAX_LENGTH = 2000
+    MAX_DEPTH = 20
+
     def initialize
       @grammar = Grammar.new
       @transform = Transform.new
@@ -282,8 +288,14 @@ module Search
 
     def parse(query_string)
       return nil if query_string.blank?
+      raise TooComplex, "Query is too long" if query_string.length > MAX_LENGTH
+      raise TooComplex, "Query is nested too deeply" if nesting_depth(query_string) > MAX_DEPTH
 
-      tree = @grammar.parse(query_string)
+      tree = begin
+        @grammar.parse(query_string)
+      rescue SystemStackError
+        raise TooComplex, "Query is too complex"
+      end
       ast = @transform.apply(tree)
 
       return nil if ast.nil? || ast == "" || ast == {}
@@ -300,13 +312,29 @@ module Search
 
     private
 
+    def nesting_depth(query_string)
+      depth = max = 0
+      quoted = false
+      query_string.each_char do |c|
+        if c == '"'
+          quoted = !quoted
+        elsif !quoted && c == "("
+          depth += 1
+          max = depth if depth > max
+        elsif !quoted && c == ")"
+          depth -= 1
+        end
+      end
+      max
+    end
+
     def normalize_ast(node)
       return node unless node.is_a?(Hash)
 
       if node[:type] == :and || node[:type] == :or
         children = node[:children].map { |c| normalize_ast(c) }
         children = children.flat_map do |c|
-          if c.is_a?(Hash) && c[:type] == node[:type]
+          if c.is_a?(Hash) && c[:type] == node[:type] && !c[:negated]
             c[:children]
           else
             [ c ]

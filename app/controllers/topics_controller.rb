@@ -905,6 +905,8 @@ class TopicsController < ApplicationController
   end
 
   def format_parse_error(error)
+    return error.message if error.is_a?(Search::QueryParser::TooComplex)
+
     # Extract user-friendly error message from Parslet error
     cause = error.parse_failure_cause
     if cause
