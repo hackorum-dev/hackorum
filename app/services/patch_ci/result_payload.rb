@@ -12,6 +12,9 @@ module PatchCi
     SCHEMA = 1
     INT4_MAX = 2_147_483_647
     INT8_MAX = 9_223_372_036_854_775_807
+    # a payload is written at the end of a run: anything in-flight would park
+    # the row as running until the stuck marker gave up on it
+    PAYLOAD_STATUSES = (PatchCiRun::TERMINAL_STATUSES - %w[cancelled]).freeze
 
     attr_reader :error, :raw
 
@@ -89,7 +92,7 @@ module PatchCi
 
       @data = parsed
       return fail!("unsupported schema: #{parsed['schema'].inspect}") unless parsed["schema"] == SCHEMA
-      return fail!("unknown status: #{parsed['status'].inspect}") unless PatchCiRun::STATUSES.include?(parsed["status"])
+      return fail!("unknown status: #{parsed['status'].inspect}") unless PAYLOAD_STATUSES.include?(parsed["status"])
 
       @raw = parsed
       nil

@@ -67,6 +67,12 @@ RSpec.describe PatchCi::ResultPayload do
     expect(result.error).to include("schema")
   end
 
+  it "rejects non-terminal statuses" do
+    result = described_class.parse(valid_json(status: "running"))
+
+    expect(result).not_to be_valid
+  end
+
   it "rejects an unknown status" do
     result = described_class.parse(valid_json(status: "rm -rf"))
 
