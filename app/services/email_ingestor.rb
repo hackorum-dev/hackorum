@@ -6,8 +6,12 @@ class EmailIngestor
 
     message_id = clean_reference(m.message_id)
     message_id = nil if message_id.blank?
-    return nil unless message_id
-    sent_at = trust_date ? m.date : sanitize_email_date(m.date, m[:date], message_id)
+    unless message_id
+      Rails.logger.warn("EmailIngestor: skipping mail without Message-ID (subject: #{m.subject.inspect})")
+      return nil
+    end
+    # an unparseable Date: comes back as a String even when trusted
+    sent_at = trust_date && m.date.respond_to?(:utc) ? m.date : sanitize_email_date(m.date, m[:date], message_id)
 
     body = normalize_body(extract_body(m))
     reply_to_message_id = m.in_reply_to ? clean_reference(m.in_reply_to) : nil
@@ -40,7 +44,7 @@ class EmailIngestor
     to = create_users(m[:to], sent_at)
     cc = create_users(m[:cc], sent_at)
 
-    subject = m.subject || "No title"
+    subject = (m.subject || "No title").delete("\0")
 
     reply_to_msg, import_log = resolve_threading(m, reply_to_message_id, import_log)
     if fallback_threading && reply_to_msg.nil? && subject.present? && subject.match?(/\A\s*(re|aw|fwd):/i)
@@ -57,7 +61,10 @@ class EmailIngestor
     import_log = nil if import_log == ""
 
     begin
-      msg = Message.create!(
+      # savepoint: callers may hold an outer transaction, which a failed
+      # insert would otherwise abort before the rescue can look up the winner
+      msg = Message.transaction(requires_new: true) do
+        Message.create!(
         topic: topic,
         sender: from[0],
         sender_person_id: from[0].person_id,
@@ -68,7 +75,8 @@ class EmailIngestor
         created_at: sent_at,
         message_id: message_id,
         import_log: import_log
-      )
+        )
+      end
     rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
       raise unless message_id && (e.is_a?(ActiveRecord::RecordNotUnique) || e.message.include?("Message has already been taken"))
       existing_message = Message.find_by(message_id: message_id)
@@ -81,8 +89,7 @@ class EmailIngestor
 
     update_default_alias_for_person(msg.sender)
 
-    add_mentions(msg, to)
-    add_mentions(msg, cc)
+    add_mentions(msg, (to + cc).uniq(&:id))
 
     handle_attachments(m, msg)
     # attachment callbacks already recompute; only needed for inline-only diffs
@@ -190,7 +197,7 @@ class EmailIngestor
 
       Attachment.create!(
         message: msg,
-        file_name: a.filename,
+        file_name: a.filename&.delete("\0"),
         content_type: a[:content_type].decoded,
         body: Base64.encode64(a.decoded)
       )
@@ -209,7 +216,8 @@ class EmailIngestor
       references = m.references
       references = [] unless references
       references = [ references ] if references.is_a?(String)
-      references.each do |ref|
+      # nearest ancestor first
+      references.reverse_each do |ref|
         reply_to_msg = Message.find_by_message_id(clean_reference(ref))
         break if reply_to_msg
         import_log += "Reference msg id not found: #{clean_reference(ref)}" unless reply_to_msg
@@ -221,8 +229,9 @@ class EmailIngestor
 
   def extract_body(m)
     body = nil
-    body = lookup_main_part(m.parts) if m.parts.size.positive?
-    unless body
+    if m.parts.size.positive?
+      body = lookup_main_part(m.parts).presence || html_part_text(m.parts)
+    else
       begin
         body = m.decoded
       rescue => e
@@ -242,7 +251,19 @@ class EmailIngestor
     text
   end
 
-  def create_users(fields, created_at, limit = 0)
+  def html_part_text(parts)
+    parts.each do |p|
+      if p.parts.size > 0
+        text = html_part_text(p.parts)
+        return text if text
+      elsif p.content_type&.match?(/text\/html/) && !p.attachment?
+        return Nokogiri::HTML(p.decoded).text.strip.presence
+      end
+    end
+    nil
+  end
+
+  def create_users(fields, created_at, limit = nil)
     return [] unless fields
     addresses = nil
     begin
@@ -253,11 +274,11 @@ class EmailIngestor
     users = []
     count = 0
     addresses.each_index do |idx|
-      break if count > limit
+      break if limit && count >= limit
       count += 1
       display_names = fields.respond_to?(:display_names) ? (fields.display_names || []) : []
       name_or_alias = display_names[idx]
-      name_or_alias = name_or_alias.to_s.strip
+      name_or_alias = name_or_alias.to_s.delete("\0").strip
       name_or_alias = "Noname" if name_or_alias.blank?
       email = addresses[idx]
       next if email.nil? || email.empty?

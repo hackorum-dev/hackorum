@@ -4,6 +4,8 @@ module MessageIdNormalizer
   def self.normalize(ref)
     return "" if ref.nil?
 
+    # Mail splits multi-id and "Your message of ... <id>" headers into words
+    ref = ref.reverse.find { |r| r.to_s.include?("@") } || ref.last if ref.is_a?(Array)
     ref_str = ref.to_s
 
     if ref_str.include?("<")

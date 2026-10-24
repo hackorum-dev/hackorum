@@ -34,7 +34,7 @@ module Dev
     end
 
     def ingest!(mail)
-      EmailIngestor.new.ingest_raw(mail.to_s)
+      EmailIngestor.new.ingest_raw(mail.to_s, mailing_list: MailingList.order(:id).first!)
     end
 
     def generate_and_ingest!(sent_at: Time.current)

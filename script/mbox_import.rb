@@ -133,3 +133,4 @@ ARGV.each do |fn|
     end
   end
 end
+parse_message(message, update_existing: update_existing, mailing_list: mailing_list) unless message.empty?

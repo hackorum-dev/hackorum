@@ -502,4 +502,66 @@ RSpec.describe EmailIngestor do
       expect(topic.reload.last_message_at).to eq(before)
     end
   end
+
+  describe "#ingest_raw header edge cases" do
+    let(:list) { create(:mailing_list) }
+    let(:ingestor) { described_class.new }
+
+    def raw(headers, body = "hello\n")
+      "From: Alice <alice@example.com>\nTo: list@example.com\nSubject: Topic\n#{headers}\n\n#{body}"
+    end
+
+    it "threads multi-id and prose In-Reply-To headers" do
+      parent = ingestor.ingest_raw(raw("Message-ID: <p1@x>"), mailing_list: list)
+      a = ingestor.ingest_raw(raw("Message-ID: <c1@x>\nIn-Reply-To: <zz@x> <p1@x>"), mailing_list: list)
+      b = ingestor.ingest_raw(raw("Message-ID: <c2@x>\nIn-Reply-To: Your message of Mon <p1@x>"), mailing_list: list)
+
+      expect(a.reply_to_message_id).to eq("p1@x")
+      expect(b.reply_to).to eq(parent)
+    end
+
+    it "uses the nearest known reference" do
+      root = ingestor.ingest_raw(raw("Message-ID: <r@x>"), mailing_list: list)
+      mid = ingestor.ingest_raw(raw("Message-ID: <m@x>\nIn-Reply-To: <r@x>"), mailing_list: list)
+      leaf = ingestor.ingest_raw(raw("Message-ID: <l@x>\nReferences: <r@x> <m@x>"), mailing_list: list)
+
+      expect(leaf.reply_to).to eq(mid)
+      expect(root).to be_present
+    end
+
+    it "mentions every To and Cc address once" do
+      msg = ingestor.ingest_raw(raw("Message-ID: <cc@x>\nCc: bob@example.com, carol@example.com, Alice <alice2@example.com>"), mailing_list: list)
+
+      expect(msg.mentions.map { |m| m.alias.email }).to contain_exactly("list@example.com", "bob@example.com", "carol@example.com", "alice2@example.com")
+    end
+
+    it "falls back to the html part when there is no text part" do
+      html = <<~MAIL
+        Message-ID: <html@x>
+        MIME-Version: 1.0
+        Content-Type: multipart/alternative; boundary="b"
+
+        --b
+        Content-Type: text/html; charset=UTF-8
+
+        <p>Hello <b>world</b></p>
+        --b--
+      MAIL
+      msg = ingestor.ingest_raw(raw(html.chomp, ""), mailing_list: list)
+
+      expect(msg.body).to include("Hello world")
+    end
+
+    it "strips NUL from encoded subjects" do
+      msg = ingestor.ingest_raw(raw("Message-ID: <nul@x>").sub("Subject: Topic", "Subject: =?UTF-8?Q?hi=00there?="), mailing_list: list)
+
+      expect(msg.subject).to eq("hithere")
+    end
+
+    it "does not crash on an unparseable trusted Date" do
+      msg = ingestor.ingest_raw(raw("Message-ID: <date@x>\nDate: Mon, 32 Foo 2024 99:99:99"), mailing_list: list, trust_date: true)
+
+      expect(msg).to be_persisted
+    end
+  end
 end
