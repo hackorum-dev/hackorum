@@ -2,6 +2,11 @@ class SessionsController < ApplicationController
   rate_limit to: 10, within: 3.minutes, only: :create,
     with: -> { redirect_to new_session_path, alert: "Too many attempts. Try again later." }
 
+  DUMMY_DIGEST = BCrypt::Password.create(
+    SecureRandom.hex(16),
+    cost: ActiveModel::SecurePassword.min_cost ? BCrypt::Engine::MIN_COST : BCrypt::Engine.cost
+  ).to_s
+
   def new
   end
 
@@ -15,7 +20,12 @@ class SessionsController < ApplicationController
     user = normalized_email && Alias.by_email(normalized_email).includes(:user).first&.user
     verified_alias = user&.aliases&.where&.not(verified_at: nil)&.exists?
 
-    if user.nil? || !user.authenticate(params[:password])
+    if user.nil? || user.password_digest.blank?
+      # same bcrypt cost as a real check, timing must not tell registered emails apart
+      BCrypt::Password.new(DUMMY_DIGEST).is_password?(params[:password].to_s)
+      flash.now[:alert] = "Invalid email or password"
+      render :new, status: :unauthorized
+    elsif !user.authenticate(params[:password])
       flash.now[:alert] = "Invalid email or password"
       render :new, status: :unauthorized
     elsif !verified_alias

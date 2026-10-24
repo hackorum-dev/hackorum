@@ -37,6 +37,7 @@ class PasswordsController < ApplicationController
       token.consume!
       updated = user.save(context: :password_change)
       raise ActiveRecord::Rollback unless updated
+      UserToken.unconsumed.where(user: user, purpose: "reset_password").update_all(consumed_at: Time.current)
     end
 
     if updated

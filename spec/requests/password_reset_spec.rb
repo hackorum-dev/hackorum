@@ -45,6 +45,16 @@ RSpec.describe 'Password reset', type: :request do
     expect(user.reload.authenticate('newsecret')).to be_truthy
   end
 
+  it 'invalidates other reset tokens once one is used' do
+    user = create(:user, password: 'oldsecret', password_confirmation: 'oldsecret')
+    _, first = UserToken.issue!(purpose: 'reset_password', user: user, email: 'x@example.com', ttl: 30.minutes)
+    _, second = UserToken.issue!(purpose: 'reset_password', user: user, email: 'x@example.com', ttl: 30.minutes)
+
+    patch password_path, params: { token: first, password: 'newsecret', password_confirmation: 'newsecret' }
+    expect(response).to redirect_to(new_session_path)
+    expect(UserToken.find_usable(second, purpose: 'reset_password')).to be_nil
+  end
+
   it 'rejects edit with an invalid token' do
     get edit_password_path(token: 'bogus')
     expect(response).to redirect_to(new_password_path)

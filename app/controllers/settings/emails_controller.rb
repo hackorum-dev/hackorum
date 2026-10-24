@@ -7,6 +7,9 @@ module Settings
 
     def create
       email = EmailNormalizer.normalize(params[:email])
+      unless email&.match?(URI::MailTo::EMAIL_REGEXP)
+        return redirect_to settings_account_path, alert: "A valid email is required."
+      end
       name = params[:name].presence
 
       if Alias.claimed_by_other?(email, current_user)

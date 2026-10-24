@@ -46,6 +46,17 @@ RSpec.describe 'Emails management', type: :request do
     expect(response).to redirect_to(root_path)
   end
 
+  it 'rejects malformed emails' do
+    user = create(:user, password: 'secret', password_confirmation: 'secret')
+    attach_verified_alias(user, email: 'me@example.com')
+    sign_in(email: 'me@example.com')
+
+    expect {
+      post settings_emails_path, params: { email: 'not an email', name: 'X' }
+    }.not_to change(UserToken, :count)
+    expect(response).to redirect_to(settings_account_path)
+  end
+
   it 'blocks adding an email owned by another user' do
     other = create(:user)
     attach_verified_alias(other, email: 'taken@example.com')
