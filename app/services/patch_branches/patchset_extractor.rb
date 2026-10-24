@@ -156,7 +156,7 @@ module PatchBranches
       path
     end
 
-    # Same ordering as hackorum-patch: 4+ digit series number, then the rest.
+    # 4+ digit series number first, then the rest.
     def sort_patch_files(files)
       files.sort_by do |f|
         basename = File.basename(f)

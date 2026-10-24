@@ -144,8 +144,6 @@ Rails.application.routes.draw do
   # Help pages
   resources :help, only: [ :index, :show ], param: :slug
 
-  # Script version endpoint
-  get "scripts/:name/version", to: "scripts#version", as: :script_version
   # must precede the person/*email glob - it would otherwise swallow /commits
   # into the email itself
   get "person/*email/commits/contributions/:year", to: "person_commits#contributions", as: :person_commit_contributions, format: false

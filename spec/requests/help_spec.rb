@@ -9,22 +9,21 @@ RSpec.describe "Help", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Help")
-      expect(response.body).to include("hackorum-patch")
+      expect(response.body).to include("Advanced Search Guide")
     end
   end
 
   describe "GET /help/:slug" do
     context "with valid slug" do
       it "returns the help page" do
-        get help_path("hackorum-patch")
+        get help_path("search")
 
         expect(response).to have_http_status(:ok)
-        expect(response.body).to include("Applying Patches")
-        expect(response.body).to include("hackorum-patch")
+        expect(response.body).to include("Advanced Search Guide")
       end
 
       it "renders markdown content as HTML" do
-        get help_path("hackorum-patch")
+        get help_path("search")
 
         expect(response.body).to include("<h1")
         expect(response.body).to include("<code>")
