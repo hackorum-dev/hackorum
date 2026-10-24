@@ -3,7 +3,7 @@
 
 - if @topics.size == 25
   - last_topic = @topics.last
-  - cursor = "#{last_topic.last_activity.iso8601}_#{last_topic.id}"
+  - cursor = "#{last_topic.last_activity.iso8601(6)}_#{last_topic.id}"
   = turbo_stream.replace "pagination" do
     = turbo_frame_tag "pagination", src: topics_path(cursor: cursor, viewing_since: @viewing_since.iso8601, format: :turbo_stream), loading: :lazy, data: { controller: "prefetch-frame" } do
       .loading-indicator Loading more topics...
