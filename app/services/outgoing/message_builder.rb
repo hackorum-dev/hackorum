@@ -13,9 +13,11 @@ module Outgoing
       domain     = ENV.fetch("HACKORUM_OUTGOING_DOMAIN", DEFAULT_DOMAIN)
       msg_id     = "<#{SecureRandom.uuid}@#{domain}>"
 
-      from_addr = draft.sender_alias
+      from_addr = Mail::Address.new
+      from_addr.address = draft.sender_alias.email
+      from_addr.display_name = draft.sender_alias.name
       mail = Mail.new do
-        from       "#{from_addr.name} <#{from_addr.email}>"
+        from       from_addr.format
         to         recipients.to
         subject    draft.subject
         message_id msg_id

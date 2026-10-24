@@ -74,6 +74,13 @@ RSpec.describe Outgoing::MessageBuilder do
     end
   end
 
+  it 'quotes sender names with commas and parens' do
+    sender.update!(name: 'Doe, John (PG)')
+    mail = Mail.new(described_class.build(build_draft).encoded)
+    expect(mail.from).to eq([ 'a@b' ])
+    expect(mail[:from].display_names).to eq([ 'Doe, John (PG)' ])
+  end
+
   it 'omits ancestors with nil message_id from References' do
     orphan = create(:message, topic: topic, message_id: nil)
     parent.update!(reply_to: orphan, reply_to_message_id: nil)

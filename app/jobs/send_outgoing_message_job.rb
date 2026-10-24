@@ -23,7 +23,8 @@ class SendOutgoingMessageJob < ApplicationJob
     msg = nil
     Message.transaction do
       msg = Message.create!(
-        topic:                draft.topic,
+        # the parent's topic, not draft.topic: that may have been merged away
+        topic:                draft.reply_to_message.topic,
         sender:               draft.sender_alias,
         sender_person_id:     draft.sender_alias.person_id,
         reply_to:             draft.reply_to_message,
