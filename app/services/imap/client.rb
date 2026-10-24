@@ -100,9 +100,15 @@ module Imap
     start = uid.to_i + 1
     last = max_uid
     return [] if last.nil? || last < start
-    finish = [ last, start + batch_size - 1 ].min
-    data = @imap.uid_fetch("#{start}:#{finish}", [ "UID" ])
-    (data || []).map { |d| d.attr["UID"] }.compact.sort
+    # gaps of batch_size or more (expunged or relabelled mail) must not
+    # look like the end of the mailbox
+    loop do
+      finish = [ last, start + batch_size - 1 ].min
+      data = @imap.uid_fetch("#{start}:#{finish}", [ "UID" ])
+      uids = (data || []).map { |d| d.attr["UID"] }.compact.sort
+      return uids if uids.any? || finish >= last
+      start = finish + 1
+    end
   end
 
   # Returns the highest UID in the selected mailbox/label, or 0 if empty

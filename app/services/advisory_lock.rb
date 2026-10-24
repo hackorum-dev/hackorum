@@ -8,7 +8,10 @@ class AdvisoryLock
   def self.with_lock(key, wait: false)
     a, b = hash_to_two_ints(key)
     acquired = try_lock(a, b, wait: wait)
-    return nil unless acquired
+    unless acquired
+      Rails.logger.info("advisory lock #{key} held elsewhere, skipping")
+      return nil
+    end
     begin
       yield
     ensure

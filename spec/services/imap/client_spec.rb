@@ -27,6 +27,17 @@ RSpec.describe Imap::Client, type: :service do
     expect(uids).to eq([ 101, 102 ])
   end
 
+  it 'skips over empty uid windows' do
+    client = described_class.new(username: 'u', password: 'p', mailbox: 'list-mail')
+    client.connect!
+    allow(imap_double).to receive(:uid_fetch).with("*", [ "UID" ]).and_return([ double('Data', attr: { 'UID' => 950 }) ])
+    allow(imap_double).to receive(:uid_fetch).with("1:200", [ "UID" ]).and_return(nil)
+    allow(imap_double).to receive(:uid_fetch).with("201:400", [ "UID" ]).and_return([])
+    allow(imap_double).to receive(:uid_fetch).with("401:600", [ "UID" ]).and_return([ double('Data', attr: { 'UID' => 450 }) ])
+
+    expect(client.uids_after(0, batch_size: 200)).to eq([ 450 ])
+  end
+
   it 'fetches RFC822 by UID' do
     client = described_class.new(username: 'u', password: 'p', mailbox: 'list-mail')
     client.connect!

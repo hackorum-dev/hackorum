@@ -1,7 +1,13 @@
 # frozen_string_literal: true
 
+require "net/imap"
+
 class ImapIdleRunner
   DEFAULT_IDLE_TIMEOUT = 1500 # 25 minutes (Gmail drops ~29m, we re-IDLE earlier)
+  TRANSIENT_ERRORS = [
+    Net::IMAP::Error, IOError, SystemCallError, OpenSSL::SSL::SSLError, Timeout::Error,
+    ActiveRecord::ConnectionNotEstablished, ActiveRecord::ConnectionFailed
+  ].freeze
 
   def initialize(label: ENV["IMAP_MAILBOX_LABEL"],
                  client: nil,
@@ -92,10 +98,18 @@ class ImapIdleRunner
   end
 
   def reconnect_with_backoff
-    sleep_seconds = [ @backoff, 60 ].min
-    sleep sleep_seconds
-    @backoff = [ @backoff * 2, 60 ].min
-    connect!
+    loop do
+      sleep [ @backoff, 60 ].min
+      @backoff = [ @backoff * 2, 60 ].min
+      begin
+        disconnect!
+        connect!
+        return
+      rescue => e
+        log_warn(event: "reconnect_failed", error_class: e.class.to_s, message: e.message, backoff: @backoff)
+        return if @stop
+      end
+    end
   end
 
   def state
@@ -141,7 +155,10 @@ class ImapIdleRunner
     raw = instrument("imap.fetch", label: @label, uid: uid) do
       @client.uid_fetch_rfc822(uid)
     end
-    return unless raw
+    unless raw
+      state.update!(last_uid: uid, last_checked_at: Time.now)
+      return { ingested: false, attachments: 0 }
+    end
 
     mail = Mail.new(raw)
     mailing_lists = resolve_mailing_lists_from_mail(mail)
@@ -167,6 +184,9 @@ class ImapIdleRunner
     state.update!(last_uid: uid, last_checked_at: Time.now, last_error: nil)
     log_info(event: "ingest", uid: uid, message_id: msg&.message_id, duplicate: msg.nil?, attachments: (msg ? msg.attachments.count : 0))
     { ingested: !msg.nil?, attachments: (msg ? msg.attachments.count : 0) }
+  rescue *TRANSIENT_ERRORS
+    # connection trouble: retry this uid after reconnect instead of skipping it
+    raise
   rescue => e
     log_error(event: "ingest_error", uid: uid, error_class: e.class.to_s, message: e.message)
     state.update!(last_uid: uid, last_checked_at: Time.now, last_error: short_error(e))

@@ -49,6 +49,36 @@ RSpec.describe ImapIdleRunner, type: :service do
       expect(Message.find_by(message_id: 'uid-101@example.com')).to be_present
     end
 
+  describe "error handling" do
+    let!(:default_list) { create(:mailing_list, identifier: "pgsql-test", display_name: "test", email: "you@example.com") }
+
+    before do
+      allow(imap_client).to receive(:connect!).and_return(true)
+      allow(imap_client).to receive(:disconnect!).and_return(true)
+    end
+
+    it "does not advance last_uid past a uid that failed on a connection error" do
+      allow(imap_client).to receive(:uids_after).with(0).and_return([ 301, 302 ])
+      allow(imap_client).to receive(:uid_fetch_rfc822).with(301).and_raise(IOError, "connection closed")
+
+      runner = described_class.new(client: imap_client, label: 'INBOX')
+      expect { runner.run(max_cycles: 0, idle_timeout: 1) }.to raise_error(IOError)
+
+      expect(ImapSyncState.for_label('INBOX').reload.last_uid).to eq(0)
+    end
+
+    it "advances past a uid that is gone from the server" do
+      allow(imap_client).to receive(:uids_after).with(0).and_return([ 401 ])
+      allow(imap_client).to receive(:uids_after).with(401).and_return([])
+      allow(imap_client).to receive(:uid_fetch_rfc822).with(401).and_return(nil)
+
+      runner = described_class.new(client: imap_client, label: 'INBOX')
+      runner.run(max_cycles: 0, idle_timeout: 1)
+
+      expect(ImapSyncState.for_label('INBOX').reload.last_uid).to eq(401)
+    end
+  end
+
   describe "mailbox/label validation" do
     it "accepts INBOX as the label" do
       expect { described_class.new(label: "INBOX", client: imap_client) }.not_to raise_error
