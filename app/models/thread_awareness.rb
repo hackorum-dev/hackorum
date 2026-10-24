@@ -7,12 +7,20 @@ class ThreadAwareness < ApplicationRecord
   validates :aware_until_message_id, :aware_at, presence: true
 
   def self.mark_until(user:, topic:, until_message_id:, aware_at: Time.current)
-    transaction do
-      record = lock.find_or_initialize_by(user:, topic:)
-      record.aware_at = aware_at if record.new_record?
-      record.aware_until_message_id = [ record.aware_until_message_id || 0, until_message_id ].max
-      record.save!
-      record
+    retried = false
+    begin
+      transaction(requires_new: true) do
+        record = lock.find_or_initialize_by(user:, topic:)
+        record.aware_at = aware_at if record.new_record?
+        record.aware_until_message_id = [ record.aware_until_message_id || 0, until_message_id ].max
+        record.save!
+        record
+      end
+    rescue ActiveRecord::RecordNotUnique
+      # concurrent first visit inserted the row, lock it this time
+      raise if retried
+      retried = true
+      retry
     end
   end
 
