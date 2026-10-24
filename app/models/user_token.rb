@@ -1,4 +1,6 @@
 class UserToken < ApplicationRecord
+  class AlreadyConsumed < StandardError; end
+
   PURPOSES = %w[register add_alias reset_password].freeze
 
   belongs_to :user, optional: true
@@ -17,8 +19,12 @@ class UserToken < ApplicationRecord
     Time.current >= expires_at
   end
 
+  # Atomic; call inside the transaction doing the token's action so a failure keeps it usable.
   def consume!
-    update!(consumed_at: Time.current)
+    now = Time.current
+    claimed = self.class.unconsumed.where(id: id).update_all(consumed_at: now, updated_at: now)
+    raise AlreadyConsumed if claimed.zero?
+    self.consumed_at = now
   end
 
   def self.issue!(purpose:, email: nil, user: nil, ttl: 1.hour, metadata: nil)
@@ -35,13 +41,21 @@ class UserToken < ApplicationRecord
     [ record, raw ]
   end
 
-  def self.consume!(raw, purpose: nil)
+  def self.find_usable(raw, purpose: nil)
+    return nil if raw.blank?
     record = find_by(token_digest: digest(raw))
     return nil unless record
     return nil if purpose && record.purpose != purpose
     return nil if record.expired? || record.consumed?
-    record.consume!
     record
+  end
+
+  def self.consume!(raw, purpose: nil)
+    record = find_usable(raw, purpose: purpose)
+    record&.consume!
+    record
+  rescue AlreadyConsumed
+    nil
   end
 
   def self.digest(raw)

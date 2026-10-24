@@ -13,7 +13,8 @@ module Settings
         end
       end
 
-      if user.update(password: params[:password], password_confirmation: params[:password_confirmation])
+      user.assign_attributes(password: params[:password], password_confirmation: params[:password_confirmation])
+      if user.save(context: :password_change)
         redirect_to settings_password_path, notice: "Password updated."
       else
         redirect_to settings_password_path, alert: user.errors.full_messages.to_sentence

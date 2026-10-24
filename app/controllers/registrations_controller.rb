@@ -1,5 +1,30 @@
 class RegistrationsController < ApplicationController
+  rate_limit to: 5, within: 1.hour, only: :resend,
+    with: -> { redirect_to resend_verification_path, alert: "Too many requests. Try again later." }
+
   def new
+  end
+
+  def resend_form
+  end
+
+  def resend
+    email = EmailNormalizer.normalize(params[:email])
+    pending = email && UserToken.unconsumed
+      .where(purpose: "register", email: email)
+      .joins(:user).merge(User.unverified.where(deleted_at: nil))
+      .order(created_at: :desc).first
+
+    if pending
+      user = pending.user
+      ttl = user.created_at + User::UNVERIFIED_TTL - Time.current
+      if ttl.positive?
+        token, raw = UserToken.issue!(purpose: "register", user: user, email: email, ttl: ttl, metadata: pending.metadata)
+        UserMailer.verification_email(token, raw).deliver_later
+      end
+    end
+
+    redirect_to root_path, notice: "If a pending registration exists for that email, a new verification email has been sent."
   end
 
   def create

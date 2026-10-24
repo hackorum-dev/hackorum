@@ -141,6 +141,99 @@ RSpec.describe 'Registration and Login', type: :request do
     end
   end
 
+  describe 'token lifetime' do
+    def register(email:, username:)
+      perform_enqueued_jobs do
+        post registration_path, params: { email: email, username: username, password: 'secret', password_confirmation: 'secret' }
+      end
+      extract_raw_token_from_mailer
+    end
+
+    it 'keeps the token usable when verification fails midway' do
+      raw = register(email: 'flaky@example.com', username: 'flaky')
+
+      allow(Alias).to receive(:create!).and_raise(ActiveRecord::RecordInvalid.new(Alias.new))
+      get verification_path(token: raw)
+      expect(flash[:alert]).to match(/could not complete/i)
+      expect(User.find_by(username: 'flaky')).not_to be_verified
+      expect(UserToken.find_usable(raw)).to be_present
+
+      allow(Alias).to receive(:create!).and_call_original
+      get verification_path(token: raw)
+      expect(flash[:notice]).to match(/registration complete/i)
+      expect(User.find_by(username: 'flaky')).to be_verified
+    end
+
+    it 'does not accept a token twice' do
+      raw = register(email: 'twice@example.com', username: 'twice')
+      get verification_path(token: raw)
+      get verification_path(token: raw)
+      expect(flash[:alert]).to match(/invalid or expired/i)
+    end
+  end
+
+  describe 'resend verification' do
+    before do
+      perform_enqueued_jobs do
+        post registration_path, params: { email: 'resend@example.com', username: 'resender', password: 'secret', password_confirmation: 'secret' }
+      end
+      @first_raw = extract_raw_token_from_mailer
+      ActionMailer::Base.deliveries.clear
+    end
+
+    it 'renders the resend form and links to it' do
+      get resend_verification_path
+      expect(response).to have_http_status(:ok)
+      get new_session_path
+      expect(response.body).to include(resend_verification_path)
+    end
+
+    it 'sends a new working token and keeps the old one valid' do
+      perform_enqueued_jobs do
+        post resend_verification_path, params: { email: ' Resend@Example.com ' }
+      end
+      expect(response).to redirect_to(root_path)
+      raw = extract_raw_token_from_mailer
+      expect(raw).not_to eq(@first_raw)
+
+      user = User.find_by(username: 'resender')
+      token = UserToken.find_usable(raw)
+      expect(token.expires_at).to be_within(1.second).of(user.created_at + User::UNVERIFIED_TTL)
+      expect(UserToken.find_usable(@first_raw)).to be_present
+
+      get verification_path(token: raw)
+      expect(user.reload).to be_verified
+      expect(UserToken.find_usable(@first_raw)).to be_present
+      get verification_path(token: @first_raw)
+      expect(flash[:alert]).to match(/invalid or expired/i)
+    end
+
+    it 'answers the same for unknown emails without sending mail' do
+      perform_enqueued_jobs do
+        post resend_verification_path, params: { email: 'nobody@example.com' }
+      end
+      expect(response).to redirect_to(root_path)
+      expect(flash[:notice]).to match(/if a pending registration exists/i)
+      expect(ActionMailer::Base.deliveries).to be_empty
+    end
+
+    it 'does not resend for verified users' do
+      get verification_path(token: @first_raw)
+      perform_enqueued_jobs do
+        post resend_verification_path, params: { email: 'resend@example.com' }
+      end
+      expect(ActionMailer::Base.deliveries).to be_empty
+    end
+
+    it 'does not resend past the cleanup deadline' do
+      User.find_by(username: 'resender').update_columns(created_at: 4.days.ago)
+      perform_enqueued_jobs do
+        post resend_verification_path, params: { email: 'resend@example.com' }
+      end
+      expect(ActionMailer::Base.deliveries).to be_empty
+    end
+  end
+
   describe 'password login' do
     it 'signs in with verified alias and password' do
       user = create(:user, password: 'secret', password_confirmation: 'secret')

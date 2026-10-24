@@ -170,6 +170,8 @@ Rails.application.routes.draw do
   # Authentication
   resource :session, only: [ :new, :create, :destroy ]
   resource :registration, only: [ :new, :create ]
+  get "/registration/resend", to: "registrations#resend_form", as: :resend_verification
+  post "/registration/resend", to: "registrations#resend"
   get "/verify", to: "verifications#show", as: :verification
   resource :password, only: [ :new, :create, :edit, :update ]
 

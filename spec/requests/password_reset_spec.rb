@@ -27,6 +27,29 @@ RSpec.describe 'Password reset', type: :request do
     expect(response).to redirect_to(root_path)
   end
 
+  it 'keeps the token usable after a failed update' do
+    user = create(:user, password: 'oldsecret', password_confirmation: 'oldsecret')
+    _, raw = UserToken.issue!(purpose: 'reset_password', user: user, email: 'x@example.com', ttl: 30.minutes)
+
+    patch password_path, params: { token: raw, password: 'newsecret', password_confirmation: 'typo' }
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(user.reload.authenticate('oldsecret')).to be_truthy
+    expect(UserToken.find_usable(raw)).to be_present
+
+    patch password_path, params: { token: raw, password: 'newsecret', password_confirmation: 'newsecret' }
+    expect(response).to redirect_to(new_session_path)
+    expect(user.reload.authenticate('newsecret')).to be_truthy
+
+    patch password_path, params: { token: raw, password: 'other', password_confirmation: 'other' }
+    expect(response).to redirect_to(new_password_path)
+    expect(user.reload.authenticate('newsecret')).to be_truthy
+  end
+
+  it 'rejects edit with an invalid token' do
+    get edit_password_path(token: 'bogus')
+    expect(response).to redirect_to(new_password_path)
+  end
+
   def extract_raw_token_from_mailer
     mail = ActionMailer::Base.deliveries.last
     expect(mail).to be_present

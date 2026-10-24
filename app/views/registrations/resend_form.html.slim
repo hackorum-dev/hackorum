@@ -1,0 +1,14 @@
+.session-page
+  .session-card
+    h1.session-title Resend verification
+    p.session-text Enter the email you registered with. Pending registrations are removed after a few days, after that you need to register again.
+
+    = form_with url: resend_verification_path, method: :post, data: { turbo: false }, class: 'session-form' do
+      .session-field
+        = label_tag :email, 'Email', class: 'visually-hidden'
+        = email_field_tag :email, nil, required: true, placeholder: 'you@example.com', autocomplete: 'email', class: 'session-input'
+      .session-actions
+        = submit_tag 'Resend verification email', class: 'session-submit'
+
+    .session-links
+      = link_to 'Back to Log In', new_session_path, class: 'session-link'

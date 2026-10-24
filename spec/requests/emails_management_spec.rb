@@ -102,6 +102,7 @@ RSpec.describe 'Emails management', type: :request do
     expect(response).to redirect_to(settings_account_path)
     expect(flash[:alert]).to match(/different user/)
     expect(Alias.by_email('token-user@example.com').pluck(:user_id).uniq).to eq([ token_user.id ])
+    expect(UserToken.find_usable(raw)).to be_present
   ensure
     token&.destroy
   end

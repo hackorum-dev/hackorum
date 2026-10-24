@@ -78,7 +78,7 @@ class User < ApplicationRecord
   validates :username, format: { with: /\A[a-zA-Z0-9_\-\.]+\z/, allow_blank: true }
   validates :username, uniqueness: { allow_blank: true, case_sensitive: false }
   validates :username, presence: true, on: :registration
-  validates :password, presence: true, confirmation: true, on: :registration
+  validates :password, presence: true, confirmation: true, on: [ :registration, :password_change ]
   validate :username_available_in_reservations
 
   before_save :release_old_username_reservation
