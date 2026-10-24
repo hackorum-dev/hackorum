@@ -15,6 +15,25 @@ RSpec.describe TopicMergeService do
       )
     end
 
+    it "moves the source slug to a target without one" do
+      source_topic.update!(slug: "my-feature")
+
+      service.call
+
+      expect(source_topic.reload.slug).to be_nil
+      expect(target_topic.reload.slug).to eq("my-feature")
+    end
+
+    it "keeps the target slug and drops the source one" do
+      source_topic.update!(slug: "src")
+      target_topic.update!(slug: "dst")
+
+      service.call
+
+      expect(source_topic.reload.slug).to be_nil
+      expect(target_topic.reload.slug).to eq("dst")
+    end
+
     it "returns a successful result" do
       result = service.call
       expect(result.success?).to be true

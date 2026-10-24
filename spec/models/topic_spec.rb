@@ -135,4 +135,53 @@ RSpec.describe Topic, type: :model do
       end
     end
   end
+
+  describe "slug" do
+    it "normalizes case and whitespace" do
+      topic = create(:topic, slug: " My-Feature ")
+      expect(topic.reload.slug).to eq("my-feature")
+    end
+
+    it "stores blank as nil" do
+      topic = create(:topic, slug: "  ")
+      expect(topic.reload.slug).to be_nil
+    end
+
+    %w[ab my-feature_2.0 t1x].each do |ok|
+      it "accepts #{ok}" do
+        expect(build(:topic, slug: ok)).to be_valid
+      end
+    end
+
+    [ "a", "1abc", "t123", "latest", "a..b", "has space", "a/b", "a#{'b' * 64}" ].each do |bad|
+      it "rejects #{bad.inspect}" do
+        expect(build(:topic, slug: bad)).not_to be_valid
+      end
+    end
+
+    it "is unique regardless of case" do
+      create(:topic, slug: "my-feature")
+      expect(build(:topic, slug: "MY-FEATURE")).not_to be_valid
+    end
+  end
+
+  describe "#slug_editable_by?" do
+    let(:topic) { create(:topic) }
+
+    it "allows the creator's user" do
+      expect(topic.slug_editable_by?(create(:user, person: topic.creator_person))).to be(true)
+    end
+
+    it "allows admins" do
+      expect(topic.slug_editable_by?(create(:user, admin: true))).to be(true)
+    end
+
+    it "denies other users" do
+      expect(topic.slug_editable_by?(create(:user))).to be(false)
+    end
+
+    it "denies nil" do
+      expect(topic.slug_editable_by?(nil)).to be(false)
+    end
+  end
 end

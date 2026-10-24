@@ -570,3 +570,34 @@
   min-width: 6.5rem;
   color: var(--color-text-secondary);
 }
+
+.slug-sidebar-row {
+  margin-bottom: var(--spacing-2);
+}
+
+.slug-sidebar-edit summary {
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.slug-sidebar-form {
+  display: flex;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-2);
+
+  & input[type="text"] {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.slug-sidebar-remove {
+  margin-top: var(--spacing-2);
+}
+
+.slug-sidebar-error {
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+  margin-top: var(--spacing-1);
+}

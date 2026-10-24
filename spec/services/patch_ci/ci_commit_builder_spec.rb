@@ -25,6 +25,33 @@ RSpec.describe PatchCi::CiCommitBuilder do
     )
   end
 
+  it "keeps the no-slug commit byte-identical" do
+    base = fixture.commit(subject: "base", files: { "a.c" => "v1\n" })
+    fixture.create_branch("t42_3")
+
+    expect(build(worktree, base: base)).to eq("7b340b0647c420e08afcbf9c7c155fbcbf844b57")
+  end
+
+  it "passes the slug when given" do
+    base = fixture.commit(subject: "base", files: { "a.c" => "v1\n" })
+    fixture.create_branch("t42_3")
+
+    sha = build(worktree, base: base, slug: "my-feature")
+
+    stub = repo.run!("show", "#{sha}:.github/workflows/hackorum-ci.yml").stdout
+    expect(stub).to include(%(      slug: "my-feature"\n))
+  end
+
+  it "omits the slug line without one" do
+    base = fixture.commit(subject: "base", files: { "a.c" => "v1\n" })
+    fixture.create_branch("t42_3")
+
+    sha = build(worktree, base: base, slug: nil)
+
+    stub = repo.run!("show", "#{sha}:.github/workflows/hackorum-ci.yml").stdout
+    expect(stub).not_to include("slug:")
+  end
+
   it "adds the stub workflow on top of the branch" do
     base = fixture.commit(subject: "base", files: { "a.c" => "v1\n" })
     fixture.create_branch("t42_3")

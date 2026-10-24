@@ -477,11 +477,12 @@ class TopicsController < ApplicationController
   end
 
   def set_topic
-    @topic = Topic.includes(
+    scope = Topic.includes(
       :creator,
       :creator_person,
       creator_person: :default_alias
-    ).find(params[:id])
+    )
+    @topic = params[:slug] ? scope.find_by!(slug: params[:slug].downcase) : scope.find(params[:id])
 
     if @topic.merged?
       redirect_to topic_path(@topic.final_topic), status: :moved_permanently

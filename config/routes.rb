@@ -84,6 +84,8 @@ Rails.application.routes.draw do
     end
     delete "send_auth/:identity_id", to: "send_auth#destroy", as: :send_auth
   end
+  get "t/:slug", to: "topics#show", as: :short_topic, format: false,
+                 constraints: { slug: /[A-Za-z][A-Za-z0-9._-]*/ }
   resources :topics, only: [ :index, :show ] do
     collection do
       get :search
@@ -105,6 +107,7 @@ Rails.application.routes.draw do
       get :summary, defaults: { format: :json }
       get :messages, defaults: { format: :json }
     end
+    resource :slug, only: [ :update, :destroy ], controller: "topic_slugs"
   end
   resources :activities, only: [ :index ] do
     post :mark_all_read, on: :collection

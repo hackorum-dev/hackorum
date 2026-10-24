@@ -16,6 +16,7 @@ module PatchCi
         on_master: record.on_master,
         pg_major: major,
         topic_id: record.topic_id,
+        slug: record.topic.slug,
         message_index: message_index(record),
         committed_at: record.message.created_at
       )

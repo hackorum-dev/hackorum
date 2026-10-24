@@ -18,7 +18,7 @@ module PatchCi
     # branch, same inputs, same committed_at reproduce the same sha, so a
     # re-push is a no-op.
     def build(branch:, base_sha:, on_master:, pg_major:, topic_id:, message_index:,
-              committed_at:)
+              committed_at:, slug: nil)
       raise MissingCommittedAt, "committed_at is required for deterministic commits" unless committed_at
 
       @wt.run!("checkout", "--quiet", "--force", "--detach", branch)
@@ -26,7 +26,7 @@ module PatchCi
       drop_existing_ci_commit
 
       write_stub(pg_major: pg_major, topic_id: topic_id, message_index: message_index,
-                 base_sha: base_sha)
+                 base_sha: base_sha, slug: slug)
       @wt.run!("rm", "-q", "-f", "--ignore-unmatch", "--", UPSTREAM_PATH)
 
       @wt.run!("add", "-A", "--", ".github")
@@ -60,10 +60,13 @@ module PatchCi
       paths.any? && (paths - [ STUB_PATH, UPSTREAM_PATH ]).empty?
     end
 
-    def write_stub(pg_major:, topic_id:, message_index:, base_sha:)
+    # slug line only when set: stubs of topics without one must stay
+    # byte-identical, or every deterministic sha changes. Quoted, or a slug
+    # like "true" or "null" stops being a string.
+    def write_stub(pg_major:, topic_id:, message_index:, base_sha:, slug:)
       path = File.join(@wt.dir, STUB_PATH)
       FileUtils.mkdir_p(File.dirname(path))
-      File.write(path, <<~YAML)
+      stub = <<~YAML
         name: hackorum patch CI
         on: push
         jobs:
@@ -78,6 +81,8 @@ module PatchCi
               message_index: #{message_index}
               base_sha: #{base_sha}
       YAML
+      stub += "      slug: \"#{slug}\"\n" if slug.present?
+      File.write(path, stub)
     end
 
     def message(branch:, base_sha:, on_master:, message_index:)

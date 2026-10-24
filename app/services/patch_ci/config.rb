@@ -2,6 +2,8 @@ module PatchCi
   # every tunable in one place (script entry points default to nil at
   # optparse time and fill in from here after rails loads)
   module Config
+    SLUG_SYNC_BRANCH = "hackorum-slugs" # fork branch whose workflow retags slug images
+    SLUG_RESYNC_HOURS = 24      # full retag at least this often
     BUDGET = 30                 # queued+running target on github
     IN_PROGRESS_LIST = 40
     UP_NEXT_LIST = 30

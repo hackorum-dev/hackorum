@@ -35,9 +35,9 @@ module PatchCi
     def runs(status: nil, pages: MAX_PAGES)
       all = []
       (1..pages).each do |page|
-        batch = fetch_page(page, status: status)
+        batch, raw_size = fetch_page(page, status: status)
         all.concat(batch)
-        break if batch.size < PER_PAGE
+        break if raw_size < PER_PAGE
       end
       all
     end
@@ -68,7 +68,9 @@ module PatchCi
       # sizes its push budget on this and must not read it as "nothing running"
       raise Error, "GET #{uri} -> 200 but no workflow_runs array" unless runs.is_a?(Array)
 
-      runs.map { |raw| to_run(raw) }
+      # slug sync branch is not a patch branch: no budget slot, no ingest
+      kept = runs.reject { |raw| raw["head_branch"] == Config::SLUG_SYNC_BRANCH }
+      [ kept.map { |raw| to_run(raw) }, runs.size ]
     rescue JSON::ParserError => e
       raise Error, "unparseable response: #{e.message}"
     end

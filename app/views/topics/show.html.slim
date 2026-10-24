@@ -2,6 +2,7 @@
 
 - content_for :sidebar do
   .sidebar
+    = render "topics/slug_sidebar", topic: @topic, ci_status: @ci_status
     - if @commit_groups.present?
       details.sidebar-section open=true
         summary.sidebar-heading Commits

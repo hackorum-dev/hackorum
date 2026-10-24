@@ -79,6 +79,7 @@ orchestrator = PatchCi::Orchestrator.new(
                                              push_remote: options[:remote],
                                              master_ref: options[:master_ref],
                                              mirror: options[:mirror_master]),
+  slug_sync: PatchCi::SlugSync.new(repo: repo, remote: options[:remote]),
   budget: options[:budget],
   max_pushes: options[:max_pushes],
   dry_run: options[:dry_run]

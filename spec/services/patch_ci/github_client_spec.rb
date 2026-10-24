@@ -110,4 +110,20 @@ RSpec.describe PatchCi::GithubClient, :webmock do
     expect { described_class.new(repo: "x/y", token: nil) }
       .to raise_error(PatchCi::GithubClient::Error, /HACKORUM_GITHUB_TOKEN/)
   end
+
+  it "drops slug sync runs" do
+    stub_request(:get, url).with(query: hash_including({}))
+      .to_return(status: 200, headers: { "Content-Type" => "application/json" },
+                 body: { workflow_runs: [ run_json(id: 1, branch: "t1_1", status: "completed"),
+                                          run_json(id: 2, branch: "hackorum-slugs", status: "completed") ] }.to_json)
+
+    expect(client.runs.map(&:id)).to eq([ 1 ])
+  end
+
+  it "does not count slug sync runs as in flight" do
+    PatchCi::GithubClient::IN_FLIGHT.each { |state| stub_status(state, []) }
+    stub_status("queued", [ run_json(id: 2, branch: "hackorum-slugs", status: "queued") ])
+
+    expect(client.in_flight_count).to eq(0)
+  end
 end

@@ -522,4 +522,46 @@ RSpec.describe PatchCi::Orchestrator do
       expect(master_sync).to have_received(:call)
     end
   end
+
+  describe "slug sync" do
+    let(:slug_sync) { instance_double(PatchCi::SlugSync) }
+
+    it "survives an exception" do
+      allow(slug_sync).to receive(:call).and_raise(ActiveRecord::ConnectionNotEstablished, "db gone")
+
+      result = orchestrator(slug_sync: slug_sync).cycle
+
+      expect(result[:failed]).to eq(1)
+      expect(result[:error]).to be_nil
+      expect(result[:slugs_synced]).to be(false)
+    end
+
+    it "runs each cycle" do
+      allow(slug_sync).to receive(:call).and_return(PatchCi::SlugSync::Result.new(pushed: true))
+
+      result = orchestrator(slug_sync: slug_sync).cycle
+
+      expect(slug_sync).to have_received(:call).once
+      expect(result[:slugs_synced]).to be(true)
+    end
+
+    it "is skipped on a dry run" do
+      allow(slug_sync).to receive(:call)
+
+      orchestrator(slug_sync: slug_sync, dry_run: true).cycle
+
+      expect(slug_sync).not_to have_received(:call)
+    end
+
+    it "counts a failure without aborting the cycle" do
+      allow(slug_sync).to receive(:call)
+        .and_return(PatchCi::SlugSync::Result.new(pushed: false, error: "push failed: nope"))
+
+      result = orchestrator(slug_sync: slug_sync).cycle
+
+      expect(result[:failed]).to eq(1)
+      expect(result[:error]).to be_nil
+      expect(result[:slugs_synced]).to be(false)
+    end
+  end
 end

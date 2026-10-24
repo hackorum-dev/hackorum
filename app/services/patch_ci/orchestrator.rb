@@ -3,7 +3,7 @@ module PatchCi
   # bin/orchestrator does the wiring.
   class Orchestrator
     def initialize(client:, pusher:, guard:, apply_one:, result_refs:, pruner:,
-                   repo:, master_sync:,
+                   repo:, master_sync:, slug_sync: nil,
                    budget: Config::BUDGET, max_pushes: nil, dry_run: false,
                    planner_factory: ->(state) { Planner.new(repo_state: state) })
       @client = client
@@ -14,6 +14,7 @@ module PatchCi
       @pruner = pruner
       @repo = repo
       @master_sync = master_sync
+      @slug_sync = slug_sync
       @budget = budget
       @max_pushes = max_pushes
       @dry_run = dry_run
@@ -68,11 +69,12 @@ module PatchCi
         end
       end
       @total_pushed += pushed
+      slugs_synced = sync_slugs
       warn "#{@failed} item(s) failed this cycle, first: #{@first_error}" if @failed.positive?
 
       DashboardBroadcast.refresh! unless @dry_run
 
-      { in_flight: in_flight, free_slots: free, pushed: pushed, failed: @failed,
+      { in_flight: in_flight, free_slots: free, pushed: pushed, slugs_synced: slugs_synced, failed: @failed,
         pruned: pruned, era_skips_cleared: @era_skips_cleared, ingested: ingested,
         refs_stale: !refs_ok, fetch_failed: @fetch_failed, mirror_error: @mirror_error,
         error: nil }
@@ -80,7 +82,7 @@ module PatchCi
       # not knowing what is in flight must never be read as "nothing is".
       # the counters read zero even when the fetch and ingest above already
       # happened: the error path reports the cycle as a loss, on purpose
-      { in_flight: nil, free_slots: 0, pushed: 0, failed: 0, pruned: 0,
+      { in_flight: nil, free_slots: 0, pushed: 0, slugs_synced: false, failed: 0, pruned: 0,
         era_skips_cleared: @era_skips_cleared, ingested: {}, refs_stale: true,
         fetch_failed: @fetch_failed, mirror_error: @mirror_error, error: e.message }
     end
@@ -139,6 +141,22 @@ module PatchCi
 
     def remaining_pushes
       @max_pushes ? [ @max_pushes - @total_pushed, 0 ].max : Float::INFINITY
+    end
+
+    # a sync error counts as a failure but must not stop the cycle
+    def sync_slugs
+      return false if @dry_run || @slug_sync.nil?
+
+      result = @slug_sync.call
+      if result.error
+        @failed += 1
+        @first_error ||= "slug sync: #{result.error}"
+      end
+      result.pushed
+    rescue StandardError => e
+      @failed += 1
+      @first_error ||= "slug sync: #{e.class}: #{e.message}"
+      false
     end
 
     def execute(item, master_sha)

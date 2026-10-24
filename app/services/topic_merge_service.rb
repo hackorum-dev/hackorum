@@ -139,8 +139,12 @@ class TopicMergeService
     end
   end
 
+  # the slug follows the thread unless the target has its own. Cleared on the
+  # source first: the unique index would reject the move otherwise
   def mark_source_merged!
-    source_topic.update!(merged_into_topic: target_topic)
+    slug = source_topic.slug
+    source_topic.update!(merged_into_topic: target_topic, slug: nil)
+    target_topic.update!(slug: slug) if slug && target_topic.slug.nil?
   end
 
   def recalculate_target_stats!

@@ -39,6 +39,20 @@ class Topic < ApplicationRecord
 
   validates :title, presence: true
 
+  SLUG_FORMAT = /\A[a-z][a-z0-9._-]*\z/
+  # t<digits> is the CI image tag namespace
+  SLUG_RESERVED = /\A(t\d+|latest)\z/
+
+  before_validation :normalize_slug
+
+  with_options if: :will_save_change_to_slug?, allow_nil: true do
+    validates :slug, length: { in: 2..64 },
+                     format: { with: SLUG_FORMAT,
+                               message: "must start with a letter and use only letters, digits, '.', '_' or '-'" },
+                     uniqueness: true
+  end
+  validate :slug_not_reserved, if: :will_save_change_to_slug?
+
   def creator_display_alias
     creator_person&.default_alias || creator
   end
@@ -388,5 +402,22 @@ class Topic < ApplicationRecord
       .where("similarity(title, ?) > 0.3", normalized)
       .order(Arel.sql(sanitize_sql_array([ "similarity(title, ?) DESC", normalized ])))
       .limit(limit)
+  end
+
+  def slug_editable_by?(user)
+    return false unless user
+    user.admin? || user.person_id == creator_person_id
+  end
+
+  private
+
+  def normalize_slug
+    self.slug = slug.to_s.strip.downcase.presence
+  end
+
+  def slug_not_reserved
+    return if slug.nil?
+    errors.add(:slug, "is reserved") if slug.match?(SLUG_RESERVED)
+    errors.add(:slug, "can't contain '..'") if slug.include?("..")
   end
 end

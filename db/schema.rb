@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_10_13_120000) do
+ActiveRecord::Schema[8.0].define(version: 2026_10_13_130100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -512,6 +512,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_13_120000) do
     t.datetime "fetched_at", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "slug_sync_digest"
+    t.datetime "slug_sync_pushed_at"
   end
 
   create_table "patch_ci_runs", force: :cascade do |t|
@@ -904,11 +906,13 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_13_120000) do
     t.virtual "title_tsv", type: :tsvector, as: "to_tsvector('english'::regconfig, (COALESCE(title, ''::character varying))::text)", stored: true
     t.integer "commit_count", default: 0, null: false
     t.datetime "last_commit_at"
+    t.string "slug"
     t.index ["created_at"], name: "index_topics_on_created_at"
     t.index ["creator_id"], name: "index_topics_on_creator_id"
     t.index ["creator_person_id"], name: "index_topics_on_creator_person_id"
     t.index ["last_message_at"], name: "index_topics_on_last_message_at"
     t.index ["merged_into_topic_id"], name: "index_topics_on_merged_into_topic_id"
+    t.index ["slug"], name: "index_topics_on_slug", unique: true
     t.index ["title"], name: "index_topics_on_title_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["title_tsv"], name: "index_topics_on_title_tsv", using: :gin
   end

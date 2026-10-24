@@ -36,6 +36,17 @@ RSpec.describe PatchCi::Pusher do
                           base_sha: base, status: "applied", on_master: true, **attrs)
   end
 
+  it "passes the topic slug into the stub" do
+    base = setup_branch("t9_1")
+    row = row_for("t9_1", base)
+    row.topic.update!(slug: "my-feature")
+
+    pusher.push(row)
+
+    stub = repo.run!("show", "#{row.reload.pushed_head_sha}:.github/workflows/hackorum-ci.yml").stdout
+    expect(stub).to include(%(slug: "my-feature"))
+  end
+
   it "pushes and records the head" do
     base = setup_branch("t9_1")
     row = row_for("t9_1", base)
