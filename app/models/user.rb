@@ -1,7 +1,7 @@
 class User < ApplicationRecord
   has_secure_password validations: false
 
-  belongs_to :person
+  belongs_to :person, optional: true
   has_many :aliases
   has_many :topics, through: :aliases
   has_many :messages, through: :aliases

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_10_24_120000) do
+ActiveRecord::Schema[8.0].define(version: 2026_10_25_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -950,7 +950,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_24_120000) do
     t.string "password_digest"
     t.boolean "admin", default: false, null: false
     t.datetime "deleted_at"
-    t.bigint "person_id", null: false
+    t.bigint "person_id"
     t.enum "mention_restriction", default: "anyone", null: false, enum_type: "user_mention_restriction"
     t.boolean "open_threads_at_first_unread", default: false, null: false
     t.datetime "last_login_at"
