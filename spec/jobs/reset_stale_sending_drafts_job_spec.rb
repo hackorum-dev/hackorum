@@ -1,7 +1,7 @@
 require 'rails_helper'
 
 RSpec.describe ResetStaleSendingDraftsJob do
-  it 'resets drafts stuck in sending older than 10 minutes' do
+  it 'resets drafts stuck in sending older than 20 minutes' do
     fresh = create(:outgoing_draft, status: 'sending', sending_started_at: 1.minute.ago)
     stale = create(:outgoing_draft, status: 'sending', sending_started_at: 1.hour.ago)
     described_class.new.perform
@@ -26,9 +26,9 @@ RSpec.describe ResetStaleSendingDraftsJob do
   it 'uses strict-less-than at the boundary' do
     travel_to(Time.current) do
       at_threshold = create(:outgoing_draft, status: 'sending',
-                            sending_started_at: 10.minutes.ago)
+                            sending_started_at: 20.minutes.ago)
       one_second_past = create(:outgoing_draft, status: 'sending',
-                               sending_started_at: 10.minutes.ago - 1.second)
+                               sending_started_at: 20.minutes.ago - 1.second)
       described_class.new.perform
       expect(at_threshold.reload).to be_sending,
         'a row with sending_started_at == threshold is NOT stale (strict <)'

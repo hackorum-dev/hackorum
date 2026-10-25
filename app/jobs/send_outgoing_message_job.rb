@@ -17,6 +17,8 @@ class SendOutgoingMessageJob < ApplicationJob
       draft.sender_alias = correct_sender
     end
 
+    # fixed before the first attempt: a duplicate send carries the same id
+    draft.update_columns(rfc_message_id: Outgoing::MessageBuilder.new_message_id) if draft.rfc_message_id.blank?
     rfc = Outgoing::MessageBuilder.build(draft)
     Gmail::SendClient.send_raw(draft.identity, rfc.encoded)
 
@@ -70,15 +72,18 @@ class SendOutgoingMessageJob < ApplicationJob
     ActiveSupport::Notifications.instrument("outgoing.send.failure",
       draft_id: draft&.id, reason: e.class.name, message: e.message)
     fail_draft(draft, e.message)
+  rescue Gmail::UncertainError => e
+    ActiveSupport::Notifications.instrument("outgoing.send.failure",
+      draft_id: draft&.id, reason: e.class.name, message: e.message)
+    fail_draft(draft, "Connection lost during send, the mail may have gone out. " \
+                      "Check the list before sending again.", keep_message_id: true)
   end
 
   private
 
-  def fail_draft(draft, msg)
-    draft.update!(
-      status: OutgoingDraft::STATUS_IDLE,
-      last_send_error: msg,
-      sending_started_at: nil
-    )
+  def fail_draft(draft, msg, keep_message_id: false)
+    attrs = { status: OutgoingDraft::STATUS_IDLE, last_send_error: msg, sending_started_at: nil }
+    attrs[:rfc_message_id] = nil unless keep_message_id
+    draft.update!(attrs)
   end
 end

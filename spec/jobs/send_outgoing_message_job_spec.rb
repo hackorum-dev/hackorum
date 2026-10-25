@@ -122,6 +122,34 @@ RSpec.describe SendOutgoingMessageJob do
     expect(draft.last_send_error).to include('insufficient authentication scopes')
   end
 
+  it 'fixes the message id before the first send attempt' do
+    allow(Gmail::SendClient).to receive(:send_raw).and_raise(Gmail::TransientError, 'down')
+    expect { described_class.new.perform(draft.id) }.to raise_error(Gmail::TransientError)
+    first = draft.reload.rfc_message_id
+    expect(first).to match(/\A<.+@.+>\z/)
+
+    expect { described_class.new.perform(draft.id) }.to raise_error(Gmail::TransientError)
+    expect(draft.reload.rfc_message_id).to eq(first)
+  end
+
+  it 'does not retry an uncertain send, keeps the message id' do
+    allow(Gmail::SendClient).to receive(:send_raw).and_raise(Gmail::UncertainError, 'reset')
+    expect {
+      described_class.new.perform(draft.id)
+    }.not_to change(Message, :count)
+    draft.reload
+    expect(draft).to be_idle
+    expect(draft.last_send_error).to include('may have gone out')
+    expect(draft.rfc_message_id).to be_present
+  end
+
+  it 'drops the message id on a permanent failure' do
+    draft.update_columns(rfc_message_id: '<old@x>')
+    allow(Gmail::SendClient).to receive(:send_raw).and_raise(Gmail::PermanentError, 'bad request')
+    described_class.new.perform(draft.id)
+    expect(draft.reload.rfc_message_id).to be_nil
+  end
+
   it 'lets TransientError propagate so ActiveJob can retry' do
     allow(Gmail::SendClient).to receive(:send_raw).and_raise(Gmail::TransientError, 'down')
     expect {

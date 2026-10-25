@@ -25,7 +25,7 @@ class OutgoingDraft < ApplicationRecord
   scope :idle,    -> { where(status: STATUS_IDLE) }
   scope :sending, -> { where(status: STATUS_SENDING) }
   scope :sent,    -> { where(status: STATUS_SENT) }
-  scope :stale_sending, ->(threshold = 10.minutes.ago) {
+  scope :stale_sending, ->(threshold = 20.minutes.ago) {
     sending.where("sending_started_at < ?", threshold)
   }
 

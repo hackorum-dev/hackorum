@@ -8,10 +8,13 @@ module Outgoing
                         keyword_init: true)
     DEFAULT_DOMAIN = "hackorum.dev"
 
+    def self.new_message_id
+      "<#{SecureRandom.uuid}@#{ENV.fetch('HACKORUM_OUTGOING_DOMAIN', DEFAULT_DOMAIN)}>"
+    end
+
     def self.build(draft)
       recipients = RecipientResolver.for(draft)
-      domain     = ENV.fetch("HACKORUM_OUTGOING_DOMAIN", DEFAULT_DOMAIN)
-      msg_id     = "<#{SecureRandom.uuid}@#{domain}>"
+      msg_id     = draft.rfc_message_id.presence || new_message_id
 
       from_addr = Mail::Address.new
       from_addr.address = draft.sender_alias.email

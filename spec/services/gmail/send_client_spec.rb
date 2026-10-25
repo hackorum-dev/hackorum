@@ -46,12 +46,32 @@ RSpec.describe Gmail::SendClient do
       .to raise_error(Gmail::TransientError)
   end
 
-  it 'maps Net::ReadTimeout to TransientError' do
+  it 'raises TransientError on 429' do
+    stub_response(code: 429, body: 'slow down')
+    expect { described_class.send_raw(identity, rfc822) }
+      .to raise_error(Gmail::TransientError)
+  end
+
+  it 'maps Net::ReadTimeout to UncertainError' do
     http = double('Net::HTTP')
     allow(http).to receive(:request).and_raise(Net::ReadTimeout.new('timeout'))
     allow(Net::HTTP).to receive(:start).and_yield(http)
     expect { described_class.send_raw(identity, rfc822) }
-      .to raise_error(Gmail::TransientError, /network error: Net::ReadTimeout/)
+      .to raise_error(Gmail::UncertainError, /network error: Net::ReadTimeout/)
+  end
+
+  it 'maps ECONNRESET to UncertainError' do
+    http = double('Net::HTTP')
+    allow(http).to receive(:request).and_raise(Errno::ECONNRESET)
+    allow(Net::HTTP).to receive(:start).and_yield(http)
+    expect { described_class.send_raw(identity, rfc822) }
+      .to raise_error(Gmail::UncertainError)
+  end
+
+  it 'maps Net::OpenTimeout to TransientError' do
+    allow(Net::HTTP).to receive(:start).and_raise(Net::OpenTimeout.new('connect'))
+    expect { described_class.send_raw(identity, rfc822) }
+      .to raise_error(Gmail::TransientError, /Net::OpenTimeout/)
   end
 
   it 'maps SocketError to TransientError' do

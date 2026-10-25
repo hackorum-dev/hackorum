@@ -47,6 +47,12 @@ RSpec.describe Outgoing::MessageBuilder do
     end
   end
 
+  it 'reuses the draft message id' do
+    result = described_class.build(build_draft(rfc_message_id: '<fixed@x>'))
+    expect(result.message_id).to eq('<fixed@x>')
+    expect(Mail.new(result.encoded).message_id).to eq('fixed@x')
+  end
+
   it 'falls back to default outgoing domain when env unset' do
     with_env('HACKORUM_OUTGOING_DOMAIN' => nil) do
       result = described_class.build(build_draft)

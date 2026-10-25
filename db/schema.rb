@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_10_25_120000) do
+ActiveRecord::Schema[8.0].define(version: 2026_10_25_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -444,6 +444,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_25_120000) do
     t.datetime "updated_at", null: false
     t.bigint "sent_message_id"
     t.datetime "sent_at"
+    t.string "rfc_message_id"
     t.index ["identity_id"], name: "index_outgoing_drafts_on_identity_id"
     t.index ["reply_to_message_id"], name: "index_outgoing_drafts_on_reply_to_message_id"
     t.index ["sender_alias_id"], name: "index_outgoing_drafts_on_sender_alias_id"

@@ -1,6 +1,8 @@
 module Gmail
   class TransientError < StandardError; end
   class PermanentError < StandardError; end
+  # request may have reached gmail; a retry can send twice
+  class UncertainError < StandardError; end
   class AuthRevokedError < PermanentError; end
   # 403 from Gmail almost always means the OAuth grant is missing the
   # gmail.send scope, not that the token is revoked. Treat it as a permanent
