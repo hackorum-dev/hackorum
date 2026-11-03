@@ -36,59 +36,36 @@ def fetch_doc(url)
   Nokogiri::HTML(response.body)
 end
 
-def find_aliases_by_name(name)
-  aliases = Alias.where(name: name).to_a
-  if aliases.empty?
-    aliases = Alias.where("LOWER(name) = ?", name.downcase).to_a
+# Never merges people. A contributor's name also sits on list addresses
+# (pgsql-hackers@ carried Bruce Momjian and Greg Stark alike), so merging by
+# name glued unrelated people together. Duplicates are merged separately,
+# see script/person_duplicates_report.rb.
+def resolve_person_for(name, email: nil)
+  if email.present?
+    person = Person.find_by_email(email.sub(/\s+at\s+/, "@"))
+    return [ person, person.aliases.to_a ] if person
   end
-  if aliases.empty?
-    aliases = Alias.where("name ILIKE ?", "%#{name}%").to_a
-  end
-  aliases
-end
 
-def merge_people!(target, others)
-  others.each do |person|
-    next if person.id == target.id
-
-    Alias.where(person_id: person.id).update_all(person_id: target.id)
-
-    person.contributor_memberships.find_each do |membership|
-      ContributorMembership.find_or_create_by!(person_id: target.id, contributor_type: membership.contributor_type) do |record|
-        record.description = membership.description
-      end
-    end
-
-    if target.default_alias_id.nil? && person.default_alias_id.present?
-      target.update!(default_alias_id: person.default_alias_id)
-    end
-
-    person.destroy!
-  end
-end
-
-def resolve_person_for(name)
-  aliases = find_aliases_by_name(name)
-  return [ nil, aliases ] if aliases.empty?
-
+  aliases = Alias.where("LOWER(name) = ?", name.downcase).includes(:person).to_a
   people = aliases.map(&:person).compact.uniq
-  return [ people.first, aliases ] if people.size == 1
+  return [ people.first, aliases ] if people.size <= 1
 
-  with_users, without_users = people.partition { |person| person.user.present? }
+  own = people.select do |person|
+    PersonNameMatch.compatible?(PersonNameMatch.norm(person.display_name), PersonNameMatch.norm(name))
+  end
+  if own.empty?
+    puts "  ⚠ #{name}: only on others' addresses (#{people.map(&:id).join(', ')}), skipping"
+    return [ nil, aliases ]
+  end
 
+  with_users = own.select { |person| person.user.present? }
   if with_users.size > 1
     puts "  ⚠ #{name}: multiple user-owned people (#{with_users.map(&:id).join(', ')}), skipping"
     return [ nil, aliases ]
   end
 
-  if with_users.size == 1
-    puts "  ⚠ #{name}: multiple people found, keeping user-owned person #{with_users.first.id}"
-    return [ with_users.first, aliases ]
-  end
-
-  target = people.min_by(&:id)
-  merge_people!(target, people - [ target ])
-  puts "  ↺ #{name}: merged #{people.size} people into #{target.id}"
+  target = with_users.first || own.max_by { |person| Alias.where(person_id: person.id).sum(:sender_count) }
+  puts "  ⚠ #{name}: #{own.size} people, linking #{target.id}, merge the rest by hand" if own.size > 1
   [ target, aliases ]
 end
 
@@ -235,7 +212,7 @@ end
 puts "Parsing contributors..."
 parse_contributor_sections(contributors_doc).each do |entry|
   name = entry[:name]
-  person, aliases = resolve_person_for(name)
+  person, aliases = resolve_person_for(name, email: entry[:email])
   result = add_membership(
     person,
     entry[:contributor_type],
