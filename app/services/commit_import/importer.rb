@@ -213,9 +213,16 @@ module CommitImport
 
     # Fills entry[:person_id] in place. Email match first; then an exact
     # case-insensitive name match, but only when it points at a single person.
+    # Email first (typos corrected), then the name. A name matching several
+    # persons goes to the one whose own name it is, so a stray alias ("Tom
+    # Lane" on somebody else's address) or an unmerged duplicate does not
+    # block it; two persons both called that stay unresolved.
     def resolve_person_ids(entries)
-      emails = entries.filter_map { |e| e[:raw_email].presence&.downcase }.uniq
-      names = entries.filter_map { |e| e[:raw_name].presence&.downcase if e[:raw_email].blank? }.uniq
+      lookups = entries.map do |entry|
+        [ PersonOverrides.email_for(entry[:raw_email], nil),
+          PersonOverrides.email_for(nil, entry[:raw_name]) ].compact.uniq
+      end
+      emails = lookups.flatten.uniq
 
       by_email = {}
       if emails.any?
@@ -223,22 +230,64 @@ module CommitImport
                         .pluck(Arel.sql("lower(trim(email))"), :person_id).to_h
       end
 
-      by_name = {}
-      if names.any?
-        by_name = Alias.where("lower(name) IN (?)", names)
-                       .pluck(Arel.sql("lower(name)"), :person_id)
-                       .group_by(&:first)
-                       .transform_values { |pairs| pairs.map(&:last).uniq }
+      entries.zip(lookups).each do |entry, entry_emails|
+        entry[:person_id] = entry_emails.filter_map { |email| by_email[email] }.first ||
+                            person_id_for_name(entry[:raw_name])
       end
+    end
 
-      entries.each do |entry|
-        email = entry[:raw_email].presence&.downcase
-        entry[:person_id] = if email
-          by_email[email]
-        else
-          candidates = by_name[entry[:raw_name].to_s.downcase] || []
-          candidates.size == 1 ? candidates.first : nil
-        end
+    # The loose key only when the exact name is unknown: it pulls in more
+    # unmerged duplicates and would turn a unique exact hit into a tie.
+    def person_id_for_name(name)
+      exact = name.to_s.downcase.squeeze(" ").strip
+      return nil if exact.empty?
+
+      key = name_key(name)
+      candidates = person_ids_by_name[exact] || person_ids_by_name_key[key]
+      return nil if candidates.blank?
+      return candidates.first if candidates.size == 1
+
+      own = candidates.select { |pid| own_name?(default_name_keys[pid], key) }
+      own.size == 1 ? own.first : nil
+    end
+
+    # Accents, punctuation and order do not matter: "Kuroda, Hayato" is
+    # "Hayato Kuroda", "Michael Paquier" is "Michaël Paquier".
+    def name_key(name)
+      name = name.to_s
+      ascii = I18n.transliterate(name)
+      name = ascii unless ascii.include?("?") && !name.include?("?")
+      name.downcase.gsub(/[^[:alnum:]]+/, " ").split.sort.join(" ")
+    end
+
+    def own_name?(default_key, key)
+      return true if default_key.nil?
+
+      a = default_key.split
+      b = key.split
+      (a - b).empty? || (b - a).empty?
+    end
+
+    def person_ids_by_name
+      @person_ids_by_name ||= alias_names.group_by { |name, _| name.downcase.squeeze(" ").strip }
+                                         .transform_values { |rows| rows.map(&:last).uniq }
+    end
+
+    def person_ids_by_name_key
+      @person_ids_by_name_key ||= alias_names.group_by { |name, _| name_key(name) }
+                                             .transform_values { |rows| rows.map(&:last).uniq }
+    end
+
+    def alias_names
+      @alias_names ||= Alias.pluck(:name, :person_id)
+    end
+
+    # nil when the default alias is no real name ("Noname", an address)
+    def default_name_keys
+      @default_name_keys ||= Person.joins("JOIN aliases ON aliases.id = people.default_alias_id")
+                                   .pluck("people.id", "aliases.name")
+                                   .to_h do |pid, name|
+        [ pid, name.include?("@") || name.casecmp?("noname") ? nil : name_key(name) ]
       end
     end
 

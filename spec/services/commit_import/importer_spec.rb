@@ -95,6 +95,49 @@ RSpec.describe CommitImport::Importer do
       expect(row.person_id).to be_nil
     end
 
+    def person_named(name, email)
+      person = create(:person)
+      person.update!(default_alias: create(:alias, name: name, email: email, person: person))
+      person
+    end
+
+    def resolved(body, role)
+      sha = fixture_repo.commit(subject: "x", body: body)
+      importer.run!
+      Commit.find_by(sha: sha).commit_people.find_by(role: role).person_id
+    end
+
+    it "ignores a person that only has a stray alias with the name" do
+      tom = person_named("Tom Lane", "tgl@x")
+      amit = person_named("Amit Kapila", "amit@x")
+      create(:alias, name: "Tom Lane", email: "amit@x", person: amit)
+
+      expect(resolved("Reviewed-by: Tom Lane\n", "reviewer")).to eq(tom.id)
+    end
+
+    it "resolves a name in another order, with accents or punctuation" do
+      kuroda = person_named("Kuroda, Hayato", "kuroda@x")
+      paquier = person_named("Michael Paquier", "michael@x")
+
+      expect(resolved("Reviewed-by: Hayato Kuroda\n", "reviewer")).to eq(kuroda.id)
+      expect(resolved("Reported-by: Michaël Paquier\n", "reported_by")).to eq(paquier.id)
+    end
+
+    it "falls back to the name when the email is unknown" do
+      person = person_named("Zsolt Parragi", "zsolt@percona.example")
+
+      expect(resolved("Reported-by: Zsolt Parragi <zsolt@cybertec.example>\n", "reported_by")).to eq(person.id)
+    end
+
+    it "resolves through the person overrides" do
+      person = person_named("Justin Pryzby", "pryzby@x")
+      stub_const("CommitImport::PersonOverrides::EMAILS", { "pryzbi@x" => "pryzby@x" })
+      stub_const("CommitImport::PersonOverrides::NAMES", { "justin prysby" => "pryzby@x" })
+
+      expect(resolved("Reviewed-by: Justin Prysby\n", "reviewer")).to eq(person.id)
+      expect(resolved("Reported-by: Someone Else <pryzbi@x>\n", "reported_by")).to eq(person.id)
+    end
+
     it "links a commit to the topic of its Discussion message" do
       topic = create(:topic)
       create(:message, topic: topic, message_id: "abc-123@example.com")
