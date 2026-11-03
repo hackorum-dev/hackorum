@@ -111,6 +111,71 @@ RSpec.describe CommitImport::TrailerParser do
       expect(result.people.first.name).to be_nil
     end
 
+    it "ignores a note after the email" do
+      result = parse(subject: "x", body: "Author: Andrey Borodin <x4mmm@yandex-team.ru> (in absentia)\n")
+      expect(result.people.map(&:name)).to eq([ "Andrey Borodin" ])
+      expect(result.people.map(&:email)).to eq([ "x4mmm@yandex-team.ru" ])
+    end
+
+    it "does not split on commas inside a note" do
+      body = "Reviewed-by: Tom Lane <tgl@x> (concept, not the code), Andres Freund <a@y>\n"
+      result = parse(subject: "x", body: body)
+      expect(result.people.map(&:name)).to eq([ "Tom Lane", "Andres Freund" ])
+      expect(result.people.map(&:email)).to eq([ "tgl@x", "a@y" ])
+    end
+
+    it "still splits when a paren is never closed" do
+      body = "Reviewed-by: Sergey Dudoladov (mysterious, Tom Lane <tgl@x>\n"
+      result = parse(subject: "x", body: body)
+      expect(result.people.map(&:email)).to eq([ nil, "tgl@x" ])
+    end
+
+    it "ignores a note around a bare name" do
+      body = "Reviewed-by: Tom Lane (offlist), (in an earlier version) Dilip Kumar\n"
+      result = parse(subject: "x", body: body)
+      expect(result.people.map(&:name)).to eq([ "Tom Lane", "Dilip Kumar" ])
+    end
+
+    it "takes an email in parens" do
+      body = "Author: Sho Kato (<kato-sho@fujitsu.com>), suyu.cmj (mengjuan.cmj@alibaba-inc.com)\n"
+      result = parse(subject: "x", body: body)
+      expect(result.people.map(&:name)).to eq([ "Sho Kato", "suyu.cmj" ])
+      expect(result.people.map(&:email)).to eq([ "kato-sho@fujitsu.com", "mengjuan.cmj@alibaba-inc.com" ])
+    end
+
+    it "does not credit someone named inside a note" do
+      body = "Reported-by: iMSA (via Jehan-Guillaume de Rorthais <jgdr@dalibo.com>)\n"
+      result = parse(subject: "x", body: body)
+      expect(result.people.map(&:name)).to eq([ "iMSA" ])
+      expect(result.people.map(&:email)).to eq([ nil ])
+    end
+
+    it "takes an unclosed or doubled bracket email" do
+      body = "Reviewed-by: Andres Freund <andres@anarazel.de\nTested-by: David Rowley <<dgr@x>> (earlier version)\n"
+      result = parse(subject: "x", body: body)
+      expect(result.people.map(&:name)).to eq([ "Andres Freund", "David Rowley" ])
+      expect(result.people.map(&:email)).to eq([ "andres@anarazel.de", "dgr@x" ])
+    end
+
+    it "keeps a quoted name with a comma together and drops the quotes" do
+      body = %(Author: "Tang, Haiying" <tanghy@x>, "A1ex" <a@y>\n)
+      result = parse(subject: "x", body: body)
+      expect(result.people.map(&:name)).to eq([ "Tang, Haiying", "A1ex" ])
+      expect(result.people.map(&:email)).to eq([ "tanghy@x", "a@y" ])
+    end
+
+    it "splits people joined with and" do
+      body = "Reviewed-by: Amit Kapila and Robert Haas\nReported-by: Yuhang Wu <y@x> and Zhenpeng Lin\n"
+      result = parse(subject: "x", body: body)
+      expect(result.people.map(&:name)).to eq([ "Amit Kapila", "Robert Haas", "Yuhang Wu", "Zhenpeng Lin" ])
+      expect(result.people.map(&:email)).to eq([ nil, nil, "y@x", nil ])
+    end
+
+    it "does not split on and inside a note" do
+      body = "Reported-by: Andrew Dunstan (found by Simon and Tom)\n"
+      expect(parse(subject: "x", body: body).people.map(&:name)).to eq([ "Andrew Dunstan" ])
+    end
+
     it "handles a bare name with no email" do
       result = parse(subject: "x", body: "Reported-by: buildfarm member koel\n")
       expect(result.people.first.name).to eq("buildfarm member koel")

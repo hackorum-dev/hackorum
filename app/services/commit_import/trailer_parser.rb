@@ -23,6 +23,15 @@ module CommitImport
     CHERRY_PICK_RE = /cherry picked from commit\s+([0-9a-f]{8,40})\b/i
     TRAILER_RE = /\A([A-Za-z][A-Za-z-]*):[ \t]*(.*)\z/
 
+    # Anything after the email is a note ("(in absentia)", "(earlier
+    # version)"). A name with an unclosed paren means the email sits inside
+    # a note about someone else, so it is not this person's.
+    ANGLE_EMAIL_RE = /\A([^<>]*?)\s*<+([^<>\s]+@[^<>\s]+)(?:>+.*)?\z/
+    PAREN_EMAIL_RE = /\A([^()<>]*?)\s*\(\s*<?([^\s()<>]+@[^\s()<>]+?)>?\s*\)\z/
+    NOTE_RE = /\A\s*\([^()]*\)\s*|\s*\([^()]*\)\s*\z/
+    COMMA_SEP = /\G,/
+    AND_SEP = /\G\s+and\s+/i
+
     def initialize(subject:, body:)
       @subject = subject.to_s
       @body = body.to_s
@@ -91,34 +100,47 @@ module CommitImport
     end
 
     def split_entries(value)
-      raw_parts = split_on_top_level_commas(value)
-      merge_incomplete_parts(raw_parts).map(&:strip).reject(&:empty?)
+      parts = merge_incomplete_parts(split_people(value, COMMA_SEP))
+      parts.flat_map { |part| split_people(part, AND_SEP) }.map(&:strip).reject(&:empty?)
     end
 
-    def split_on_top_level_commas(value)
+    def split_people(value, sep)
+      split_top_level(value, sep, nesting: true) || split_top_level(value, sep, nesting: false)
+    end
+
+    # Never splits inside <...>. With nesting, not inside (...) or "..."
+    # either, as notes and quoted "Last, First" names hold separators too.
+    # Returns nil when a paren or quote is left open, so the caller can
+    # retry without nesting.
+    def split_top_level(value, sep, nesting:)
       parts = []
       buffer = +""
-      depth = 0
+      angle = 0
+      paren = 0
+      quoted = false
+      i = 0
 
-      value.each_char do |char|
-        case char
-        when "<"
-          depth += 1
-          buffer << char
-        when ">"
-          depth -= 1 if depth.positive?
-          buffer << char
-        when ","
-          if depth.zero?
-            parts << buffer
-            buffer = +""
-          else
-            buffer << char
-          end
-        else
-          buffer << char
+      while i < value.length
+        if angle.zero? && paren.zero? && !quoted && (m = value.match(sep, i))
+          parts << buffer
+          buffer = +""
+          i = m.end(0)
+          next
         end
+
+        char = value[i]
+        case char
+        when "<" then angle += 1
+        when ">" then angle -= 1 if angle.positive?
+        when "(" then paren += 1 if nesting
+        when ")" then paren -= 1 if paren.positive?
+        when '"' then quoted = !quoted if nesting
+        end
+        buffer << char
+        i += 1
       end
+
+      return nil if paren.positive? || quoted
 
       parts << buffer
       parts
@@ -172,11 +194,16 @@ module CommitImport
     end
 
     def person_for(role, entry)
-      m = entry.match(/\A(.*?)\s*<([^>]+)>\s*\z/)
+      entry = entry.delete('"').strip
+      m = entry.match(ANGLE_EMAIL_RE)
+      m = nil if m && m[1].count("(") != m[1].count(")")
+      m ||= entry.match(PAREN_EMAIL_RE)
       return Person.new(role: role, name: m[1].strip.presence, email: m[2].strip.downcase) if m
-      return Person.new(role: role, name: nil, email: entry.downcase) if bare_email?(entry)
 
-      Person.new(role: role, name: entry, email: nil)
+      name = entry.gsub(NOTE_RE, "").presence || entry
+      return Person.new(role: role, name: nil, email: name.downcase) if bare_email?(name)
+
+      Person.new(role: role, name: name, email: nil)
     end
 
     def bare_email?(entry)
