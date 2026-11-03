@@ -223,8 +223,10 @@ module PatchCi
         FROM (
           SELECT pb.topic_id,
                  count(*) AS versions,
-                 EXISTS (SELECT 1 FROM commit_topics ct WHERE ct.topic_id = pb.topic_id) AS committed
+                 EXISTS (SELECT 1 FROM commit_topics ct
+                          WHERE ct.topic_id = pb.topic_id AND ct.source = 'trailer') AS committed
           FROM patch_branches pb
+          WHERE NOT pb.lineage_only
           GROUP BY pb.topic_id
         ) t
         GROUP BY versions, committed

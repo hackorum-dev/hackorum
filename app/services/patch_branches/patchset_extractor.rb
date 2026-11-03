@@ -22,8 +22,9 @@ module PatchBranches
     PYTHON_BZ2_DECOMPRESS =
       "import sys,bz2; sys.stdout.buffer.write(bz2.decompress(sys.stdin.buffer.read()))"
 
-    def initialize(message)
+    def initialize(message, include_nocfbot: false)
       @message = message
+      @include_nocfbot = include_nocfbot
     end
 
     # Writes the message's patch attachments into dir, returns sorted paths.
@@ -31,7 +32,8 @@ module PatchBranches
       # sort_by id, not the association's default: it has none, so postgres is
       # free to hand back colliding filenames in either order, and the collision
       # renaming below would then pick a different winner between runs
-      patches = @message.attachments.sort_by(&:id).select(&:patch_submission_candidate?)
+      candidate = @include_nocfbot ? :lineage_patch_candidate? : :patch_submission_candidate?
+      patches = @message.attachments.sort_by(&:id).select(&candidate)
       raise Error, "no patch attachments on message #{@message.id}" if patches.empty?
 
       patches = select_series(patches)

@@ -29,9 +29,13 @@
                     .commit-role-tags
                       - credit[:roles].each do |role|
                         span class="activity-tag #{commit_role_tag_class(role)}" = commit_role_label(role)
+                        - if credit[:llm_roles].include?(role)
+                          span.commit-credit-llm title="Attributed by the patchset lineage model" LLM
               - else
                 - row[:roles].each do |role|
                   span class="activity-tag #{commit_role_tag_class(role)}" = commit_role_label(role)
+                  - if row[:llm_roles].include?(role)
+                    span.commit-credit-llm title="Attributed by the patchset lineage model" LLM
               - if row[:backported]
                 span.activity-tag.tag-backported Backported
             td

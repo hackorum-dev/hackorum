@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_10_25_130000) do
+ActiveRecord::Schema[8.0].define(version: 2026_11_04_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -92,6 +92,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_25_130000) do
     t.string "raw_name"
     t.string "raw_email"
     t.bigint "person_id"
+    t.string "source", default: "parsed", null: false
+    t.float "confidence"
     t.index ["commit_id", "role"], name: "index_commit_people_on_commit_id_and_role"
     t.index ["person_id"], name: "index_commit_people_on_person_id"
   end
@@ -100,8 +102,33 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_25_130000) do
     t.bigint "commit_id", null: false
     t.bigint "topic_id", null: false
     t.string "external_message_id"
+    t.string "source", default: "trailer", null: false
+    t.float "confidence"
     t.index ["commit_id", "topic_id"], name: "index_commit_topics_on_commit_id_and_topic_id", unique: true
     t.index ["topic_id"], name: "index_commit_topics_on_topic_id"
+  end
+
+  create_table "commit_verdicts", force: :cascade do |t|
+    t.bigint "topic_id", null: false
+    t.bigint "patchset_run_id", null: false
+    t.bigint "commit_id", null: false
+    t.string "verdict", null: false
+    t.bigint "source_message_id"
+    t.float "confidence", null: false
+    t.text "evidence"
+    t.boolean "extra", default: false, null: false
+    t.string "origin", default: "trailer", null: false
+    t.string "change_level"
+    t.jsonb "reviews"
+    t.integer "reviewers_final"
+    t.integer "reviewers_earlier"
+    t.integer "reviewers_none"
+    t.string "author_name"
+    t.bigint "author_message_id"
+    t.index ["author_message_id"], name: "index_commit_verdicts_on_author_message_id"
+    t.index ["commit_id"], name: "index_commit_verdicts_on_commit_id"
+    t.index ["patchset_run_id", "commit_id"], name: "index_commit_verdicts_on_patchset_run_id_and_commit_id", unique: true
+    t.index ["topic_id"], name: "index_commit_verdicts_on_topic_id"
   end
 
   create_table "commitfest_patch_commitfests", force: :cascade do |t|
@@ -493,6 +520,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_25_130000) do
     t.integer "pg_major"
     t.string "master_apply_sha"
     t.string "master_conflict_files", default: [], null: false, array: true
+    t.boolean "lineage_only", default: false, null: false
     t.index ["attempted_at"], name: "index_patch_branches_on_attempted_at", order: :desc
     t.index ["branch_name"], name: "index_patch_branches_on_branch_name", unique: true
     t.index ["ci_status"], name: "index_patch_branches_on_ci_status"
@@ -547,6 +575,51 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_25_130000) do
     t.bigint "message_id", null: false
     t.string "path", null: false
     t.index ["message_id", "path"], name: "index_patch_submission_files_on_message_id_and_path", unique: true
+  end
+
+  create_table "patchset_lineages", force: :cascade do |t|
+    t.bigint "topic_id", null: false
+    t.bigint "patchset_run_id", null: false
+    t.bigint "message_id", null: false
+    t.bigint "parent_message_id"
+    t.string "step_kind", null: false
+    t.float "confidence", null: false
+    t.text "reason"
+    t.index ["patchset_run_id", "message_id"], name: "index_patchset_lineages_on_patchset_run_id_and_message_id", unique: true
+    t.index ["topic_id"], name: "index_patchset_lineages_on_topic_id"
+  end
+
+  create_table "patchset_pairs", force: :cascade do |t|
+    t.bigint "topic_id", null: false
+    t.bigint "later_message_id", null: false
+    t.bigint "earlier_message_id", null: false
+    t.jsonb "metrics", default: {}, null: false
+    t.index ["later_message_id", "earlier_message_id"], name: "index_patchset_pairs_on_message_pair", unique: true
+    t.index ["topic_id"], name: "index_patchset_pairs_on_topic_id"
+  end
+
+  create_table "patchset_runs", force: :cascade do |t|
+    t.bigint "topic_id", null: false
+    t.string "status", default: "queued", null: false
+    t.string "model"
+    t.string "effort"
+    t.string "prompt_version"
+    t.datetime "started_at"
+    t.datetime "finished_at"
+    t.float "duration_s"
+    t.integer "input_tokens"
+    t.integer "cached_input_tokens"
+    t.integer "output_tokens"
+    t.integer "exit_code"
+    t.bigint "through_message_id"
+    t.string "job_dir"
+    t.text "story"
+    t.jsonb "raw_result"
+    t.text "error"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "failure_kind"
+    t.index ["topic_id", "created_at"], name: "index_patchset_runs_on_topic_id_and_created_at"
   end
 
   create_table "people", force: :cascade do |t|
@@ -974,6 +1047,11 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_25_130000) do
   add_foreign_key "commit_people", "people"
   add_foreign_key "commit_topics", "commits"
   add_foreign_key "commit_topics", "topics"
+  add_foreign_key "commit_verdicts", "commits"
+  add_foreign_key "commit_verdicts", "messages", column: "author_message_id", on_delete: :nullify
+  add_foreign_key "commit_verdicts", "messages", column: "source_message_id", on_delete: :nullify
+  add_foreign_key "commit_verdicts", "patchset_runs", on_delete: :cascade
+  add_foreign_key "commit_verdicts", "topics"
   add_foreign_key "commitfest_patch_commitfests", "commitfest_patches"
   add_foreign_key "commitfest_patch_commitfests", "commitfests"
   add_foreign_key "commitfest_patch_messages", "commitfest_patches"
@@ -1019,6 +1097,14 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_25_130000) do
   add_foreign_key "patch_branches", "topics"
   add_foreign_key "patch_ci_runs", "patch_branches", on_delete: :cascade
   add_foreign_key "patch_submission_files", "messages"
+  add_foreign_key "patchset_lineages", "messages"
+  add_foreign_key "patchset_lineages", "messages", column: "parent_message_id", on_delete: :nullify
+  add_foreign_key "patchset_lineages", "patchset_runs", on_delete: :cascade
+  add_foreign_key "patchset_lineages", "topics"
+  add_foreign_key "patchset_pairs", "messages", column: "earlier_message_id"
+  add_foreign_key "patchset_pairs", "messages", column: "later_message_id"
+  add_foreign_key "patchset_pairs", "topics"
+  add_foreign_key "patchset_runs", "topics"
   add_foreign_key "people", "aliases", column: "default_alias_id"
   add_foreign_key "person_merges", "users", column: "performed_by_id"
   add_foreign_key "saved_search_preferences", "saved_searches"

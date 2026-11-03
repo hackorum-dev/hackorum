@@ -91,7 +91,8 @@ module PatchCi
       # into a nested loop rescanning every message (60s+ on dev). Semi and anti
       # joins keep their shape whether the outer select is rows or a count.
       eligible(Message.where(id: latest))
-        .where("NOT EXISTS (SELECT 1 FROM patch_branches pb WHERE pb.message_id = messages.id)")
+        .where("NOT EXISTS (SELECT 1 FROM patch_branches pb WHERE pb.message_id = messages.id" \
+               " AND NOT pb.lineage_only)")
         .order(created_at: :desc, id: :desc)
     end
 

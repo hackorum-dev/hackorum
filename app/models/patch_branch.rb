@@ -33,7 +33,7 @@ class PatchBranch < ApplicationRecord
   scope :pushed, -> { where.not(pushed_at: nil) }
   scope :ci_in_flight, -> { where(ci_status: PatchCiRun::IN_FLIGHT_BRANCH_STATUSES) }
   scope :ci_terminal, -> { where(ci_status: PatchCiRun::TERMINAL_STATUSES) }
-  scope :current, -> { where(superseded_by_id: nil) }
+  scope :current, -> { where(superseded_by_id: nil, lineage_only: false) }
 
   def behind_commits(repo_state)
     return nil unless repo_state && base_commit_height

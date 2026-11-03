@@ -33,6 +33,7 @@ class Topic < ApplicationRecord
   has_many :mailing_lists, through: :topic_mailing_lists
   has_many :commit_topics, dependent: :destroy
   has_many :commits, through: :commit_topics
+  has_many :patchset_runs, dependent: :destroy
 
   scope :active, -> { where(merged_into_topic_id: nil) }
   scope :merged, -> { where.not(merged_into_topic_id: nil) }
@@ -59,9 +60,12 @@ class Topic < ApplicationRecord
 
   # id tiebreak: same-second messages must keep a stable order, branch names
   # derived from this index depend on it
+  def chronological_message_ids
+    messages.order(:created_at, :id).pluck(:id)
+  end
+
   def chronological_index_of(message)
-    ids = messages.order(:created_at, :id).pluck(:id)
-    ids.index(message.id).to_i + 1
+    chronological_message_ids.index(message.id).to_i + 1
   end
 
   def participant_aliases(limit: 10)
@@ -339,7 +343,7 @@ class Topic < ApplicationRecord
 
     rows = Commit
       .joins(:commit_topics)
-      .where(commit_topics: { topic_id: ids })
+      .where(commit_topics: { topic_id: ids, source: "trailer" })
       .select(<<~COLUMNS.squish)
         commits.id, commits.sha, commits.subject, commits.branches,
         commits.released_in, commits.released_at, commits.committed_at,

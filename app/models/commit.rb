@@ -9,8 +9,8 @@ class Commit < ApplicationRecord
 
   validates :sha, presence: true, uniqueness: true
 
-  scope :for_topic, ->(topic_id) {
-    joins(:commit_topics).where(commit_topics: { topic_id: topic_id }).order(committed_at: :desc)
+  scope :for_topic, ->(topic_id, sources: %w[trailer]) {
+    joins(:commit_topics).where(commit_topics: { topic_id: topic_id, source: sources }).order(committed_at: :desc)
   }
 
   # The commit that actually landed the change, as opposed to a cherry-pick

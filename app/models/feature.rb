@@ -1,6 +1,7 @@
 class Feature
   ALL = {
-    email_sending: "Email sending"
+    email_sending: "Email sending",
+    patchset_lineage: "Patchset lineage"
   }.freeze
 
   NAMES = ALL.keys.map(&:to_s).freeze

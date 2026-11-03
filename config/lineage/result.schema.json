@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["lineage", "verdicts", "extra_commits", "story"],
+  "properties": {
+    "lineage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["message_id", "parent_message_id", "step_kind", "confidence", "reason"],
+        "properties": {
+          "message_id": { "type": "integer" },
+          "parent_message_id": { "type": ["integer", "null"] },
+          "step_kind": { "type": "string", "enum": ["resend", "rebase", "minor_revision", "major_rework", "remainder", "fix_on_top", "new_series"] },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "verdicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sha", "verdict", "source_message_id", "author_name", "author_message_id", "confidence", "evidence", "change_level", "reviews"],
+        "properties": {
+          "sha": { "type": "string" },
+          "verdict": { "type": "string", "enum": ["as_is", "modified", "partial", "from_discussion", "not_this_thread", "undecided"] },
+          "source_message_id": { "type": ["integer", "null"] },
+          "author_name": { "type": ["string", "null"] },
+          "author_message_id": { "type": ["integer", "null"] },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "evidence": { "type": "string" },
+          "change_level": { "type": ["string", "null"], "enum": ["light", "moderate", "significant", null] },
+          "reviews": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["reviewer", "reviewed_message_ids", "coverage", "note"],
+              "properties": {
+                "reviewer": { "type": "string" },
+                "reviewed_message_ids": { "type": "array", "items": { "type": "integer" } },
+                "coverage": { "type": "string", "enum": ["final", "earlier", "none"] },
+                "note": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "extra_commits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sha", "verdict", "source_message_id", "author_name", "author_message_id", "confidence", "evidence", "change_level", "reviews"],
+        "properties": {
+          "sha": { "type": "string" },
+          "verdict": { "type": "string", "enum": ["as_is", "modified", "partial", "from_discussion"] },
+          "source_message_id": { "type": ["integer", "null"] },
+          "author_name": { "type": ["string", "null"] },
+          "author_message_id": { "type": ["integer", "null"] },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "evidence": { "type": "string" },
+          "change_level": { "type": ["string", "null"], "enum": ["light", "moderate", "significant", null] },
+          "reviews": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["reviewer", "reviewed_message_ids", "coverage", "note"],
+              "properties": {
+                "reviewer": { "type": "string" },
+                "reviewed_message_ids": { "type": "array", "items": { "type": "integer" } },
+                "coverage": { "type": "string", "enum": ["final", "earlier", "none"] },
+                "note": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "story": { "type": "string" }
+  }
+}

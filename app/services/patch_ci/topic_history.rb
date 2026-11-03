@@ -66,7 +66,7 @@ module PatchCi
     # one is current. preload, not joins-and-reuse: the select carries alias
     # columns, and the message is needed whole for the thread anchor.
     def base_scope
-      PatchBranch.where(topic_id: @topic.id)
+      PatchBranch.where(topic_id: @topic.id, lineage_only: false)
                  .joins(:message)
                  .preload(:message)
                  .order(Arel.sql("messages.created_at DESC, messages.id DESC"))

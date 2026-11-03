@@ -196,4 +196,13 @@ RSpec.describe PatchBranches::PatchsetExtractor do
     attachment = add_attachment(".txt", "content", content_type: "text/x-patch")
     expect(extract).to eq([ [ "attachment-#{attachment.id}.patch", "content" ] ])
   end
+
+  it "extracts nocfbot attachments only when asked" do
+    add_attachment("delta.patch.nocfbot", "delta")
+    expect { extract }.to raise_error(described_class::Error, /no patch attachments/)
+    Dir.mktmpdir do |dir|
+      files = described_class.new(message.reload, include_nocfbot: true).extract(dir)
+      expect(files.map { |f| File.basename(f) }).to eq([ "delta.patch.nocfbot" ])
+    end
+  end
 end

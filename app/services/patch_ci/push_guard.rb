@@ -16,6 +16,7 @@ module PatchCi
     def check(row)
       # free row-state checks first: the planner should never emit these, but
       # this is the last line of defense and must not trust the planner
+      return "lineage only row" if row.lineage_only
       return "row not applied" unless row.status == "applied"
       return "row superseded" if row.superseded_by_id.present?
 

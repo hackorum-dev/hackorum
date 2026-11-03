@@ -7,6 +7,7 @@ class Attachment < ApplicationRecord
     PATCH_SUBMISSION_WRAPPER_EXTS.map { |w| ".#{b}#{w}" }
   }.freeze
   PATCH_SUBMISSION_EXCLUDE_PATTERNS = %w[nocfbot no_cfbot].freeze
+  PATCH_SUBMISSION_EXCLUDE_REGEX = Regexp.union(PATCH_SUBMISSION_EXCLUDE_PATTERNS).freeze
   PATCH_SUBMISSION_CONTENT_TYPES = %w[text/x-diff text/x-patch application/x-patch].freeze
   # Matches the historical pg-hackers naming conventions the extension list misses:
   # bare basenames like /bjm/diff, /rtmp/diff, "patch"; numeric suffix like foo.patch.3.
@@ -49,9 +50,19 @@ class Attachment < ApplicationRecord
   end
 
   def patch_submission_candidate?
+    lineage_patch_candidate? && !nocfbot?
+  end
+
+  def nocfbot?
     return false if file_name.blank?
     name_lower = file_name.downcase
-    return false if PATCH_SUBMISSION_EXCLUDE_PATTERNS.any? { |p| name_lower.include?(p) }
+    PATCH_SUBMISSION_EXCLUDE_PATTERNS.any? { |p| name_lower.include?(p) }
+  end
+
+  def lineage_patch_candidate?
+    return false if file_name.blank?
+    return true if nocfbot? && patch_content?
+    name_lower = file_name.downcase.sub(/[._-]*#{PATCH_SUBMISSION_EXCLUDE_REGEX}\z/, "")
     return true if PATCH_SUBMISSION_EXTENSIONS.any? { |ext| name_lower.end_with?(ext) }
     return true if name_lower.match?(PATCH_SUBMISSION_FILENAME_REGEX)
     PATCH_SUBMISSION_CONTENT_TYPES.any? { |ct| content_type&.downcase&.start_with?(ct) }

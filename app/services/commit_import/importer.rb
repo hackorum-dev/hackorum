@@ -64,13 +64,12 @@ module CommitImport
         topic_map = message_topic_map(parsed.values.flat_map(&:message_ids).uniq)
 
         Commit.transaction do
-          CommitPerson.where(commit_id: id_by_sha.values).delete_all
           rewrite_people(commits, parsed)
 
           # Drop old links first: a topic that lost its only link during
           # reparse still needs its aggregates refreshed down.
-          touched = CommitTopic.where(commit_id: id_by_sha.values).pluck(:topic_id).to_set
-          CommitTopic.where(commit_id: id_by_sha.values).delete_all
+          touched = CommitTopic.trailer.where(commit_id: id_by_sha.values).pluck(:topic_id).to_set
+          CommitTopic.trailer.where(commit_id: id_by_sha.values).delete_all
           touched.merge(insert_topic_links(parsed, id_by_sha, topic_map))
           update_unresolved(parsed, id_by_sha, topic_map)
           update_cherry_picks(parsed, id_by_sha)
@@ -175,11 +174,11 @@ module CommitImport
         next [] unless commit_id
 
         people = parsed[record.sha].people.map do |person|
-          { commit_id: commit_id, role: person.role, raw_name: person.name, raw_email: person.email }
+          { commit_id: commit_id, role: person.role, raw_name: person.name, raw_email: person.email, source: "parsed" }
         end
         people << {
           commit_id: commit_id, role: CommitPerson::COMMITTER,
-          raw_name: record.committer_name, raw_email: record.committer_email&.downcase
+          raw_name: record.committer_name, raw_email: record.committer_email&.downcase, source: "parsed"
         }
         people
       end.uniq
@@ -203,7 +202,8 @@ module CommitImport
           next unless topic_id
 
           touched << topic_id
-          { commit_id: commit_id, topic_id: topic_id, external_message_id: raw }
+          { commit_id: commit_id, topic_id: topic_id, external_message_id: raw,
+            source: "trailer", confidence: nil }
         end
       end.uniq { |row| [ row[:commit_id], row[:topic_id] ] }
 
@@ -320,10 +320,11 @@ module CommitImport
         UPDATE topics SET commit_count = sub.n, last_commit_at = sub.last_at
         FROM (
           SELECT t.id,
-                 (SELECT COUNT(*) FROM commit_topics ct WHERE ct.topic_id = t.id) AS n,
+                 (SELECT COUNT(*) FROM commit_topics ct
+                   WHERE ct.topic_id = t.id AND ct.source = 'trailer') AS n,
                  (SELECT MAX(c.committed_at) FROM commit_topics ct
                     JOIN commits c ON c.id = ct.commit_id
-                   WHERE ct.topic_id = t.id) AS last_at
+                   WHERE ct.topic_id = t.id AND ct.source = 'trailer') AS last_at
           FROM topics t WHERE t.id IN (?)
         ) sub
         WHERE topics.id = sub.id
@@ -331,16 +332,17 @@ module CommitImport
       ApplicationRecord.connection.execute(sql)
     end
 
-    # commit_people rows are wiped per-batch in reparse!, including the
-    # committer row, so it has to be re-added here too, not just trailer people.
+    # Wipes and re-adds the parsed rows per batch, committer row included.
+    # llm rows come from elsewhere and are left alone.
     def rewrite_people(commits, parsed)
+      CommitPerson.parsed.where(commit_id: commits.map(&:id)).delete_all
       entries = commits.flat_map do |commit|
         people = parsed[commit.sha].people.map do |person|
-          { commit_id: commit.id, role: person.role, raw_name: person.name, raw_email: person.email }
+          { commit_id: commit.id, role: person.role, raw_name: person.name, raw_email: person.email, source: "parsed" }
         end
         people << {
           commit_id: commit.id, role: CommitPerson::COMMITTER,
-          raw_name: commit.committer_name, raw_email: commit.committer_email&.downcase
+          raw_name: commit.committer_name, raw_email: commit.committer_email&.downcase, source: "parsed"
         }
         people
       end.uniq
@@ -470,7 +472,8 @@ module CommitImport
 
           resolved.each do |raw|
             touched << topic_map[raw]
-            rows << { commit_id: commit.id, topic_id: topic_map[raw], external_message_id: raw }
+            rows << { commit_id: commit.id, topic_id: topic_map[raw], external_message_id: raw,
+                      source: "trailer", confidence: nil }
           end
           remaining_by_id[commit.id] = commit.unresolved_message_ids - resolved
         end

@@ -1,0 +1,40 @@
+- content_for :title, "Admin - Patchset runs"
+- link_counts = CommitTopic.llm.where(topic_id: @runs.map(&:topic_id)).group(:topic_id).count
+
+.settings-page
+  h1 Patchset lineage runs
+  p
+    - @status_counts.sort.each do |status, n|
+      span.commit-sidebar-meta = "#{status}: #{n}  "
+  p
+    = link_to "newest", admin_patchset_runs_path
+    |  /
+    = link_to "slowest", admin_patchset_runs_path(sort: "duration")
+    |  /
+    = link_to "most tokens", admin_patchset_runs_path(sort: "tokens")
+
+  table.email-table
+    thead
+      tr
+        th Run
+        th Topic
+        th Status
+        th Model
+        th Duration
+        th Tokens in/cached/out
+        th Verdicts
+        th Links
+    tbody
+      - @runs.each do |run|
+        tr
+          td = link_to run.id, admin_patchset_run_path(run)
+          td = link_to run.topic.title, topic_path(run.topic)
+          td = run.status
+          td = run.model
+          td = run.duration_s ? "#{run.duration_s.round}s" : ""
+          td = "#{run.input_tokens}/#{run.cached_input_tokens}/#{run.output_tokens}"
+          td
+            - @verdict_counts.fetch(run.id, []).each do |(_, verdict), n|
+              span = "#{verdict}: #{n} "
+          td = link_counts.fetch(run.topic_id, 0)
+  = paginate @runs

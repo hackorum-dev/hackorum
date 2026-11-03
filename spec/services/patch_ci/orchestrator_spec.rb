@@ -290,6 +290,16 @@ RSpec.describe PatchCi::Orchestrator do
       expect(old_row.reload.superseded_by_id).to eq(new_row.id)
     end
 
+    it "leaves lineage-only rows alone when superseding" do
+      lineage = create(:patch_branch, topic: topic, lineage_only: true)
+      allow(apply_one).to receive(:call).and_return([ :applied_on_master, new_row ])
+      allow(pusher).to receive(:push).and_return(true)
+
+      expect(orchestrator.cycle[:pushed]).to eq(1)
+      expect(old_row.reload.superseded_by_id).to eq(new_row.id)
+      expect(lineage.reload.superseded_by_id).to be_nil
+    end
+
     it "does not supersede when the push fails" do
       allow(apply_one).to receive(:call).and_return([ :applied_on_master, new_row ])
       allow(pusher).to receive(:push).and_return(false)

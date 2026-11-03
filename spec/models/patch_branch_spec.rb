@@ -89,4 +89,12 @@ RSpec.describe PatchBranch do
       end
     end
   end
+
+  describe ".current" do
+    it "excludes lineage_only branches" do
+      live = create(:patch_branch)
+      create(:patch_branch, lineage_only: true)
+      expect(PatchBranch.current).to contain_exactly(live)
+    end
+  end
 end

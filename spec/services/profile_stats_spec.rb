@@ -163,6 +163,28 @@ RSpec.describe ProfileStats do
       expect(stats.landed_patch_rate).to eq(100)
     end
 
+    it "ignores llm-sourced author rows" do
+      topic = create(:topic, creator_alias: person_alias)
+      create(:message, topic: topic, sender: person_alias, is_patch_submission: true)
+
+      commit = create(:commit)
+      create(:commit_topic, commit: commit, topic: topic)
+      CommitPerson.create!(commit: commit, role: "author", person_id: person.id, source: "llm", confidence: 0.9)
+
+      expect(described_class.new(person.id).landed_patch_threads).to eq(0)
+    end
+
+    it "counts llm-sourced author rows when widened to llm" do
+      topic = create(:topic, creator_alias: person_alias)
+      create(:message, topic: topic, sender: person_alias, is_patch_submission: true)
+
+      commit = create(:commit)
+      create(:commit_topic, commit: commit, topic: topic)
+      CommitPerson.create!(commit: commit, role: "author", person_id: person.id, source: "llm", confidence: 0.9)
+
+      expect(described_class.new(person.id, sources: %w[parsed llm]).landed_patch_threads).to eq(1)
+    end
+
     it "counts a thread landed once even when a backport gives it two credited commits" do
       topic = create(:topic, creator_alias: person_alias)
       create(:message, topic: topic, sender: person_alias, is_patch_submission: true)
@@ -289,6 +311,26 @@ RSpec.describe ProfileStats do
       )
     end
 
+    it "ignores llm-sourced rows" do
+      commit = create(:commit)
+      CommitPerson.create!(commit: commit, role: "author", person_id: person.id, source: "llm", confidence: 0.9)
+
+      stats = described_class.new(person.id)
+
+      expect(stats.commit_credits_total).to eq(0)
+      expect(stats.commit_credits_by_role["author"]).to eq(0)
+    end
+
+    it "counts llm-sourced rows when widened to llm" do
+      commit = create(:commit)
+      CommitPerson.create!(commit: commit, role: "author", person_id: person.id, source: "llm", confidence: 0.9)
+
+      stats = described_class.new(person.id, sources: %w[parsed llm])
+
+      expect(stats.commit_credits_total).to eq(1)
+      expect(stats.commit_credits_by_role["author"]).to eq(1)
+    end
+
     it "counts one commit once even when it credits the person in two roles" do
       commit = create(:commit)
       CommitPerson.create!(commit: commit, role: "author", person_id: person.id)
@@ -385,6 +427,22 @@ RSpec.describe ProfileStats do
       CommitPerson.create!(commit: backport_commit, role: "author", person_id: person.id)
 
       expect(described_class.new(person.id).backport_credits).to eq(1)
+    end
+
+    it "ignores an llm-sourced backport author row" do
+      master_commit = create(:commit, branches: [ "master" ])
+      backport_commit = create(:commit, branches: [ "REL_17_STABLE" ], cherry_picked_from_sha: master_commit.sha)
+      CommitPerson.create!(commit: backport_commit, role: "author", person_id: person.id, source: "llm", confidence: 0.9)
+
+      expect(described_class.new(person.id).backport_credits).to eq(0)
+    end
+
+    it "counts an llm-sourced backport author row when widened to llm" do
+      master_commit = create(:commit, branches: [ "master" ])
+      backport_commit = create(:commit, branches: [ "REL_17_STABLE" ], cherry_picked_from_sha: master_commit.sha)
+      CommitPerson.create!(commit: backport_commit, role: "author", person_id: person.id, source: "llm", confidence: 0.9)
+
+      expect(described_class.new(person.id, sources: %w[parsed llm]).backport_credits).to eq(1)
     end
 
     it "does not count a backport where the person is only credited as reviewer" do

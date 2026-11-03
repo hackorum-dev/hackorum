@@ -256,5 +256,58 @@ RSpec.describe CommitActivity do
     it "is empty without people" do
       expect(described_class.available_years([])).to eq([])
     end
+
+    it "widens to llm credits only when asked" do
+      commit = create(:commit, branches: [ "master" ], committed_at: Time.zone.local(2023, 5, 5, 9))
+      create(:commit_person, commit: commit, person: person, role: "author", source: "llm", confidence: 0.9)
+
+      expect(described_class.available_years([ person.id ])).to eq([])
+      expect(described_class.available_years([ person.id ], sources: %w[parsed llm])).to eq([ 2023 ])
+    end
+  end
+
+  describe "sources" do
+    let!(:parsed_commit) do
+      create(:commit, sha: "abc123", subject: "Parsed", branches: [ "master" ], committed_at: Time.zone.local(year, 2, 1, 9))
+    end
+    let!(:llm_commit) do
+      create(:commit, sha: "def456", subject: "Guessed", branches: [ "master" ], committed_at: Time.zone.local(year, 3, 1, 9))
+    end
+
+    before do
+      create(:commit_person, commit: parsed_commit, person: person, role: "author")
+      create(:commit_person, commit: llm_commit, person: person, role: "author", source: "llm", confidence: 0.9)
+    end
+
+    it "reads parsed credits only by default" do
+      rows = activity.detail_rows_in(year_range)
+
+      expect(rows.map { |row| row[:commit].subject }).to eq([ "Parsed" ])
+      expect(rows.first[:llm_roles]).to eq([])
+    end
+
+    it "flags llm-only roles when widened" do
+      rows = described_class.new(person_ids: [ person.id ], year: year, sources: %w[parsed llm]).detail_rows_in(year_range)
+
+      expect(rows.map { |row| [ row[:commit].subject, row[:llm_roles] ] }).to eq([ [ "Guessed", [ "author" ] ], [ "Parsed", [] ] ])
+      expect(rows.first[:member_credits].first[:llm_roles]).to eq([ "author" ])
+    end
+
+    it "flags only the llm role when the same person has a parsed role on the commit" do
+      create(:commit_person, commit: llm_commit, person: person, role: "committer")
+
+      rows = described_class.new(person_ids: [ person.id ], year: year, sources: %w[parsed llm]).detail_rows_in(year_range)
+
+      expect(rows.first[:roles]).to eq(%w[author committer])
+      expect(rows.first[:llm_roles]).to eq([ "author" ])
+    end
+
+    it "does not flag a role that also has a parsed credit" do
+      create(:commit_person, commit: llm_commit, person: person, role: "author", source: "parsed")
+
+      rows = described_class.new(person_ids: [ person.id ], year: year, sources: %w[parsed llm]).detail_rows_in(year_range)
+
+      expect(rows.first[:llm_roles]).to eq([])
+    end
   end
 end

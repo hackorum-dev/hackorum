@@ -1,0 +1,11 @@
+# Batch profile, copied into tmp/codex_home by Lineage::CodexRunner.
+model = "gpt-6-astra"
+model_reasoning_effort = "high"
+approval_policy = "never"
+
+[features]
+multi_agent = true
+# no marketplace sync into the batch home, no skill injection into the prompt
+plugins = false
+remote_plugin = false
+skill_search = false

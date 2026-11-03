@@ -11,10 +11,11 @@ module PatchBranches
     # (Runner turns it into an "error" row + counters)
     attr_reader :record, :message, :save_error
 
-    def initialize(repo:, worktree:, force: false)
+    def initialize(repo:, worktree:, force: false, lineage_only: false)
       @repo = repo
       @worktree = worktree
       @force = force
+      @lineage_only = lineage_only
       @era = PatchCi::EraDetector.new(repo)
     end
 
@@ -31,10 +32,16 @@ module PatchBranches
       @branch_name = "t#{@message.topic_id}_#{@message.topic.chronological_index_of(@message)}"
       @record = PatchBranch.find_or_initialize_by(message_id: @message.id)
 
+      # a lineage run never takes a row CI already owns: the flag only moves
+      # one way, lineage -> CI
+      return [ :skipped, @record ] if @lineage_only && @record.persisted? && !@record.lineage_only
+
       if master_only
         # no row means no branch to rebase; building one is the normal path's
-        # job, and a probe must never write a first version of a row
-        return [ :skipped, @record ] unless @record.persisted?
+        # job, and a probe must never write a first version of a row - and a
+        # lineage row is not a branch CI owns, so there is nothing to rebase
+        # either
+        return [ :skipped, @record ] unless @record.persisted? && !@record.lineage_only
         # already sitting on this master: re-applying would only churn the ref
         if @record.status == "applied" && @record.base_sha == master_sha
           return [ :already_current, @record ]
@@ -173,6 +180,10 @@ module PatchBranches
     end
 
     def skippable?(content_hash)
+      # a lineage row is not CI's: the normal path has to apply it again and
+      # own it before anything may push it, so "already applied" does not count
+      return false if @record.lineage_only && !@lineage_only
+
       !@force && @record.persisted? &&
         @record.status == "applied" && @record.patch_content_hash == content_hash &&
         @record.base_committed_at.present?
@@ -249,7 +260,8 @@ module PatchBranches
         failure_reason: failure_reason,
         conflict_files: conflict_files || [],
         patch_content_hash: content_hash,
-        attempted_at: now
+        attempted_at: now,
+        lineage_only: @lineage_only
       )
       @record.assign_attributes(base_columns(base_sha, on_master, base_source)) unless keep_base
       touch_master_apply(master_attempt, now: now) unless master_attempt == :unset

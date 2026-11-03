@@ -119,6 +119,23 @@ RSpec.describe "TeamsProfile", type: :request do
       expect(response.body).to include("Commit credits")
     end
 
+    it "counts llm-sourced commit credits only with the patchset_lineage feature" do
+      team.update!(visibility: :visible)
+      member_alias = attach_verified_alias(member, email: "llm-member@example.com")
+      create(:message, topic: create(:topic, creator_alias: member_alias), sender: member_alias, sender_person_id: member.person.id)
+      CommitPerson.create!(commit: create(:commit, branches: [ "master" ]), role: "author", person_id: member.person.id)
+      CommitPerson.create!(commit: create(:commit, branches: [ "master" ]), role: "author", person_id: member.person.id, source: "llm", confidence: 0.9)
+
+      get team_profile_path("test-team")
+      expect(response.body[/credits-hero-value">([^<]+)</, 1]).to eq("1")
+
+      create(:user_feature, user: non_member, feature: "patchset_lineage")
+      sign_in_as(non_member)
+
+      get team_profile_path("test-team")
+      expect(response.body[/credits-hero-value">([^<]+)</, 1]).to eq("2")
+    end
+
     it "renders the strip tiles without search links" do
       team.update!(visibility: :visible)
       member_alias = attach_verified_alias(member, email: "nolink-member@example.com")

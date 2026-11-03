@@ -83,6 +83,58 @@ RSpec.describe PatchBranches::ApplyOne do
     expect(record.master_apply_error).to be_nil
   end
 
+  it "flags lineage-only rows" do
+    base = fixture.commit(subject: "base", files: { "a.txt" => "one\n" })
+    patch = generate_patch(fixture.path, base, "a.txt", "two\n", @patch_dir)
+    message = message_with_patch(patch)
+
+    described_class.new(repo: repo, worktree: worktree, lineage_only: true)
+                   .call(message.id, master_sha: base)
+
+    expect(PatchBranch.find_by(message_id: message.id).lineage_only).to be(true)
+  end
+
+  it "promotes a lineage-only row when CI applies the same content" do
+    base = fixture.commit(subject: "base", files: { "a.txt" => "one\n" })
+    patch = generate_patch(fixture.path, base, "a.txt", "two\n", @patch_dir)
+    message = message_with_patch(patch)
+    described_class.new(repo: repo, worktree: worktree, lineage_only: true)
+                   .call(message.id, master_sha: base)
+
+    outcome, = apply_one.call(message.id, master_sha: base)
+
+    expect(outcome).to eq(:applied_on_master)
+    record = PatchBranch.find_by(message_id: message.id)
+    expect(record.lineage_only).to be(false)
+    expect(record.status).to eq("applied")
+  end
+
+  it "does not let a lineage apply take a CI-owned row" do
+    base = fixture.commit(subject: "base", files: { "a.txt" => "one\n" })
+    patch = generate_patch(fixture.path, base, "a.txt", "two\n", @patch_dir)
+    message = message_with_patch(patch)
+    apply_one.call(message.id, master_sha: base)
+
+    outcome, = described_class.new(repo: repo, worktree: worktree, lineage_only: true, force: true)
+                              .call(message.id, master_sha: base)
+
+    expect(outcome).to eq(:skipped)
+    expect(PatchBranch.find_by(message_id: message.id).lineage_only).to be(false)
+  end
+
+  it "does not let a master probe own a lineage-only row" do
+    base = fixture.commit(subject: "base", files: { "a.txt" => "one\n" })
+    patch = generate_patch(fixture.path, base, "a.txt", "two\n", @patch_dir)
+    message = message_with_patch(patch)
+    described_class.new(repo: repo, worktree: worktree, lineage_only: true)
+                   .call(message.id, master_sha: base)
+
+    outcome, = apply_one.call(message.id, master_sha: base, master_only: true)
+
+    expect(outcome).to eq(:skipped)
+    expect(PatchBranch.find_by(message_id: message.id).lineage_only).to be(true)
+  end
+
   it "records the master failure and still applies on the detected base" do
     old_date = "2026-01-01T00:00:00+00:00"
     old = fixture.commit(subject: "old", files: { "a.c" => "v1\n" }, date: old_date)

@@ -33,6 +33,14 @@ RSpec.describe PatchBranches::CandidateSelector do
     expect(selector.candidates).to be_empty
   end
 
+  it "keeps a topic that only has an llm link" do
+    topic = create(:topic)
+    latest = patch_message(topic, Time.utc(2020, 1, 1))
+    create(:commit_topic, topic: topic, source: "llm", confidence: 0.9)
+
+    expect(selector.candidates.map(&:id)).to eq([ latest.id ])
+  end
+
   it "excludes merged topics" do
     target = create(:topic)
     topic = create(:topic, merged_into_topic: target)

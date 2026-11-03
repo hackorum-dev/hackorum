@@ -1,6 +1,7 @@
 Rails.application.routes.draw do
   namespace :admin do
     root "dashboard#show"
+    resources :patchset_runs, only: [ :index, :show ]
     resources :users, only: [ :index ] do
       member do
         post :toggle_admin

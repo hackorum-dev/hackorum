@@ -115,6 +115,13 @@ RSpec.describe PatchCi::PushGuard do
     expect(guard.check(row)).to eq("row superseded")
   end
 
+  it "rejects a lineage-only row" do
+    base = branch_with_commit("t12_1")
+    row = record("t12_1", base, lineage_only: true)
+
+    expect(guard.check(row)).to eq("lineage only row")
+  end
+
   # 8.x predates every era image and no family covers it - a handful of corpus
   # branches really do sit on pre-9.6 bases, so this is the live case
   it "rejects an unsupported era with a reason" do

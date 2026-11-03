@@ -243,7 +243,7 @@ module PatchCi
                       .order(created_at: :desc, id: :desc).pick(:id)
       return unless newest && row.message_id == newest
 
-      PatchBranch.where(topic_id: row.topic_id, superseded_by_id: nil)
+      PatchBranch.where(topic_id: row.topic_id, superseded_by_id: nil, lineage_only: false)
                  .where.not(id: row.id).update_all(superseded_by_id: row.id)
     end
   end

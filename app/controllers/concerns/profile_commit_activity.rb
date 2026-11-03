@@ -15,6 +15,7 @@ module ProfileCommitActivity
       person_ids: commit_activity_person_ids,
       year: period.year,
       roles: @commit_roles,
+      sources: commit_credit_sources,
       wday_start: @week_start_day
     )
 
@@ -41,7 +42,7 @@ module ProfileCommitActivity
   end
 
   def commit_activity_years
-    @commit_activity_years ||= CommitActivity.available_years(commit_activity_person_ids)
+    @commit_activity_years ||= CommitActivity.available_years(commit_activity_person_ids, sources: commit_credit_sources)
   end
 
   def commit_activity_person_ids

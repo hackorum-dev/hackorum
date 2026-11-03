@@ -133,6 +133,38 @@ RSpec.describe 'Team commit activity', type: :request do
       )
     end
 
+    it 'ignores llm-sourced credits' do
+      other = create(:commit, subject: 'Guessed authorship', branches: [ 'master' ],
+                              committed_at: Time.zone.local(2024, 5, 11, 11))
+      create(:commit_person, commit: other, person: member.person, role: 'author', source: 'llm', confidence: 0.9)
+
+      get team_commits_path('commit-team')
+
+      expect(response.body).to include('Widen the executor check')
+      expect(response.body).not_to include('Guessed authorship')
+    end
+
+    it 'lists llm-sourced credits marked LLM for a member with the patchset_lineage feature' do
+      other = create(:commit, subject: 'Guessed authorship', branches: [ 'master' ],
+                              committed_at: Time.zone.local(2024, 5, 11, 11))
+      create(:commit_person, commit: other, person: member.person, role: 'author', source: 'llm', confidence: 0.9)
+      create(:user_feature, user: member, feature: 'patchset_lineage')
+
+      get team_commits_path('commit-team')
+
+      doc = Nokogiri::HTML(response.body)
+      rows = doc.css('table.commit-activity-table tbody tr')
+      expect(rows.size).to eq(2)
+
+      guessed = rows.find { |tr| tr.text.include?('Guessed authorship') }
+      marker = guessed.at_css('.commit-role-tags .activity-tag + .commit-credit-llm')
+      expect(marker.text).to eq('LLM')
+      expect(marker.previous_element.text).to match(/author/i)
+      expect(guessed.css('td:nth-child(2) .commit-credit-llm')).to be_empty
+      parsed = rows.find { |tr| tr.text.include?('Widen the executor check') }
+      expect(parsed.at_css('.commit-credit-llm')).to be_nil
+    end
+
     it 'counts the shared commit once in the summary total' do
       get team_commits_path('commit-team')
 

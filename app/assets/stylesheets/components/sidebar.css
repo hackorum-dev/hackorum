@@ -601,3 +601,79 @@
   font-size: var(--font-size-sm);
   margin-top: var(--spacing-1);
 }
+
+.commit-sidebar-llm,
+.commit-credit-llm {
+  margin-left: var(--spacing-1);
+}
+
+.commit-sidebar-llm,
+.commit-credit-llm,
+.lineage-kind,
+.lineage-extra {
+  display: inline-block;
+  padding: 0 var(--spacing-1);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  background: var(--color-bg-hover, #eee);
+  color: var(--color-text-secondary);
+}
+
+.lineage-story {
+  font-size: var(--font-size-sm);
+  white-space: pre-line;
+}
+
+.lineage-verdict {
+  margin: var(--spacing-2) 0;
+}
+
+.lineage-verdict-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+}
+
+.lineage-verdict-meta,
+.lineage-run-meta,
+.patchset-lineage {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.lineage-evidence {
+  font-size: var(--font-size-xs);
+}
+
+.lineage-change {
+  display: inline-block;
+  padding: 0 var(--spacing-1);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  background: var(--color-bg-hover, #eee);
+  color: var(--color-text-secondary);
+  cursor: help;
+}
+
+.lineage-reviews {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.lineage-reviews summary {
+  cursor: pointer;
+}
+
+.lineage-review-list {
+  margin: 0;
+  padding-left: var(--spacing-3);
+}
+
+.lineage-coverage {
+  margin-left: var(--spacing-1);
+  font-style: italic;
+}
+
+.lineage-review-note {
+  margin-left: var(--spacing-1);
+}

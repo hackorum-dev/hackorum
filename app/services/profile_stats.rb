@@ -22,8 +22,11 @@ class ProfileStats
     WHERE topics.creator_person_id IN (:ids)
   SQL
 
-  def initialize(person_ids)
+  DEFAULT_SOURCES = %w[parsed].freeze
+
+  def initialize(person_ids, sources: DEFAULT_SOURCES)
     @person_ids = Array(person_ids)
+    @sources = Array(sources)
   end
 
   def messages_sent    = message_totals[:count]
@@ -57,10 +60,10 @@ class ProfileStats
       if patch_threads_since_era.zero?
         0
       else
-        CommitTopic.where(topic_id: patch_message_scope.select(:topic_id))
+        CommitTopic.trailer.where(topic_id: patch_message_scope.select(:topic_id))
                    .joins(:topic)
                    .joins(commit: :commit_people)
-                   .where(commit_people: { person_id: @person_ids, role: LANDED_ROLES })
+                   .where(commit_people: { person_id: @person_ids, role: LANDED_ROLES, source: @sources })
                    .where(topics: { created_at: COMMIT_LINK_ERA_START.. })
                    .distinct
                    .count(:topic_id)
@@ -85,14 +88,14 @@ class ProfileStats
       if @person_ids.empty?
         0
       else
-        CommitPerson.joins(:commit).merge(Commit.on_master)
+        CommitPerson.where(source: @sources).joins(:commit).merge(Commit.on_master)
                     .where(person_id: @person_ids).distinct.count(:commit_id)
       end
   end
 
   def commit_credits_by_role
     @commit_credits_by_role ||= begin
-      counts = @person_ids.empty? ? {} : CommitPerson.joins(:commit).merge(Commit.on_master)
+      counts = @person_ids.empty? ? {} : CommitPerson.where(source: @sources).joins(:commit).merge(Commit.on_master)
                                                       .where(person_id: @person_ids).group(:role).count
       PROFILE_ROLE_ORDER.index_with { |role| counts[role].to_i }
     end
@@ -104,7 +107,7 @@ class ProfileStats
       if @person_ids.empty?
         0
       else
-        CommitPerson.joins(:commit).merge(Commit.backports)
+        CommitPerson.where(source: @sources).joins(:commit).merge(Commit.backports)
                     .where(person_id: @person_ids, role: "author").distinct.count(:commit_id)
       end
   end

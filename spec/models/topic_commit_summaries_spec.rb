@@ -5,6 +5,13 @@ RSpec.describe Topic, ".commit_summaries" do
     expect(described_class.commit_summaries([])).to eq({})
   end
 
+  it "ignores llm links" do
+    topic = create(:topic)
+    create(:commit_topic, topic: topic, commit: create(:commit), source: "llm", confidence: 0.9)
+
+    expect(described_class.commit_summaries([ topic.id ])).to eq({})
+  end
+
   it "groups commits per topic, newest first" do
     topic = create(:topic)
     older = create(:commit, subject: "Older change", committed_at: 3.days.ago)

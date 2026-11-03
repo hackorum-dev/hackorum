@@ -63,7 +63,6 @@ class PatchPathExtractor
     return nil if p.match?(/\A\d+(,\d+)?\z/)
     p
   end
-  private_class_method :normalize
 
   def initialize(message)
     @message = message

@@ -105,6 +105,7 @@ class TopicsController < ApplicationController
     build_thread_outline(@messages)
     load_commitfest_sidebar
     load_commit_sidebar
+    @lineage = Lineage::ThreadPresenter.new(@topic, ordinals: @message_numbers) if lineage_visible?
     # lazy object, not a load_* call like its neighbours - the view decides
     # whether anything is needed, so this must not query on its own
     @ci_status = PatchCi::TopicStatus.new(topic: @topic)
@@ -190,9 +191,15 @@ class TopicsController < ApplicationController
 
     # a row with no pushed_at has no branch on github yet, but it still counts
     # as CI history worth linking to
-    branches = PatchBranch.where(topic_id: @topic.id).pluck(:message_id, :branch_name, :pushed_at)
+    branches = PatchBranch.where(topic_id: @topic.id, lineage_only: false)
+                          .pluck(:message_id, :branch_name, :pushed_at)
     @has_patch_branches = branches.any?
     @patchset_branches = branches.filter_map { |message_id, name, pushed_at| [ message_id, name ] if pushed_at }.to_h
+    @lineage_by_message = if lineage_visible?
+      Lineage::ThreadPresenter.new(@topic, ordinals: @message_numbers).lineage_by_message_id
+    else
+      {}
+    end
 
     render layout: false
   end
@@ -964,16 +971,17 @@ class TopicsController < ApplicationController
   end
 
   def load_commit_sidebar
-    commits = Commit.for_topic(@topic.id).to_a
+    sources = lineage_visible? ? %w[trailer llm] : %w[trailer]
+    commits = Commit.for_topic(@topic.id, sources: sources).to_a
     @commit_groups = Commit.group_backports(commits)
-    @commit_credits = commit_credits_for(commits)
+    @commit_credits = commit_credits_for(commits, sources: commit_credit_sources)
   end
 
-  # role => [{ name:, email: }], deduplicated across a change and its backports.
-  def commit_credits_for(commits)
+  # role => [{ name:, email:, llm: }], deduplicated across a change and its backports.
+  def commit_credits_for(commits, sources: %w[parsed])
     return {} if commits.empty?
 
-    rows = CommitPerson.where(commit_id: commits.map(&:id))
+    rows = CommitPerson.where(commit_id: commits.map(&:id), source: sources)
                        .includes(person: :default_alias)
     grouped = rows.group_by(&:role)
 
@@ -982,15 +990,17 @@ class TopicsController < ApplicationController
         alias_record = row.person&.default_alias
         {
           name: row.raw_name.presence || alias_record&.name || row.raw_email,
-          email: alias_record&.email
+          email: alias_record&.email,
+          llm: row.source == "llm"
         }
       end
 
       # dedupe by name, but a resolved (linked) entry wins over an unresolved
       # duplicate of the same name -- otherwise a name colliding with an
-      # earlier unresolved row would silently drop its person link.
+      # earlier unresolved row would silently drop its person link. Among
+      # resolved ones a parsed row beats an llm one.
       deduped = entries.group_by { |entry| entry[:name].to_s.downcase }.map do |_, dups|
-        dups.find { |entry| entry[:email].present? } || dups.first
+        dups.min_by { |entry| [ entry[:email].present? ? 0 : 1, entry[:llm] ? 1 : 0 ] }
       end
 
       acc[role] = deduped if deduped.any?

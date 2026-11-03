@@ -354,6 +354,18 @@ RSpec.describe CommitImport::Importer do
     end
   end
 
+  describe "#refresh_commit_aggregates" do
+    it "counts trailer links only" do
+      topic = create(:topic)
+      create(:commit_topic, topic: topic, commit: create(:commit))
+      create(:commit_topic, topic: topic, commit: create(:commit), source: "llm", confidence: 0.9)
+
+      importer.send(:refresh_commit_aggregates, [ topic.id ])
+
+      expect(topic.reload.commit_count).to eq(1)
+    end
+  end
+
   describe "#reparse!" do
     it "re-derives people and links from stored bodies" do
       topic = create(:topic)
@@ -370,6 +382,18 @@ RSpec.describe CommitImport::Importer do
       commit = Commit.find_by(sha: sha)
       expect(commit.commit_people.where(role: "reviewer").count).to eq(1)
       expect(commit.topics).to eq([ topic ])
+    end
+
+    it "keeps llm-sourced people across a reparse" do
+      sha = fixture_repo.commit(subject: "x", body: "Reviewed-by: Tom Lane <tgl@sss.pgh.pa.us>\n")
+      importer.run!
+      commit = Commit.find_by(sha: sha)
+      commit.commit_people.create!(role: "author", raw_name: "Sender", source: "llm", confidence: 0.9)
+
+      importer.reparse!
+
+      expect(commit.commit_people.llm.where(role: "author").count).to eq(1)
+      expect(commit.commit_people.parsed.where(role: "reviewer").count).to eq(1)
     end
 
     it "drops last_commit_at back to null when the trailer is gone" do

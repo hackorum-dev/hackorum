@@ -42,5 +42,8 @@
       = link_to admin_features_path, class: admin_nav_link_class(:features) do
         i.fas.fa-flag
         span Features
+      = link_to admin_patchset_runs_path, class: admin_nav_link_class(:patchset_runs) do
+        i.fas.fa-project-diagram
+        span Patchset Runs
 
 = render template: 'layouts/application'

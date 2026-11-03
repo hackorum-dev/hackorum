@@ -350,7 +350,7 @@ module CiHelper
     return nil unless message.is_patch_submission
     @ci_message_branch_names ||= {}
     @ci_message_branch_names[message.topic_id] ||=
-      PatchBranch.where(topic_id: message.topic_id).where.not(pushed_at: nil)
+      PatchBranch.where(topic_id: message.topic_id, lineage_only: false).where.not(pushed_at: nil)
                  .pluck(:message_id, :branch_name).to_h
     @ci_message_branch_names[message.topic_id][message.id]
   end

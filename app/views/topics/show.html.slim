@@ -11,12 +11,17 @@
             - @commit_groups.each do |group|
               .commit-sidebar-entry
                 = link_to group[:subject], commit_web_url(group[:sha]), target: "_blank", rel: "noopener", class: "commit-sidebar-link"
+                - if @lineage && @lineage.llm_commit_shas.include?(group[:sha])
+                  span.commit-sidebar-llm title="Linked by the patchset lineage model, not a commit trailer" LLM
                 .commit-sidebar-branches
                   = render partial: "shared/branch_badges", locals: { branches: group[:branches] }
                 .commit-sidebar-meta
                   - if group[:committer_name].present?
                     span.commit-sidebar-committer = "Committed by #{group[:committer_name]}"
                   span.commit-sidebar-date = absolute_time_display(group[:committed_at])
+
+    - if @lineage&.run
+      = render "topics/lineage_sidebar", lineage: @lineage
 
     - if @commit_credits.present?
       details.sidebar-section open=true
@@ -33,6 +38,8 @@
                     = link_to entry[:name], person_path(entry[:email]), class: "commit-credit-link"
                   - else
                     = entry[:name]
+                  - if entry[:llm]
+                    span.commit-credit-llm title="Attributed by the patchset lineage model" LLM
 
     - if ci_thread_visible?(@ci_status)
       = render "topics/ci_sidebar", status: @ci_status, topic: @topic

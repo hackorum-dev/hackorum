@@ -47,6 +47,17 @@ RSpec.describe Commit do
 
       expect(described_class.for_topic(topic.id).map(&:id)).to eq([ new_commit.id, old.id ])
     end
+
+    it "returns trailer links only unless asked for llm ones too" do
+      topic = create(:topic)
+      trailer = create(:commit)
+      llm = create(:commit)
+      create(:commit_topic, topic: topic, commit: trailer)
+      create(:commit_topic, topic: topic, commit: llm, source: "llm", confidence: 0.9)
+
+      expect(described_class.for_topic(topic.id)).to contain_exactly(trailer)
+      expect(described_class.for_topic(topic.id, sources: %w[trailer llm])).to contain_exactly(trailer, llm)
+    end
   end
 
   describe ".group_backports" do

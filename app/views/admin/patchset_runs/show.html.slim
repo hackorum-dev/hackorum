@@ -1,0 +1,81 @@
+- content_for :title, "Admin - Patchset run #{@run.id}"
+- ordinals = lineage_ordinals(@run.topic)
+
+.settings-page
+  h1 = "Run #{@run.id}: #{@run.topic.title}"
+  p = link_to "open thread", topic_path(@run.topic)
+  table.email-table
+    tr
+      th Status
+      td = @run.status
+    tr
+      th Model / effort / prompt
+      td = "#{@run.model} / #{@run.effort} / #{@run.prompt_version}"
+    tr
+      th Duration
+      td = @run.duration_s ? "#{@run.duration_s.round}s" : ""
+    tr
+      th Tokens in/cached/out
+      td = "#{@run.input_tokens}/#{@run.cached_input_tokens}/#{@run.output_tokens}"
+    tr
+      th Job dir
+      td
+        code = @run.job_dir
+    - if @run.error.present?
+      tr
+        th = @run.status == "done" ? "Notes" : "Error"
+        td
+          pre = @run.error
+
+  h2 Story
+  pre = lineage_text(@run.story, ordinals)
+
+  h2 Lineage
+  table.email-table
+    thead
+      tr
+        th Message
+        th Parent
+        th Kind
+        th Confidence
+        th Reason
+    tbody
+      - @lineages.each do |l|
+        tr
+          td = l.message_id
+          td = l.parent_message_id
+          td = l.step_kind
+          td = l.confidence
+          td = lineage_text(l.reason, ordinals)
+
+  h2 Verdicts
+  table.email-table
+    thead
+      tr
+        th Commit
+        th Verdict
+        th Origin
+        th Change
+        th Source
+        th Author
+        th Extra
+        th Confidence
+        th Reviews (final/earlier/none)
+        th Evidence
+    tbody
+      - @verdicts.each do |v|
+        tr
+          td = link_to v.commit.sha[0, 10], commit_web_url(v.commit.sha), target: "_blank", rel: "noopener"
+          td = v.verdict
+          td = v.origin
+          td = v.change_level
+          td = v.source_message_id
+          td = v.author_message ? "#{v.author_message.sender.name} (#{v.author_message_id})" : (v.author_name || "via sender")
+          td = v.extra ? "yes" : "no"
+          td = v.confidence
+          td = "#{v.reviewers_final.to_i}/#{v.reviewers_earlier.to_i}/#{v.reviewers_none.to_i}"
+          td = lineage_text(v.evidence, ordinals)
+
+  details
+    summary Raw result
+    pre = JSON.pretty_generate(@run.raw_result || {})

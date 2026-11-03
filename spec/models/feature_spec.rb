@@ -7,6 +7,10 @@ RSpec.describe Feature do
       expect(Feature.valid?("email_sending")).to be true
     end
 
+    it "knows the patchset_lineage feature" do
+      expect(Feature.valid?("patchset_lineage")).to be true
+    end
+
     it "returns false for unknown names" do
       expect(Feature.valid?(:bogus)).to be false
     end

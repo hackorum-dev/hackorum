@@ -17,7 +17,7 @@ module PatchBranches
       scope = Message
         .from(latest, "messages")
         .where(created_at: @from...@to)
-        .where.not(topic_id: CommitTopic.select(:topic_id))
+        .where.not(topic_id: CommitTopic.trailer.select(:topic_id))
         .where(topic_id: Topic.active.select(:id))
 
       scope = sample ? scope.order(Arel.sql("RANDOM()")) : scope.order(created_at: :desc, id: :desc)

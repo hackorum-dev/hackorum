@@ -33,6 +33,16 @@ class ApplicationController < ActionController::Base
     current_user&.admin?
   end
 
+  def lineage_visible?
+    return @lineage_visible if defined?(@lineage_visible)
+
+    @lineage_visible = user_signed_in? && current_user.has_feature?(:patchset_lineage)
+  end
+
+  def commit_credit_sources
+    lineage_visible? ? %w[parsed llm] : %w[parsed]
+  end
+
   def require_authentication
     redirect_to new_session_path, alert: "Please sign in" unless user_signed_in?
   end

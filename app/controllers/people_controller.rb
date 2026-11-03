@@ -5,7 +5,7 @@ class PeopleController < ApplicationController
 
   def show
     @active_tab = params[:tab] == "commits" ? :commits : :messages
-    @profile_stats = ProfileStats.new(@person.id)
+    @profile_stats = ProfileStats.new(@person.id, sources: commit_credit_sources)
     @teams = load_visible_teams
     load_activity_data(period: default_activity_period)
   end
