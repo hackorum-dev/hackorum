@@ -21,3 +21,12 @@ Rails.application.config.middleware.use OmniAuth::Builder do
 end
 
 OmniAuth.config.allowed_request_methods = [ :post ]
+
+# gem only delegates csrf config to ActionController::Base on rails >= 8.1,
+# below that it keeps its own defaults (no per-form tokens) and rejects button_to tokens
+if ActionPack.version < Gem::Version.new("8.1.a")
+  OmniAuth::RailsCsrfProtection::TokenVerifier.class_eval do
+    def self.config = ActionController::Base.config
+    def config = self.class.config
+  end
+end
