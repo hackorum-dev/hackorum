@@ -152,10 +152,38 @@ reviewers: `reviews` is `[]`.
 <!-- /trailer full -->
 ## Task 4: story
 
-A short plain-text summary of how the thread progressed to its commits: which
-patchsets led to which commit, which were abandoned, where bugfix rounds
-started. Five to fifteen lines, with reference tokens for every message and
-commit mentioned (see Rules).
+An array of plain-text strings telling how the thread got to its commits,
+written for a reader who will not open the thread. One step per entry, in
+thread order, each a complete sentence that stands on its own; the UI shows
+them as list items. Reference tokens for every message and commit mentioned
+(see Rules).
+
+Cover the whole thread, not just its ending:
+
+- how it started: who proposed what, and the design decisions settled in
+  discussion before or between patchsets (who argued for what, what was
+  chosen), since a reader needs those as much as the patch history
+- every turn of the design: a review that changed the approach, a long gap
+  followed by a rebase, a change of author, reviewers supplying fix-up
+  patches that got folded in, a split into or merge of series
+- every candidate you judged as coming from this thread: which patchset it
+  came from and what changed on the way; commits that landed together from
+  the same patchset may share a line, but name each sha
+- reverts and why, and the rework that led to a second landing
+- bugfix rounds after a commit: the report that started them and what fixed
+  them
+- what was abandoned or left out, and the stated reason if there is one
+- where the thread stands at its last message: all landed, part of the series
+  landed and which patches are still in review, stalled, withdrawn; and the
+  questions still open if work continues
+
+Length follows the thread. A thread with a few patchsets and one commit needs
+five lines; a thread with dozens of patchsets, a revert and a second landing
+may need thirty or more entries. Do not drop a phase or merge distinct commits into
+"several fixes followed" to keep it short. Do not walk through versions one
+by one either: a run of versions that only answered review comments is one
+entry, described by what changed across it. Skip pings, plain resends and
+rebases that changed nothing, unless they mark the start of a new phase.
 
 ## Metrics
 

@@ -16,7 +16,7 @@ RSpec.describe Lineage::ResultIngestor do
         { "message_id" => m1.id, "parent_message_id" => nil, "step_kind" => "new_series", "confidence" => 0.95, "reason" => "first" },
         { "message_id" => m2.id, "parent_message_id" => m1.id, "step_kind" => "rebase", "confidence" => 0.8, "reason" => "same hunks" } ],
       "verdicts" => [ { "sha" => sha, "verdict" => verdict, "source_message_id" => m2.id, "confidence" => confidence, "evidence" => "e" } ],
-      "story" => "v1 then v2 then commit" }
+      "story" => [ "v1 then v2", "then commit" ] }
   end
 
   def ingest(data, **opts)
@@ -30,7 +30,7 @@ RSpec.describe Lineage::ResultIngestor do
   it "writes rows, story, links above threshold" do
     ingest(answer)
     expect(run.reload.status).to eq("done")
-    expect(run.story).to eq("v1 then v2 then commit")
+    expect(run.story).to eq("v1 then v2\nthen commit")
     expect(run.lineages.count).to eq(2)
     expect(run.lineages.find_by(message_id: m2.id).parent_message_id).to eq(m1.id)
     expect(run.verdicts.first.verdict).to eq("as_is")
@@ -423,14 +423,27 @@ RSpec.describe Lineage::ResultIngestor do
     data["lineage"][1]["reason"] = "rebased per messages/1.txt"
     data["verdicts"][0]["evidence"] = "see message #{m1.id} and #{other.sha}, also #{commit.sha}"
     data["verdicts"][0]["reviews"] = [ review("Alice Smith", note: "in message #{m2.id}") ]
-    data["story"] = "ends in #{commit.sha} after [msg:#{m1.id}]"
+    data["story"] = [ " ends in #{commit.sha} ", "", "after [msg:#{m1.id}]" ]
     ingest(data)
     run.reload
     expect(run.lineages.find_by(message_id: m2.id).reason).to eq("rebased per [msg:#{m1.id}]")
     expect(run.verdicts.first.evidence).to eq("see [msg:#{m1.id}] and [commit:#{other.sha}], also [commit:#{commit.sha}]")
     expect(run.verdicts.first.reviews.first["note"]).to eq("in [msg:#{m2.id}]")
-    expect(run.story).to eq("ends in [commit:#{commit.sha}] after [msg:#{m1.id}]")
+    expect(run.story).to eq("ends in [commit:#{commit.sha}]\nafter [msg:#{m1.id}]")
     expect(run.raw_result["story"]).to eq(data["story"])
+  end
+
+  it "still takes a string story from an older bundle" do
+    data = answer
+    data["story"] = "v1 then commit"
+    ingest(data)
+    expect(run.reload.story).to eq("v1 then commit")
+  end
+
+  it "rejects a story that is neither a string nor strings" do
+    data = answer
+    data["story"] = [ "ok", 3 ]
+    expect { ingest(data) }.to raise_error(described_class::Error, /story/)
   end
 
   it "rejects verdicts and extra commits in lineage mode" do

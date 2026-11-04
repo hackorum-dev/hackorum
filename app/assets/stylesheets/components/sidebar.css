@@ -620,8 +620,13 @@
 }
 
 .lineage-story {
+  margin: 0;
+  padding-left: var(--spacing-3);
   font-size: var(--font-size-sm);
-  white-space: pre-line;
+}
+
+.lineage-story li {
+  margin-bottom: var(--spacing-1);
 }
 
 .lineage-verdict {

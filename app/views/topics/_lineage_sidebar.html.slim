@@ -2,7 +2,9 @@ details.sidebar-section open=true
   summary.sidebar-heading Patch lineage
   .sidebar-section
     - if lineage.story.present?
-      p.lineage-story = lineage_text(lineage.story, lineage.ordinals)
+      ul.lineage-story
+        - lineage.story.lines.map(&:strip).reject(&:empty?).each do |line|
+          li = lineage_text(line, lineage.ordinals)
     - lineage.verdicts.each do |v|
       .lineage-verdict
         = link_to v[:subject], commit_web_url(v[:sha]), target: "_blank", rel: "noopener", class: "commit-sidebar-link"

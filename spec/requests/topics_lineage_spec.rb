@@ -8,7 +8,7 @@ RSpec.describe "Thread page patchset lineage", type: :request do
   let(:extra_commit) { create(:commit, subject: "Revert the thing", sha: "d" * 40) }
   let(:other_commit) { create(:commit, subject: "Unrelated overlap", sha: "e" * 40) }
   let(:pending_commit) { create(:commit, subject: "Still undecided", sha: "f" * 40) }
-  let!(:run) { create(:patchset_run, topic: topic, story: "v1 then v2 landed as c") }
+  let!(:run) { create(:patchset_run, topic: topic, story: "v1 then v2 landed as c\n\nthen a fixup followed\n") }
 
   before do
     create(:patchset_lineage, patchset_run: run, topic: topic, message: m1, step_kind: "new_series", confidence: 1.0)
@@ -43,7 +43,7 @@ RSpec.describe "Thread page patchset lineage", type: :request do
     sign_in_as(user)
 
     get topic_path(topic)
-    expect(response.body).to include("v1 then v2 landed")
+    expect(response.body).to include("<li>v1 then v2 landed as c</li><li>then a fixup followed</li>")
     expect(response.body).to include("Land the thing")
     expect(response.body).to include("commit-sidebar-llm")
     expect(response.body).to include("modified")

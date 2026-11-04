@@ -31,7 +31,7 @@ module Lineage
         PatchsetLineage.insert_all(lineage_rows(data))
         CommitVerdict.insert_all(verdict_rows(data["verdicts"], known, extra: false) +
                                  verdict_rows(extras, known, extra: true))
-        @run.finish!(status: "done", story: normalize(data["story"]), raw_result: data,
+        @run.finish!(status: "done", story: normalize(story_text(data)), raw_result: data,
                      error: @notes.join("\n").presence)
         judged = data["verdicts"] + extras
         if @link && judged.any?
@@ -65,7 +65,7 @@ module Lineage
 
     def validate!(data)
       raise Error, "top level must be an object with lineage, verdicts, story" unless data.is_a?(Hash) &&
-        data["lineage"].is_a?(Array) && data["verdicts"].is_a?(Array) && data["story"].is_a?(String)
+        data["lineage"].is_a?(Array) && data["verdicts"].is_a?(Array) && story_shape?(data["story"])
       raise Error, "extra_commits must be an array" unless extras(data).is_a?(Array)
       if @mode == "lineage" && (data["verdicts"].any? || extras(data).any?)
         raise Error, "lineage mode allows no verdicts or extra_commits"
@@ -145,8 +145,20 @@ module Lineage
       extras(data).reject { |v| candidates.key?(v["sha"]) || !shas.add?(v["sha"]) }
     end
 
+    # older bundles ship a schema with a string story
+    def story_shape?(story)
+      story.is_a?(String) || (story.is_a?(Array) && story.all?(String))
+    end
+
+    def story_text(data)
+      story = data["story"]
+      return story unless story.is_a?(Array)
+
+      story.map(&:strip).reject(&:empty?).join("\n")
+    end
+
     def reference_shas(data, known)
-      texts = data["lineage"].map { |l| l["reason"] } + [ data["story"] ] +
+      texts = data["lineage"].map { |l| l["reason"] } + [ story_text(data) ] +
               (data["verdicts"] + extras(data)).flat_map { |v| [ v["evidence"] ] + reviews(v).map { |r| r["note"] } }
       hexes = texts.compact.flat_map { |t| t.to_s.scan(References::SHA) }.map(&:downcase).uniq - known.keys
       known.keys.to_set | Commit.where(sha: hexes).pluck(:sha)
