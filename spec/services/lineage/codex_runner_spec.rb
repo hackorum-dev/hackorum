@@ -61,7 +61,8 @@ RSpec.describe Lineage::CodexRunner do
 
   {
     "Selected model is at capacity. Please try a different model." => "capacity",
-    "You have hit your usage limit." => "usage_limit",
+    "The model is not available right now, try again later." => "capacity",
+    "You have hit your usage limit. Try again later." => "usage_limit",
     "something else broke" => "codex"
   }.each do |message, kind|
     it "classifies #{kind} errors" do

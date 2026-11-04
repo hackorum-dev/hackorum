@@ -3,8 +3,9 @@ require "fileutils"
 module Lineage
   module Processor
     class Worker
-      CAPACITY_RETRY_SLEEP = 60
-      UPLOAD_RETRY_SLEEPS = [ 5, 15, 45 ].freeze
+      CAPACITY_RETRY_SLEEPS = [ 60, 180, 300 ].freeze
+      SERVER_RETRY_SLEEPS = [ 10, 30, 60, 120, 300 ].freeze
+      RELEASE_RETRY_SLEEPS = [ 5, 15, 45 ].freeze
       STOP_KINDS = %w[usage_limit capacity aborted].freeze
       MAX_CONSECUTIVE_FAILURES = 3
       COUNTED_FAILURE_KINDS = %w[processor codex].freeze
@@ -12,8 +13,8 @@ module Lineage
       Outcome = Struct.new(:kind, :claim, :status, :duration_s, :error, keyword_init: true)
 
       def initialize(client:, runner:, jobs_root:, worker_name:, stop:, phases: nil, repo_path: nil, completer: nil,
-                     say: ->(_) { }, capacity_sleep: CAPACITY_RETRY_SLEEP, upload_sleeps: UPLOAD_RETRY_SLEEPS,
-                     max_failures: MAX_CONSECUTIVE_FAILURES)
+                     say: ->(_) { }, capacity_sleeps: CAPACITY_RETRY_SLEEPS, server_sleeps: SERVER_RETRY_SLEEPS,
+                     release_sleeps: RELEASE_RETRY_SLEEPS, max_failures: MAX_CONSECUTIVE_FAILURES)
         @client = client
         @runner = runner
         @jobs_root = jobs_root.to_s
@@ -22,15 +23,16 @@ module Lineage
         @phases = phases
         @completer = completer || BundleCompleter.new(repo_path: repo_path)
         @say = say
-        @capacity_sleep = capacity_sleep
-        @upload_sleeps = upload_sleeps
+        @capacity_sleeps = capacity_sleeps
+        @server_sleeps = server_sleeps
+        @release_sleeps = release_sleeps
         @max_failures = max_failures
         @failures = 0
       end
 
       def run_one
         return Outcome.new(kind: :stopped) if @stop.set?
-        claim = @client.claim(worker: @worker_name, phases: @phases)
+        claim = with_retries("claim") { @client.claim(worker: @worker_name, phases: @phases) }
         return Outcome.new(kind: :empty) unless claim
         process(claim)
       rescue Client::Error => e
@@ -45,11 +47,14 @@ module Lineage
       def process(claim)
         job_dir = File.join(@jobs_root, claim.topic_id.to_s, claim.run_id.to_s)
         FileUtils.mkdir_p(job_dir)
-        tar = @client.download_bundle(claim.run_id, to: File.join(job_dir, "bundle.tar.gz"))
+        tar = with_retries("download of run #{claim.run_id}") do
+          @client.download_bundle(claim.run_id, to: File.join(job_dir, "bundle.tar.gz"))
+        end
         result, duration = prepare_and_run(job_dir, tar)
-        if result.failure_kind == "capacity" && !@stop.set?
-          @say.call("capacity error on topic #{claim.topic_id}, retrying in #{@capacity_sleep}s: #{result.error_message}")
-          sleep @capacity_sleep
+        @capacity_sleeps.each do |s|
+          break unless result.failure_kind == "capacity" && !@stop.set?
+          @say.call("capacity error on topic #{claim.topic_id}, retrying in #{s}s: #{result.error_message}")
+          pause(s)
           result, duration = run_codex(job_dir)
         end
         if STOP_KINDS.include?(result.failure_kind)
@@ -120,29 +125,49 @@ module Lineage
 
       # -> reply hash, or nil after the retries ran out (claim released, stop set); Conflict passes through
       def upload(claim, fields, result_path)
+        with_retries("upload of run #{claim.run_id}") do
+          @client.submit_result(claim.run_id, fields, result_path: File.exist?(result_path) ? result_path : nil)
+        end
+      rescue Client::Conflict
+        raise
+      rescue Client::Error => e
+        @say.call("upload of run #{claim.run_id} gave up, releasing: #{e.message}")
+        @stop.set!
+        release(claim)
+        nil
+      end
+
+      # release runs after a stop, so it ignores the flag
+      def release(claim)
+        with_retries("release of run #{claim.run_id}", sleeps: @release_sleeps, stoppable: false) { @client.release(claim.run_id) }
+      rescue Client::Error => e
+        @say.call("release of run #{claim.run_id} failed, left for the server sweep: #{e.message}")
+      end
+
+      # Conflict and the last Error pass through
+      def with_retries(what, sleeps: @server_sleeps, stoppable: true)
         attempts = 0
         begin
-          @client.submit_result(claim.run_id, fields, result_path: File.exist?(result_path) ? result_path : nil)
+          yield
         rescue Client::Conflict
           raise
         rescue Client::Error => e
-          if attempts < @upload_sleeps.size
-            @say.call("upload of run #{claim.run_id} failed (#{e.message}), retrying in #{@upload_sleeps[attempts]}s")
-            sleep @upload_sleeps[attempts]
-            attempts += 1
-            retry
-          end
-          @say.call("upload of run #{claim.run_id} failed #{attempts + 1} times, releasing: #{e.message}")
-          @stop.set!
-          release(claim)
-          nil
+          raise if attempts >= sleeps.size || (stoppable && @stop.set?)
+          @say.call("#{what} failed (#{e.message}), retrying in #{sleeps[attempts]}s")
+          pause(sleeps[attempts], stoppable: stoppable)
+          raise if stoppable && @stop.set?
+          attempts += 1
+          retry
         end
       end
 
-      def release(claim)
-        @client.release(claim.run_id)
-      rescue Client::Error => e
-        @say.call("release of run #{claim.run_id} failed: #{e.message}")
+      def pause(seconds, stoppable: true)
+        deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + seconds
+        loop do
+          left = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          break if left <= 0 || (stoppable && @stop.set?)
+          sleep [ left, 1 ].min
+        end
       end
     end
   end

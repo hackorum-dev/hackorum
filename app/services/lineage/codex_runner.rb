@@ -13,8 +13,8 @@ module Lineage
     STDERR_TAIL_BYTES = 4000
 
     FAILURE_PATTERNS = {
-      "capacity" => /capacity|rate limit|overloaded/i,
-      "usage_limit" => /usage limit|quota|insufficient|billing/i
+      "usage_limit" => /usage limit|quota|insufficient|billing/i,
+      "capacity" => /capacity|rate limit|overloaded|not available|unavailable|try again later/i
     }.freeze
 
     CONFIG_SOURCE = Rails.root.join("config/lineage/codex.config.toml")

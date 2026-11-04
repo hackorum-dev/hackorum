@@ -44,7 +44,7 @@ RSpec.describe Lineage::Processor::Worker do
   def worker(dir, client:, runner:, **opts)
     described_class.new(client: client, runner: runner, completer: completer, jobs_root: File.join(dir, "jobs"),
                         worker_name: "w", phases: nil, stop: stop, say: ->(l) { lines << l },
-                        capacity_sleep: 0, upload_sleeps: [ 0, 0 ], **opts)
+                        capacity_sleeps: [ 0, 0, 0 ], server_sleeps: [ 0, 0 ], release_sleeps: [ 0 ], **opts)
   end
 
   it "runs a claim end to end" do
@@ -71,16 +71,19 @@ RSpec.describe Lineage::Processor::Worker do
     end
   end
 
-  it "retries once on capacity, then stops" do
+  it "retries capacity errors on the schedule, then stops" do
     Dir.mktmpdir do |dir|
       c = client(dir)
       cap = result(exit_code: 1, failure_kind: "capacity", error: "at capacity")
-      out = worker(dir, client: c, runner: runner(cap, result)).run_one
+      out = worker(dir, client: c, runner: runner(cap, cap, cap, result)).run_one
       expect(out.kind).to eq(:done)
       expect(stop.set?).to be(false)
 
-      out = worker(dir, client: c, runner: runner(cap, cap)).run_one
+      r = runner(cap, cap, cap, cap)
+      out = worker(dir, client: c, runner: r).run_one
       expect(out.kind).to eq(:stopped)
+      expect(out.status).to eq("capacity")
+      expect(r).to have_received(:call).exactly(4).times
       expect(stop.set?).to be(true)
       expect(c).to have_received(:release).with(7)
     end
@@ -120,7 +123,7 @@ RSpec.describe Lineage::Processor::Worker do
       c = client(dir)
       cap = result(exit_code: 1, failure_kind: "capacity", error: "at capacity")
       r = runner(cap, result)
-      w = worker(dir, client: c, runner: r)
+      w = worker(dir, client: c, runner: r, capacity_sleeps: [ 60 ])
       allow(w).to receive(:sleep) { stop.set! }
       out = w.run_one
       expect(out.kind).to eq(:stopped)
@@ -150,6 +153,18 @@ RSpec.describe Lineage::Processor::Worker do
       expect(c).to have_received(:submit_result).exactly(3).times
       expect(c).to have_received(:release).with(7)
       expect(stop.set?).to be(true)
+    end
+  end
+
+  it "gives up an upload retry when stopped" do
+    Dir.mktmpdir do |dir|
+      c = client(dir)
+      allow(c).to receive(:submit_result).and_raise(Lineage::Processor::Client::Error, "down")
+      w = worker(dir, client: c, runner: runner(result), server_sleeps: [ 60, 60 ])
+      allow(w).to receive(:sleep) { stop.set! }
+      expect(w.run_one.kind).to eq(:stopped)
+      expect(c).to have_received(:submit_result).once
+      expect(c).to have_received(:release).with(7)
     end
   end
 
@@ -224,14 +239,46 @@ RSpec.describe Lineage::Processor::Worker do
     end
   end
 
-  it "stops on a claim error" do
+  it "stops once claim retries run out" do
     Dir.mktmpdir do |dir|
       c = client(dir)
       allow(c).to receive(:claim).and_raise(Lineage::Processor::Client::Error, "ECONNREFUSED")
       out = worker(dir, client: c, runner: runner).run_one
       expect(out.kind).to eq(:stopped)
+      expect(c).to have_received(:claim).exactly(3).times
       expect(stop.set?).to be(true)
       expect(c).not_to have_received(:release)
+    end
+  end
+
+  it "retries a failed claim and download" do
+    Dir.mktmpdir do |dir|
+      c = client(dir)
+      claims = downloads = 0
+      allow(c).to receive(:claim) { claims += 1; raise Lineage::Processor::Client::Error, "502" if claims == 1; claim }
+      allow(c).to receive(:download_bundle) do |_, to:|
+        downloads += 1
+        raise Lineage::Processor::Client::Error, "502" if downloads == 1
+        FileUtils.cp(tarball(dir), to)
+        to
+      end
+      out = worker(dir, client: c, runner: runner(result)).run_one
+      expect(out.kind).to eq(:done)
+      expect([ claims, downloads ]).to eq([ 2, 2 ])
+      expect(lines).to include(a_string_including("claim failed (502), retrying"))
+    end
+  end
+
+  it "retries the release after a stop, then leaves it to the sweep" do
+    Dir.mktmpdir do |dir|
+      c = client(dir)
+      allow(c).to receive(:download_bundle).and_raise(Lineage::Processor::Client::Error, "502")
+      allow(c).to receive(:release).and_raise(Lineage::Processor::Client::Error, "502")
+      out = worker(dir, client: c, runner: runner).run_one
+      expect(out.kind).to eq(:stopped)
+      expect(c).to have_received(:download_bundle).exactly(3).times
+      expect(c).to have_received(:release).with(7).twice
+      expect(lines).to include(a_string_including("left for the server sweep"))
     end
   end
 end
