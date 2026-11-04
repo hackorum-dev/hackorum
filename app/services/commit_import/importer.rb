@@ -434,23 +434,43 @@ module CommitImport
     end
 
     # Backports carry the original commit message, so (subject, author_email)
-    # identifies the change and the earliest commit is the canonical one. Only
-    # rows still NULL are touched, so an explicit cherry-pick reference wins.
+    # identifies the change. The canonical commit is the one on master, and a
+    # stable-branch commit takes the master commit closest in time: a change
+    # reverted and landed again, or a subject reused every release, has
+    # several master commits with the same subject, and only the nearest one
+    # is the original. A master commit is never a backport. A change that
+    # only ever went to stable branches groups under its earliest commit.
+    # Only rows still NULL are touched, so an explicit cherry-pick reference
+    # wins.
     def assign_backports
       sql = ApplicationRecord.sanitize_sql_array([ <<~SQL, MIN_GROUPING_SUBJECT ])
-        WITH canonical AS (
-          SELECT DISTINCT ON (subject, author_email) id, sha, subject, author_email
-          FROM commits
-          ORDER BY subject, author_email, committed_at ASC, id ASC
-        )
         UPDATE commits c
-        SET cherry_picked_from_sha = canonical.sha
-        FROM canonical
-        WHERE c.subject = canonical.subject
-          AND c.author_email = canonical.author_email
-          AND c.id <> canonical.id
-          AND c.cherry_picked_from_sha IS NULL
-          AND length(c.subject) >= ?
+        SET cherry_picked_from_sha = nearest.sha
+        FROM (
+          SELECT b.id, COALESCE((
+            SELECT x.sha
+            FROM commits x
+            WHERE x.subject = b.subject
+              AND x.author_email = b.author_email
+              AND 'master' = ANY(x.branches)
+            ORDER BY abs(extract(epoch FROM (x.committed_at - b.committed_at))), x.committed_at, x.id
+            LIMIT 1
+          ), (
+            SELECT x.sha
+            FROM commits x
+            WHERE x.subject = b.subject
+              AND x.author_email = b.author_email
+              AND (x.committed_at, x.id) < (b.committed_at, b.id)
+            ORDER BY x.committed_at, x.id
+            LIMIT 1
+          )) AS sha
+          FROM commits b
+          WHERE b.cherry_picked_from_sha IS NULL
+            AND NOT ('master' = ANY(b.branches))
+            AND length(b.subject) >= ?
+        ) nearest
+        WHERE c.id = nearest.id
+          AND nearest.sha IS NOT NULL
       SQL
       ApplicationRecord.connection.execute(sql)
     end
