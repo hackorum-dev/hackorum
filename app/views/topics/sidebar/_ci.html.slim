@@ -1,11 +1,11 @@
 - row = status.row
-- if ci_all_green?(row)
-  section.sidebar-block.ci-thread-section.ci-badges
-    .sidebar-block-head
-      span.sidebar-block-label CI
-      = link_to "History ›", ci_topic_path(topic), class: "sidebar-block-more"
+section.sidebar-block.ci-thread-section.ci-badges
+  .sidebar-block-head
+    span.sidebar-block-label CI
+    = link_to "History ›", ci_topic_path(topic), class: "sidebar-block-more"
+  - if ci_all_green?(row)
     .sidebar-chips
       span.badge.b-success All green
       span.sidebar-muted applies · builds · tests pass
-- else
-  = render "topics/ci_sidebar", status: status, topic: topic
+  - else
+    = render "topics/ci_sidebar", status: status, topic: topic

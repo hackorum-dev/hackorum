@@ -130,6 +130,19 @@ RSpec.describe "Public CI", type: :request do
       expect(sidebar).to include("+4 more")
     end
 
+    it "renders a failing result in the same block shell as a green one" do
+      repo_state
+      topic = thread_with_run({ ci_status: "tests_failed" },
+                              { status: "tests_failed", tests_total: 5, failed_tests: %w[regress/foo] })
+
+      get topic_path(topic)
+
+      block = Nokogiri::HTML(response.body).at_css(".ci-thread-section")
+      expect(block.name).to eq("section")
+      expect(block.at_css(".sidebar-block-head a")["href"]).to eq(ci_topic_path(topic))
+      expect(block.css("summary, .sidebar-section")).to be_empty
+    end
+
     it "renders no block on a thread with no patchset" do
       repo_state
       topic = create(:topic, last_message_at: Time.current)
