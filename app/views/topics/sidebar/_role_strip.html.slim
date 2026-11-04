@@ -1,0 +1,10 @@
+- total = activity.total_messages
+.role-strip role="img" aria-label=activity.strip_label
+  - activity.buckets.each do |bucket|
+    - next if bucket.messages.zero?
+    span class="role-strip-seg role-#{bucket.key}" style="width: #{(bucket.messages * 100.0 / total).round(1)}%"
+.role-cells
+  - activity.buckets.each do |bucket|
+    span.role-cell
+      span class="role-cell-label role-#{bucket.key}" = bucket.label
+      = "#{bucket.people} · #{bucket.messages} msg"

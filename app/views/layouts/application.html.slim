@@ -37,7 +37,7 @@ html data-theme="light"
     - if ENV["UMAMI_WEBSITE_ID"].present?
       - umami_host = ENV["UMAMI_HOST"].presence || "https://umami.hackorum.dev"
       script[async defer data-website-id=ENV["UMAMI_WEBSITE_ID"] src="#{umami_host}/script.js"]
-  body class=(content_for?(:sidebar) ? "has-sidebar" : nil) data-controller="sidebar swipe-nav"
+  body class=(content_for?(:sidebar) ? "has-sidebar" : nil) data-controller="sidebar swipe-nav" data-action="sidebar:close-mobile@window->sidebar#closeMobile"
     - if user_signed_in? && current_user.username.blank?
       .global-warning
         span Please set a username in Settings.

@@ -173,7 +173,8 @@ RSpec.describe "Public CI", type: :request do
 
       get topic_path(topic)
 
-      expect(sidebar).to include("https://github.com/hackorum-dev/postgres/tree/t#{topic.id}_1")
+      expect(Nokogiri::HTML(response.body).at_css(".sidebar-patch-card").to_html)
+        .to include("https://github.com/hackorum-dev/postgres/tree/t#{topic.id}_1")
     end
 
     it "drops the branch link on a patchset that was never pushed" do
@@ -182,7 +183,17 @@ RSpec.describe "Public CI", type: :request do
 
       get topic_path(topic)
 
-      expect(sidebar).not_to include("GitHub branch")
+      expect(Nokogiri::HTML(response.body).at_css(".sidebar-patch-card").to_html).not_to include("Git branch")
+    end
+
+    it "collapses to one line when everything passes" do
+      repo_state
+      topic = thread_with_run({ ci_status: "success" }, { status: "success", tests_total: 5, failed_tests: [] })
+
+      get topic_path(topic)
+
+      expect(sidebar).to include("All green")
+      expect(sidebar).not_to include("ci-thread-row")
     end
   end
 
@@ -199,7 +210,7 @@ RSpec.describe "Public CI", type: :request do
     end
 
     def banner
-      Nokogiri::HTML(response.body).at_css(".ci-banner").to_html
+      Nokogiri::HTML(response.body).at_css(".ci-run-it").to_html
     end
 
     # the beta label has to land on the feature, not on the patch being
@@ -209,7 +220,7 @@ RSpec.describe "Public CI", type: :request do
       repo_state
       patchset(1, ci_status: "success")
 
-      get topic_path(topic)
+      get patchsets_details_topic_path(topic)
 
       expect(banner).to include("Beta feature")
       expect(banner).to include("not only commitfest submissions")
@@ -224,7 +235,7 @@ RSpec.describe "Public CI", type: :request do
                    completed_at: Time.current)
       row.update_columns(latest_ci_run_id: run.id)
 
-      get topic_path(topic)
+      get patchsets_details_topic_path(topic)
 
       expect(banner).to include("docker run --rm -p 5432:5432 ghcr.io/hackorum-dev/postgres:t#{topic.id}")
       expect(banner).to include("psql -h localhost -U postgres")
@@ -238,7 +249,7 @@ RSpec.describe "Public CI", type: :request do
                    completed_at: Time.current)
       row.update_columns(latest_ci_run_id: run.id)
 
-      get topic_path(topic)
+      get patchsets_details_topic_path(topic)
 
       expect(banner).to include("patchset v1")
       expect(banner).not_to include("ci-banner-warning")
@@ -255,7 +266,7 @@ RSpec.describe "Public CI", type: :request do
              image_ref: "ghcr.io/hackorum-dev/postgres:t#{topic.id}",
              completed_at: Time.current)
 
-      get topic_path(topic)
+      get patchsets_details_topic_path(topic)
 
       expect(banner).to include("ci-banner-warning")
       expect(banner).to include("patchset v1")
@@ -266,7 +277,7 @@ RSpec.describe "Public CI", type: :request do
       repo_state
       patchset(1, ci_status: "build_failed")
 
-      get topic_path(topic)
+      get patchsets_details_topic_path(topic)
 
       expect(banner).to include("Beta feature")
       expect(banner).to include(">applies<")
@@ -278,7 +289,7 @@ RSpec.describe "Public CI", type: :request do
       repo_state
       patchset(1, ci_status: "build_failed")
 
-      get topic_path(topic)
+      get patchsets_details_topic_path(topic)
 
       expect(banner).to include("git clone --branch t#{topic.id}_1 https://github.com/hackorum-dev/postgres.git")
       expect(banner).to include("git remote add hackorum https://github.com/hackorum-dev/postgres.git")
@@ -289,7 +300,7 @@ RSpec.describe "Public CI", type: :request do
       repo_state
       patchset(1, ci_status: "build_failed")
 
-      get topic_path(topic)
+      get patchsets_details_topic_path(topic)
 
       expect(banner).to include("https://github.com/hackorum-dev/postgres/tree/t#{topic.id}_1")
       expect(banner).to include("Patchset v1")
@@ -299,7 +310,7 @@ RSpec.describe "Public CI", type: :request do
       repo_state
       patchset(1, pushed_at: nil)
 
-      get topic_path(topic)
+      get patchsets_details_topic_path(topic)
 
       expect(banner).to include("Beta feature")
       expect(banner).not_to include("git clone")
@@ -360,7 +371,7 @@ RSpec.describe "Public CI", type: :request do
       patch_message(1)
       patch_message(2, pushed_at: nil)
 
-      get patchsets_sidebar_topic_path(topic)
+      get patchsets_details_topic_path(topic)
 
       expect(response.body).to include("https://github.com/hackorum-dev/postgres/tree/t#{topic.id}_1")
       expect(response.body).not_to include("/tree/t#{topic.id}_2")

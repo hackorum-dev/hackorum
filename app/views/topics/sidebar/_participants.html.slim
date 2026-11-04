@@ -1,0 +1,26 @@
+section.sidebar-block
+  .sidebar-block-head
+    span.sidebar-block-label = "Participants · #{activity.count}"
+    - unless activity.count.zero?
+      = render "shared/modal_link", label: "All ›", src: participants_topic_path(topic), frame_id: "topic-participants-modal", title: "Participants", subtitle: "#{activity.count} people · #{activity.total_messages} messages", size: "lg", link_class: "sidebar-block-more"
+  - if activity.count.zero?
+    p.sidebar-muted No participants yet
+  - else
+    = render "topics/sidebar/role_strip", activity: activity
+    - if (last = activity.last_committer_message)
+      .sidebar-muted
+        ' Last committer message
+        = link_to "##{last[:number]}", "#message-#{last[:message].id}"
+        = " #{last[:message].sender_display_alias.name}, #{last[:message].created_at.strftime('%-d %b %Y')}"
+    - max = activity.top.first&.dig(:message_count).to_i
+    .sidebar-participants
+      - activity.top.each do |participant|
+        = render "topics/sidebar/participant", participant: participant, max: max, topic: topic
+      - if (me = activity.viewer)
+        .sidebar-participant-you
+          = render "topics/sidebar/participant", participant: me, max: max, topic: topic, you_last: activity.viewer_last_number
+    - if activity.rest.any?
+      .sidebar-avatar-stack
+        - activity.rest.first(8).each do |p|
+          = image_tag p[:alias].gravatar_url(size: 40), class: "sidebar-stack-avatar", alt: p[:alias].name, title: "#{p[:alias].name}, #{pluralize(p[:message_count], 'message')}"
+        span.sidebar-muted = "+#{activity.rest.size} more"

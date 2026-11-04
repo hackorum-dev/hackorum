@@ -1,0 +1,26 @@
+- editable = topic.slug_editable_by?(current_user)
+- current = topic.slug_in_database
+- if current.present? || editable
+  .sidebar-short-link id=dom_id(topic, :slug_sidebar)
+    .sidebar-short-row
+      span.sidebar-block-label Short link
+      - if current.present?
+        - url = short_topic_url(current)
+        button.sidebar-short-copy type="button" title="Copy #{url}" data-controller="clipboard" data-action="click->clipboard#copy" data-clipboard-url-value=url
+          code = "/t/#{current}"
+          i.fa-regular.fa-copy aria-hidden="true"
+      - if editable
+        details.slug-sidebar-edit open=topic.errors[:slug].any?
+          summary
+            span.slug-sidebar-when-closed = current.present? ? "edit" : "add short link"
+            span.slug-sidebar-when-open cancel
+          .slug-sidebar-popover
+            = form_with model: topic, scope: :topic, url: topic_slug_path(topic), method: :patch, class: "slug-sidebar-form" do |f|
+              label.slug-sidebar-field
+                span.slug-sidebar-prefix = "/t/"
+                = f.text_field :slug, placeholder: "my-feature", maxlength: 64, autocomplete: "off", spellcheck: false, "aria-label": "Short link"
+              = f.submit "Save", class: "slug-sidebar-save"
+            - topic.errors.full_messages_for(:slug).each do |msg|
+              .slug-sidebar-error = msg
+            - if current.present?
+              = button_to "Remove short link", topic_slug_path(topic), method: :delete, class: "slug-sidebar-remove", form: { class: "slug-sidebar-remove-form", data: { turbo_confirm: "Remove the short link /t/#{current}?" } }

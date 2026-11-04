@@ -119,8 +119,13 @@ Rails.application.routes.draw do
       delete :unignore
       get :latest_patchset
       get :message_batch
-      get :attachments_sidebar
-      get :patchsets_sidebar
+      get :commits_details
+      get :commitfest_details
+      get :patchsets_details
+      get :story
+      get :timeline
+      get :participants
+      get "participants/:person_id", action: :participant, as: :participant
       get :summary, defaults: { format: :json }
       get :messages, defaults: { format: :json }
     end

@@ -1,0 +1,28 @@
+- latest = summary.latest
+- first = summary.first
+- day = ->(group) { group[:committed_at]&.strftime("%-d %b %Y") }
+- subtitle = [ pluralize(summary.count, "commit") ]
+- if summary.count > 1
+  - subtitle += [ ("first #{day.(first)}" if day.(first)), ("latest #{day.(latest)}" if day.(latest)) ]
+- else
+  - subtitle << day.(latest)
+- subtitle = subtitle.compact.join(" · ")
+section.sidebar-block
+  .sidebar-block-head
+    span.sidebar-block-label Commits
+    = render "shared/modal_link", label: "#{pluralize(summary.count, 'commit')} ›", src: commits_details_topic_path(topic), frame_id: "topic-commits-modal", title: "Commits and credits", subtitle: subtitle, size: "lg", link_class: "sidebar-block-more"
+  - if (committers = summary.committers).any?
+    .sidebar-line = "Committed by #{short_name_list(committers)}"
+  - if (authors = summary.authors).any?
+    .sidebar-muted = "Authors #{short_name_list(authors)}"
+  .sidebar-commit-ends
+    span.sidebar-commit-end-label Latest
+    span.sidebar-muted = latest[:committed_at]&.strftime("%-d %b %Y")
+    = link_to latest[:subject], commit_web_url(latest[:sha]), target: "_blank", rel: "noopener", class: "sidebar-commit-subject", title: latest[:subject]
+    - if summary.count > 1
+      span.sidebar-commit-end-label First
+      span.sidebar-muted = first[:committed_at]&.strftime("%-d %b %Y")
+      = link_to first[:subject], commit_web_url(first[:sha]), target: "_blank", rel: "noopener", class: "sidebar-commit-subject", title: first[:subject]
+  - if (reverts = summary.revert_groups).any?
+    .sidebar-chips
+      span.sidebar-chip.is-revert = "#{pluralize(reverts.size, 'revert commit')}, #{reverts.filter_map { |g| g[:committed_at] }.max&.strftime('%b %Y')}"

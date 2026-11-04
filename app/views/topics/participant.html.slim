@@ -1,0 +1,4 @@
+= turbo_frame_tag @frame_id, target: "_top"
+  - if @frame_id == "topic-participants-modal"
+    = link_to "‹ All participants", participants_topic_path(@topic), class: "people-back", data: { turbo_frame: "topic-participants-modal" }
+  = render "topics/person_card"

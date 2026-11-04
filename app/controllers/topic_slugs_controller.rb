@@ -30,11 +30,12 @@ class TopicSlugsController < ApplicationController
 
     respond_to do |format|
       format.turbo_stream do
-        render turbo_stream: turbo_stream.replace(
-          helpers.dom_id(@topic, :slug_sidebar),
-          partial: "topics/slug_sidebar",
-          locals: { topic: @topic, ci_status: PatchCi::TopicStatus.new(topic: @topic) }
-        ), status: saved ? :ok : :unprocessable_content
+        streams = [ turbo_stream.replace(helpers.dom_id(@topic, :slug_sidebar), partial: "topics/sidebar/short_link", locals: { topic: @topic }) ]
+        image = saved && PatchCi::TopicStatus.new(topic: @topic).image_run
+        if image
+          streams << turbo_stream.replace(helpers.dom_id(@topic, :docker_button), partial: "topics/sidebar/docker_button", locals: { topic: @topic, image: image })
+        end
+        render turbo_stream: streams, status: saved ? :ok : :unprocessable_content
       end
       format.html do
         flash[:alert] = @topic.errors.full_messages_for(:slug).to_sentence unless saved

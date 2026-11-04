@@ -1,0 +1,14 @@
+- size = local_assigns.fetch(:size, "md")
+.modal-anchor data-controller="modal" data-modal-src-value=src data-action=local_assigns[:anchor_action]
+  a href=src class=local_assigns[:link_class] data-action="modal#open" data-turbo="false" data-modal-trigger="true" title=local_assigns[:link_title] = label
+  dialog class="modal modal-#{size}" data-modal-target="dialog" data-action="click->modal#backdrop click->modal#jump" aria-label=title
+    .modal-head
+      .modal-heading
+        h2.modal-title = title
+        - if local_assigns[:subtitle].present?
+          span.modal-subtitle = subtitle
+      button.modal-close type="button" aria-label="Close" data-action="modal#close"
+        i.fa-solid.fa-xmark aria-hidden="true"
+    .modal-body
+      = turbo_frame_tag frame_id, target: "_top", data: { "modal-target": "frame" }
+        p.modal-loading Loading...

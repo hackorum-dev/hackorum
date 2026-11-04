@@ -1,0 +1,30 @@
+details.commit-llm
+  summary.commit-llm-summary
+    span.commit-llm-confidence title="How sure the LLM analysis is about this match" = "LLM #{llm_percent(v[:confidence])}"
+    span.commit-llm-verdict = verdict_words(v[:verdict])
+    - if v[:change_level]
+      span.commit-llm-change title=LineageHelper::CHANGE_LEVEL_TITLE = "#{v[:change_level]} changes"
+    - if v[:source_ordinal]
+      span.commit-llm-source
+        | from
+        =< link_to "patchset ##{v[:source_ordinal]}", "#message-#{v[:source_message_id]}"
+    - if v[:reviewers_total] > 0
+      span.commit-llm-reviews class=("is-all" if v[:reviewers_final] == v[:reviewers_total]) = "#{v[:reviewers_final]} of #{pluralize(v[:reviewers_total], 'reviewer')} saw the final version"
+  .commit-llm-body
+    - if v[:evidence].present?
+      p.commit-llm-evidence = lineage_text(v[:evidence], ordinals)
+    - if v[:reviews].any?
+      ul.commit-llm-reviewers
+        - v[:reviews].each do |r|
+          li
+            span.commit-llm-reviewer = r["reviewer"]
+            span.commit-llm-coverage class="is-#{r['coverage'].presence || 'none'}" = coverage_words(r["coverage"])
+            - case r["source"]
+            - when "llm"
+              span.commit-llm-src.is-llm title="Found by LLM analysis, not a Reviewed-by trailer" = r["confidence"] ? "LLM #{llm_percent(r['confidence'])}" : "LLM"
+            - when "committer"
+              span.commit-llm-src.is-committer title="Committed the patch, counted as its reviewer" committer
+            - when "trailer"
+              span.commit-llm-src.is-trailer title="From a Reviewed-by trailer on the commit" trailer
+            - if r["note"].present?
+              span.commit-llm-note = lineage_text(r["note"], ordinals)

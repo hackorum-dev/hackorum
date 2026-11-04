@@ -1,4 +1,22 @@
 module TopicsHelper
+  MEMBERSHIP_ICONS = [
+    [ "core_team", "fa-solid fa-people-group", "Core Team" ],
+    [ "committer", "fa-solid fa-code-branch", "Committer" ],
+    [ "major_contributor", "fa-solid fa-star", "Major Contributor" ],
+    [ "significant_contributor", "fa-solid fa-award", "Significant Contributor" ]
+  ].freeze
+
+  def membership_icons_html(person)
+    types = person&.contributor_membership_types || []
+    icons = MEMBERSHIP_ICONS.select { |type, _, _| types.include?(type) }.map { |_, icon, label| [ icon, label ] }
+    icons << [ "fa-solid fa-clock-rotate-left", "Past Contributor" ] if types.intersect?(%w[past_major_contributor past_significant_contributor])
+    return nil if icons.empty?
+
+    tag.span(class: "participant-memberships") do
+      safe_join(icons.map { |icon, label| tag.span(class: "participant-icon", title: label) { tag.i(class: icon) } })
+    end
+  end
+
   # Replaces app/views/topics/_participant_row.html.slim
   def participant_row_html(participant:, avatar_size: 40, tooltip: nil)
     alias_record = participant[:alias]
@@ -17,15 +35,7 @@ module TopicsHelper
 
     avatar_classes = [ "participant-avatar" ]
 
-    membership_icons = []
     membership_types = person&.contributor_membership_types || []
-    membership_icons << { icon: "fa-solid fa-people-group", label: "Core Team" } if membership_types.include?("core_team")
-    membership_icons << { icon: "fa-solid fa-code-branch", label: "Committer" } if membership_types.include?("committer")
-    membership_icons << { icon: "fa-solid fa-star", label: "Major Contributor" } if membership_types.include?("major_contributor")
-    membership_icons << { icon: "fa-solid fa-award", label: "Significant Contributor" } if membership_types.include?("significant_contributor")
-    if membership_types.include?("past_major_contributor") || membership_types.include?("past_significant_contributor")
-      membership_icons << { icon: "fa-solid fa-clock-rotate-left", label: "Past Contributor" }
-    end
 
     name_classes = [ "participant-name-link" ]
     name_classes << "is-committer" if membership_types.include?("committer")
@@ -41,19 +51,23 @@ module TopicsHelper
       end
     end
 
-    memberships = if membership_icons.any?
-      tag.div(class: "participant-memberships") do
-        safe_join(membership_icons.map { |entry|
-          tag.span(class: "participant-icon", title: entry[:label]) do
-            tag.i(class: entry[:icon])
-          end
-        })
-      end
-    end
+    memberships = membership_icons_html(person)
 
     tag.div(class: "participant-row", title: tooltip) do
       safe_join([ left, memberships ].compact)
     end
+  end
+
+  def month_range_label(from, to)
+    from, to = [ from.to_date, to.to_date ].minmax
+    return from.strftime("%b %Y") if from.year == to.year && from.month == to.month
+    return "#{from.strftime('%b')} - #{to.strftime('%b %Y')}" if from.year == to.year
+    "#{from.strftime('%b %Y')} - #{to.strftime('%b %Y')}"
+  end
+
+  def short_name_list(names, limit: 2)
+    shown = names.first(limit).join(", ")
+    names.size > limit ? "#{shown} +#{names.size - limit}" : shown
   end
 
   # Replaces app/views/topics/_avatar_list.slim
@@ -290,5 +304,21 @@ module TopicsHelper
     end
 
     classes.join(" ")
+  end
+
+  # [[label, [[kind, item]]]], kind :message or :commit, in time order
+  def timeline_days(messages, commits, by_week:)
+    entries = messages.map { |m| [ :message, m, m.created_at ] } +
+              commits.filter_map { |c| [ :commit, c, c[:committed_at] ] if c[:committed_at] }
+    entries.sort_by! { |_, _, at| at }
+    entries.chunk_while { |a, b| timeline_day_key(a[2], by_week) == timeline_day_key(b[2], by_week) }.map do |chunk|
+      at = chunk.first[2]
+      label = by_week ? "Week of #{at.to_date.beginning_of_week.strftime('%-d %b %Y')}" : at.strftime("%a %-d %b %Y")
+      [ label, chunk.map { |kind, item, _| [ kind, item ] } ]
+    end
+  end
+
+  def timeline_day_key(at, by_week)
+    by_week ? at.to_date.beginning_of_week : at.to_date
   end
 end

@@ -229,23 +229,23 @@ RSpec.describe "Topics", type: :request do
         expect(response.body).not_to include("diff --git")
       end
 
-      it "renders the Show all patchsets details when patches exist" do
+      it "renders the patchsets modal trigger when patches exist" do
         create(:attachment, :patch_file, message: root_message)
 
         get topic_path(topic)
 
         expect(response).to have_http_status(:success)
-        expect(response.body).to include("Show all patchsets")
-        expect(response.body).to include("patchsets-sidebar-list")
-        expect(response.body).to include(patchsets_sidebar_topic_path(topic))
+        expect(response.body).to include("all attachments")
+        expect(response.body).to include("topic-patchsets-modal")
+        expect(response.body).to include(patchsets_details_topic_path(topic))
       end
 
-      it "omits the Show all patchsets details when no patches exist" do
+      it "omits the patchsets modal trigger when no patches exist" do
         get topic_path(topic)
 
         expect(response).to have_http_status(:success)
-        expect(response.body).not_to include("Show all patchsets")
-        expect(response.body).not_to include("patchsets-sidebar-list")
+        expect(response.body).not_to include("sidebar-patch-card")
+        expect(response.body).not_to include("topic-patchsets-modal")
       end
     end
 
@@ -922,7 +922,7 @@ RSpec.describe 'Topics show — drafts sidebar', type: :request do
     expect(items.first.css('.drafts-target').text.strip).to eq('#1')
   end
 
-  describe "GET /topics/:id/patchsets_sidebar" do
+  describe "GET /topics/:id/patchsets_details" do
     let!(:creator) { create(:alias) }
     let!(:topic)   { create(:topic, creator: creator) }
 
@@ -940,7 +940,7 @@ RSpec.describe 'Topics show — drafts sidebar', type: :request do
       end
 
       it "lists patch-submission messages newest first" do
-        get patchsets_sidebar_topic_path(topic)
+        get patchsets_details_topic_path(topic)
         expect(response).to have_http_status(:ok)
         body = response.body
         v2_pos = body.index("message-#{msg_v2.id}")
@@ -950,7 +950,7 @@ RSpec.describe 'Topics show — drafts sidebar', type: :request do
       end
 
       it "renders a download link per patchset" do
-        get patchsets_sidebar_topic_path(topic)
+        get patchsets_details_topic_path(topic)
         expect(response.body).to include(message_patchset_path(msg_v1))
         expect(response.body).to include(message_patchset_path(msg_v2))
       end
@@ -960,7 +960,7 @@ RSpec.describe 'Topics show — drafts sidebar', type: :request do
       let!(:msg) { create(:message, topic: topic, sender: creator) }
 
       it "renders the empty-state copy" do
-        get patchsets_sidebar_topic_path(topic)
+        get patchsets_details_topic_path(topic)
         expect(response).to have_http_status(:ok)
         expect(response.body).to include("No patchsets in this thread")
       end
@@ -971,13 +971,13 @@ RSpec.describe 'Topics show — drafts sidebar', type: :request do
       let!(:branch) { create(:patch_branch, topic: topic, message: msg) }
 
       it "links the CI history page" do
-        get patchsets_sidebar_topic_path(topic)
+        get patchsets_details_topic_path(topic)
 
         expect(response.body).to include(ci_topic_path(topic))
         expect(response.body).to include("CI history")
         # inside a lazily-loaded frame a plain link fetches the page into the
         # frame, finds no matching frame and silently discards it
-        expect(response.body).to include('data-turbo-frame="_top"')
+        expect(Nokogiri::HTML(response.body).at_css("turbo-frame#topic-patchsets-modal")["target"]).to eq("_top")
       end
     end
 
@@ -985,7 +985,7 @@ RSpec.describe 'Topics show — drafts sidebar', type: :request do
       let!(:msg) { create(:message, topic: topic, sender: creator) }
 
       it "offers no CI history link" do
-        get patchsets_sidebar_topic_path(topic)
+        get patchsets_details_topic_path(topic)
 
         expect(response.body).not_to include("CI history")
       end

@@ -61,6 +61,8 @@
   --color-bg-sidebar-header: var(--color-primary-2);
   --color-bg-table-header: var(--color-primary-2);
   --color-bg-nav: var(--color-gray-900);
+  --color-bg-stepbar: #0f172a;
+  --color-text-stepbar: #ffffff;
   --color-bg-button: var(--color-primary-2);
   --color-bg-button-hover: var(--color-primary-3);
   --color-bg-icon: var(--color-secondary1-2);
@@ -106,6 +108,17 @@
   --ci-dot-stale: #ef4444;
 
   --shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.12);
+
+  --color-bg-modal: #ffffff;
+  --color-border-modal: #a9b4d6;
+  --color-bg-modal-side: #f1f3fd;
+  --color-backdrop: rgba(15, 23, 42, 0.55);
+  --shadow-modal: 0 24px 64px rgba(15, 23, 42, 0.28), 0 2px 8px rgba(15, 23, 42, 0.12);
+  --color-bg-sidebar-block: #ffffff;
+  --color-border-sidebar-block: #d3d9ee;
+  --color-accent-llm-bg: #f3e8ff;
+  --color-accent-llm-border: #c4a1f5;
+  --color-accent-llm-text: #6b21a8;
 
   /* Chart colors */
   --color-chart-text: #0f172a;
@@ -214,6 +227,8 @@
   --color-bg-sidebar-header: var(--color-gray-100);
   --color-bg-table-header: var(--color-gray-100);
   --color-bg-nav: var(--color-gray-25);
+  --color-bg-stepbar: #3730a3;
+  --color-text-stepbar: #ffffff;
   --color-bg-button: var(--color-primary-5);
   --color-bg-button-hover: #2e3b66;
   --color-bg-icon: var(--color-gray-300);
@@ -260,6 +275,17 @@
 
   --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.45);
 
+  --color-bg-modal: #1b2133;
+  --color-border-modal: #3a4463;
+  --color-bg-modal-side: #232a3f;
+  --color-backdrop: rgba(0, 0, 0, 0.65);
+  --shadow-modal: 0 24px 72px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(129, 140, 248, 0.08);
+  --color-bg-sidebar-block: #172038;
+  --color-border-sidebar-block: #2a3656;
+  --color-accent-llm-bg: #2e2350;
+  --color-accent-llm-border: #6f52b0;
+  --color-accent-llm-text: #e2ccff;
+
   /* Chart colors */
   --color-chart-text: #e2e8f0;
   --color-chart-bg: #111827;
@@ -282,4 +308,14 @@
   --ci-chart-ord3: #60a5fa;
   --ci-chart-ord4: #93c5fd;
   --ci-chart-ord5: #bfdbfe;
+}
+
+/* dark page tones vanish on the lighter modal surface */
+:root[data-theme="dark"] dialog.modal {
+  --color-border: #313b57;
+  --color-bg-hover: #262f48;
+  --color-bg-hoverbox: #262f48;
+  --color-bg-button: #2a3454;
+  --color-bg-input: #141a2b;
+  --color-primary-3: #2b355a;
 }

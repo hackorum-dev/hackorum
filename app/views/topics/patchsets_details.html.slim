@@ -1,0 +1,17 @@
+- run_it = ci_thread_visible?(@ci_status)
+- active = @run_tab && run_it ? 2 : 0
+- tab_attrs = ->(i) { { class: [ "modal-tab", ("is-active" if i == active) ], "aria-selected": (i == active).to_s } }
+= turbo_frame_tag (@run_tab ? "topic-runit-modal" : "topic-patchsets-modal"), target: "_top"
+  .modal-tabs data-controller="tabs"
+    .modal-tab-bar role="tablist"
+      button type="button" role="tab" data-tabs-target="tab" data-action="tabs#select" data-index="0" *tab_attrs.call(0) = "Patchsets · #{@patchset_messages.size}"
+      button type="button" role="tab" data-tabs-target="tab" data-action="tabs#select" data-index="1" *tab_attrs.call(1) = "All attachments · #{@attachment_messages.size}"
+      - if run_it
+        button type="button" role="tab" data-tabs-target="tab" data-action="tabs#select" data-index="2" *tab_attrs.call(2) Run it
+    .modal-tab-panel data-tabs-target="panel" class=("is-active" if active == 0)
+      = render "topics/patchset_list", topic: @topic, patchset_messages: @patchset_messages, message_numbers: @message_numbers, lineage_by_message: @lineage_by_message, patchset_branches: @patchset_branches, has_patch_branches: @has_patch_branches
+    .modal-tab-panel data-tabs-target="panel" class=("is-active" if active == 1)
+      = render "topics/attachment_list", attachment_messages: @attachment_messages, message_numbers: @message_numbers
+    - if run_it
+      .modal-tab-panel data-tabs-target="panel" class=("is-active" if active == 2)
+        = render "topics/ci_run_it", status: @ci_status, topic: @topic, message_numbers: @message_numbers

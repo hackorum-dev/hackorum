@@ -88,7 +88,7 @@ RSpec.describe 'Person commit activity', type: :request do
         row = doc.css('table.commit-activity-table tbody tr').find { |tr| tr.text.include?('Guessed authorship') }
         marker = row.at_css('td:first-child .activity-tag + .commit-credit-llm')
         expect(marker.text).to eq('LLM')
-        expect(marker['title']).to eq('Attributed by the patchset lineage model')
+        expect(marker['title']).to eq('Credited by LLM analysis, not a commit trailer')
         expect(marker.previous_element.text).to match(/author/i)
         expect(row.css('td:nth-child(2) .commit-credit-llm')).to be_empty
       end

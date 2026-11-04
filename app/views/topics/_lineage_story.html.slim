@@ -1,0 +1,18 @@
+- if lineage.story.present?
+  - lines = lineage.story.lines.map(&:strip).reject(&:empty?)
+  - if chapters.chapters.empty?
+    ul.lineage-story
+      - lines.each do |line|
+        li = lineage_text(line, lineage.ordinals)
+  - else
+    - groups = story_chapters(lines, chapters)
+    - groups.each_with_index do |(index, group), i|
+      details.story-chapter open=(i.zero? || i == groups.size - 1)
+        summary
+          span.story-chapter-label = chapters.chapters[index].label
+          = " · #{pluralize(group.size, 'entry', 'entries')}"
+        ul.lineage-story
+          - group.each do |line|
+            li
+              span.story-dot class=story_dot_class(line, revert_shas)
+              span.story-text = lineage_text(line, lineage.ordinals)

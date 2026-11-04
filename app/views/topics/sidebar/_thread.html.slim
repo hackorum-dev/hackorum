@@ -1,0 +1,29 @@
+- timeline_subtitle = "#{pluralize(messages.size, 'message')}#{" · #{month_range_label(messages.first.created_at, messages.last.created_at)}" if messages.any?}"
+section.sidebar-block
+  .sidebar-block-head
+    span.sidebar-block-label = "Thread · #{pluralize(messages.size, 'message')}"
+    = render "shared/modal_link", label: "Timeline ›", src: timeline_topic_path(topic), frame_id: "topic-timeline-modal", title: "Thread timeline", subtitle: timeline_subtitle, size: "xl", link_class: "sidebar-block-more", anchor_action: "timeline-modal:open@window->modal#openSrc"
+  - if buckets.any?
+    - max = buckets.map(&:messages).max.to_i
+    button.activity-chart-button type="button" data-controller="dispatch" data-dispatch-event-value="timeline-modal:open" data-dispatch-detail-value={ src: timeline_topic_path(topic) }.to_json data-action="dispatch#fire" aria-label="Open thread timeline" title="Open thread timeline"
+      .activity-chart aria-hidden="true"
+        - buckets.each do |bucket|
+          - tip = "#{bucket.label}: #{pluralize(bucket.messages, 'message')}"
+          - tip += ", #{pluralize(bucket.commits, 'commit')}" if bucket.commits.positive?
+          span.activity-col title=tip
+            span.activity-bar style="height: #{max.positive? ? (bucket.messages * 100.0 / max).round : 0}%"
+            span class=[ "activity-commit", ("has-commit" if bucket.commits.positive?), ("has-revert" if bucket.reverts.positive?) ]
+      .activity-axis
+        span = buckets.first.label
+        span = buckets.last.label
+  .sidebar-jumps
+    - if messages.first
+      = link_to "First", "#message-#{messages.first.id}", class: "sidebar-jump"
+    - if latest_patch
+      = link_to "Latest patch ##{message_numbers[latest_patch.id]}", "#message-#{latest_patch.id}", class: "sidebar-jump"
+    - if unread_count.positive?
+      = link_to "Unread (#{unread_count})", "#first-unread", class: "sidebar-jump"
+  - if messages.size <= 30
+    ul.sidebar-recent
+      - messages.last(4).each do |msg|
+        li = link_to "##{message_numbers[msg.id]} #{msg.sender_display_alias.name} · #{smart_time_display(msg.created_at)}", "#message-#{msg.id}"

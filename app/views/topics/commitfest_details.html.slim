@@ -1,0 +1,30 @@
+= turbo_frame_tag "topic-commitfest-modal", target: "_top"
+  - if @commitfest_summary.any?
+    - @commitfest_summary.patches.each do |patch|
+      - status_class = patch.open? ? "is-open" : (patch.status == "Committed" ? "is-committed" : "is-closed")
+      section.cf-card
+        .cf-card-head
+          = link_to patch.title, "https://commitfest.postgresql.org/patch/#{patch.external_id}/", target: "_blank", rel: "noopener", class: "cf-card-title", title: patch.title
+          span class=["cf-status", status_class] = "#{patch.status} in #{patch.commitfest_name}"
+        dl.cf-card-facts
+          .cf-fact
+            dt Reviewers
+            dd = patch.reviewers.presence&.join(", ") || "none"
+          .cf-fact
+            dt Committer
+            dd = patch.committer || "none"
+          - if patch.tags.any?
+            .cf-fact
+              dt Tags
+              dd = patch.tags.join(", ")
+          - if patch.ci_status == "needs_rebase"
+            .cf-fact
+              dt CF bot
+              dd needs rebase
+        .cf-history
+          .cf-history-label = "#{pluralize(patch.history.size, 'commitfest')}, oldest first"
+          .cf-history-chips
+            - patch.history.each_with_index do |entry, index|
+              = link_to entry[:name], "https://commitfest.postgresql.org/#{entry[:external_id]}/", target: "_blank", rel: "noopener", class: [ "cf-chip", ("is-latest" if index == patch.history.size - 1) ], title: entry[:status]
+  - else
+    p.modal-empty Not in any commitfest.

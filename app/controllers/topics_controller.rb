@@ -1,11 +1,12 @@
 class TopicsController < ApplicationController
   include DraftSidebarLoader
 
-  before_action :set_topic, only: [ :show, :message_batch, :attachments_sidebar, :patchsets_sidebar, :aware, :read_all, :unread_all, :star, :unstar, :ignore, :unignore, :latest_patchset, :summary, :messages ]
+  before_action :set_topic, only: [ :show, :message_batch, :commits_details, :commitfest_details, :patchsets_details, :story, :timeline, :participants, :participant, :aware, :read_all, :unread_all, :star, :unstar, :ignore, :unignore, :latest_patchset, :summary, :messages ]
   before_action :require_authentication, only: [ :aware, :read_all, :unread_all, :star, :unstar, :ignore, :unignore, :row_states ]
 
   TOPIC_LIST_PRELOADS = [ :creator, { creator_person: :default_alias }, { last_sender_person: :default_alias } ].freeze
   ROW_STATES_LIMIT = 50
+  MERGED_REDIRECT_ACTIONS = %w[message_batch commits_details commitfest_details patchsets_details story timeline participants participant].freeze
 
   def index
     if user_signed_in? && request.path == root_path
@@ -96,6 +97,7 @@ class TopicsController < ApplicationController
 
     @messages = messages_scope.order(created_at: :asc)
     @message_numbers = @messages.each_with_index.to_h { |msg, idx| [ msg.id, idx + 1 ] }
+    @person_messages_json = @messages.group_by(&:sender_person_id).transform_values { |ms| ms.map { |m| [ m.id, @message_numbers[m.id] ] } }.to_json
     wire_reply_to_from_loaded_messages!
     preload_read_state!
     auto_mark_aware!
@@ -103,12 +105,20 @@ class TopicsController < ApplicationController
 
     build_participants_sidebar_data(messages_scope)
     build_thread_outline(@messages)
-    load_commitfest_sidebar
-    load_commit_sidebar
+    @commitfest_summary = Topics::CommitfestSummary.new(@topic)
+    load_commit_summary
     @lineage = Lineage::ThreadPresenter.new(@topic, ordinals: @message_numbers) if lineage_visible?
     # lazy object, not a load_* call like its neighbours - the view decides
     # whether anything is needed, so this must not query on its own
     @ci_status = PatchCi::TopicStatus.new(topic: @topic)
+    @participant_activity = Topics::ParticipantActivity.new(
+      participants: @participants, messages: @messages, message_numbers: @message_numbers,
+      viewer_person_id: current_user&.person_id
+    )
+    @activity_buckets = Topics::ActivityBuckets.new(
+      message_times: @messages.map(&:created_at), commit_groups: @commit_summary.groups
+    ).buckets
+    @unread_count = user_signed_in? ? @messages.count { |m| !@read_message_ids&.dig(m.id) } : 0
 
     @topic_mailing_lists = @topic.mailing_lists.to_a
     @topic_is_multi_list = @topic_mailing_lists.size > 1
@@ -137,6 +147,9 @@ class TopicsController < ApplicationController
     @has_patches = @topic.messages.where(is_patch_submission: true).exists?
     if @has_patches
       latest_message = latest_patchset_message
+      @latest_patch = latest_message
+      @patchset_count = @messages.count(&:is_patch_submission)
+      @attachment_message_count = Attachment.joins(:message).where(messages: { topic_id: @topic.id }).distinct.count(:message_id)
       if latest_message
         patch_attachments = latest_message.attachments.select(&:patch_submission_candidate?)
         totals = patch_attachments.reduce({ added: 0, removed: 0 }) do |acc, attachment|
@@ -164,42 +177,94 @@ class TopicsController < ApplicationController
     render layout: false
   end
 
-  def attachments_sidebar
-    message_columns = (Message.column_names - %w[body body_tsv]).map { |c| "messages.#{c}" }
-    messages = @topic.messages
-      .select(message_columns)
-      .preload(:attachments)
-      .order(created_at: :asc)
+  def commits_details
+    load_commit_summary
+    @credits = Topics::CreditCounts.new(@commit_summary.groups, sources: commit_credit_sources).by_role
+    @llm_commit_shas = lineage_visible? ? Lineage::ThreadPresenter.llm_commit_shas(@topic.id) : Set.new
+    @commit_verdicts = {}
+    if lineage_visible? && @commit_summary.any?
+      @lineage = Lineage::ThreadPresenter.new(@topic, ordinals: helpers.lineage_ordinals(@topic))
+      @commit_verdicts = @lineage.verdicts_for_groups(@commit_summary) if @lineage.run
+    end
+    render layout: false
+  end
 
-    @attachment_messages = messages.select { |msg| msg.attachments.any? }
-    @message_numbers = messages.each_with_index.to_h { |msg, idx| [ msg.id, idx + 1 ] }
+  def commitfest_details
+    @commitfest_summary = Topics::CommitfestSummary.new(@topic)
+    render layout: false
+  end
+
+  def story
+    return head :not_found unless lineage_visible?
+
+    load_thread_index
+    @lineage = Lineage::ThreadPresenter.new(@topic, ordinals: @message_numbers)
+    return head :not_found unless @lineage.run
+
+    load_commit_summary
+    @chapters = Topics::Chapters.new(@messages, commit_groups: @commit_summary.groups)
+    @revert_shas = @commit_summary.revert_shas
 
     render layout: false
   end
 
-  def patchsets_sidebar
+  def timeline
+    load_thread_index
+    preload_read_state!
+    notes = Note.active.where(topic: @topic).where.not(message_id: nil)
+    @noted_message_ids = notes.visible_to(current_user).distinct.pluck(:message_id).to_set
+    @my_noted_message_ids = user_signed_in? ? notes.where(author: current_user).distinct.pluck(:message_id).to_set : Set.new
+    load_commit_summary
+    build_participants_sidebar_data(nil)
+    @chapters = Topics::Chapters.new(@messages, commit_groups: @commit_summary.groups)
+    @buckets = Topics::ActivityBuckets.new(message_times: @messages.map(&:created_at), commit_groups: @commit_summary.groups).buckets
+    if @chapters.chapters.any?
+      first_unread = user_signed_in? && @messages.find { |m| !@read_message_ids&.dig(m.id) }
+      @selected_chapter = first_unread ? @chapters.index_of(first_unread.id) : @chapters.chapters.size - 1
+    end
+    @selected_person = params[:person].presence&.to_i
+    render layout: false
+  end
+
+  def participants
+    load_thread_index
+    build_participants_sidebar_data(nil)
+    @participant_activity = Topics::ParticipantActivity.new(
+      participants: @participants, messages: @messages, message_numbers: @message_numbers,
+      viewer_person_id: current_user&.person_id
+    )
+    @first_last = @messages.group_by(&:sender_person_id).transform_values { |ms| [ ms.first, ms.last ] }
+    render layout: false
+  end
+
+  def participant
+    load_thread_index
+    @person = Person.includes(:default_alias, :contributor_memberships).find(params[:person_id])
+    @person_messages = @messages.select { |m| m.sender_person_id == @person.id }
+    return head :not_found if @person_messages.empty?
+
+    @frame_id = [ "topic-person-#{@person.id}", "topic-participants-modal" ].include?(params[:frame].to_s) ? params[:frame] : "topic-person-#{@person.id}"
+    load_commit_summary
+    change_of = @commit_summary.groups.each_with_object({}) { |g, h| g[:commit_ids].each { |id| h[id] = g[:sha] } }
+    rows = CommitPerson.where(person_id: @person.id, commit_id: change_of.keys, source: %w[parsed committer])
+    @person_credits = rows.group_by(&:role).transform_values { |rs| rs.map { |r| change_of[r.commit_id] }.uniq.size }
+    render layout: false
+  end
+
+  def patchsets_details
     message_columns = (Message.column_names - %w[body body_tsv]).map { |c| "messages.#{c}" }
-    messages = @topic.messages
-      .select(message_columns)
-      .order(created_at: :asc)
+    messages = @topic.messages.select(message_columns).preload(:attachments, :sender, :sender_person, { sender_person: :default_alias }).order(created_at: :asc).to_a
 
     @message_numbers = messages.each_with_index.to_h { |msg, idx| [ msg.id, idx + 1 ] }
-    @patchset_messages = messages
-      .select(&:is_patch_submission)
-      .sort_by(&:created_at)
-      .reverse
+    @patchset_messages = messages.select(&:is_patch_submission).reverse
+    @attachment_messages = messages.select { |msg| msg.attachments.any? }
 
-    # a row with no pushed_at has no branch on github yet, but it still counts
-    # as CI history worth linking to
-    branches = PatchBranch.where(topic_id: @topic.id, lineage_only: false)
-                          .pluck(:message_id, :branch_name, :pushed_at)
+    branches = PatchBranch.where(topic_id: @topic.id, lineage_only: false).pluck(:message_id, :branch_name, :pushed_at)
     @has_patch_branches = branches.any?
     @patchset_branches = branches.filter_map { |message_id, name, pushed_at| [ message_id, name ] if pushed_at }.to_h
-    @lineage_by_message = if lineage_visible?
-      Lineage::ThreadPresenter.new(@topic, ordinals: @message_numbers).lineage_by_message_id
-    else
-      {}
-    end
+    @lineage_by_message = lineage_visible? ? Lineage::ThreadPresenter.new(@topic, ordinals: @message_numbers).lineage_by_message_id : {}
+    @ci_status = PatchCi::TopicStatus.new(topic: @topic)
+    @run_tab = params[:tab] == "run"
 
     render layout: false
   end
@@ -485,8 +550,16 @@ class TopicsController < ApplicationController
     @latest_patchset_message ||= @topic.messages
       .where(is_patch_submission: true)
       .order(created_at: :desc)
-      .preload(:attachments)
+      .preload(:attachments, :sender, sender_person: :default_alias)
       .first
+  end
+
+  def load_thread_index
+    message_columns = (Message.column_names - %w[body body_tsv]).map { |c| "messages.#{c}" }
+    @messages = @topic.messages.select(message_columns)
+                      .preload(:sender, :sender_person, { sender_person: :default_alias })
+                      .order(created_at: :asc).to_a
+    @message_numbers = @messages.each_with_index.to_h { |msg, idx| [ msg.id, idx + 1 ] }
   end
 
   def set_topic
@@ -498,7 +571,9 @@ class TopicsController < ApplicationController
     @topic = params[:slug] ? scope.find_by!(slug: params[:slug].downcase) : scope.find(params[:id])
 
     if @topic.merged?
-      redirect_to topic_path(@topic.final_topic), status: :moved_permanently
+      target = @topic.final_topic
+      location = MERGED_REDIRECT_ACTIONS.include?(action_name) ? url_for(request.query_parameters.merge(id: target.id, action: action_name, person_id: params[:person_id]).compact) : topic_path(target)
+      redirect_to location, status: :moved_permanently
       nil
     end
   end
@@ -942,70 +1017,10 @@ class TopicsController < ApplicationController
                                             .load(@topics.map(&:id))
   end
 
-  def load_commitfest_sidebar
-    entries = CommitfestPatchCommitfest
-      .joins(commitfest_patch: :commitfest_patch_topics)
-      .includes(:commitfest, commitfest_patch: :commitfest_tags)
-      .where(commitfest_patch_topics: { topic_id: @topic.id })
-      .order("commitfests.end_date DESC, commitfests.start_date DESC")
-
-    deduped_entries = entries.uniq { |entry| entry.commitfest_patch.external_id }
-
-    @commitfest_sidebar_entries = deduped_entries.map do |entry|
-      patch = entry.commitfest_patch
-      {
-        commitfest_name: entry.commitfest.name,
-        commitfest_external_id: entry.commitfest.external_id,
-        patch_external_id: patch.external_id,
-        patch_title: patch.title,
-        status: entry.status,
-        tags: patch.commitfest_tags.map(&:name)
-      }
-    end
-
-    reviewers = deduped_entries.flat_map { |entry| Topic.parse_csv_list(entry.commitfest_patch.reviewers) }
-    @commitfest_reviewers = reviewers.uniq
-
-    committers = deduped_entries.map { |entry| entry.commitfest_patch.committer.to_s.strip }.reject(&:blank?).uniq
-    @commitfest_committers = committers
-  end
-
-  def load_commit_sidebar
+  def load_commit_summary
     sources = lineage_visible? ? %w[trailer llm] : %w[trailer]
     commits = Commit.for_topic(@topic.id, sources: sources).to_a
-    @commit_groups = Commit.group_backports(commits)
-    @commit_credits = commit_credits_for(commits, sources: commit_credit_sources)
-  end
-
-  # role => [{ name:, email:, llm:, committer: }], deduplicated across a change and its backports.
-  def commit_credits_for(commits, sources: %w[parsed])
-    return {} if commits.empty?
-
-    rows = CommitPerson.where(commit_id: commits.map(&:id), source: sources)
-                       .includes(person: :default_alias)
-    grouped = rows.group_by(&:role)
-
-    CommitPerson::DISPLAY_ORDER.each_with_object({}) do |role, acc|
-      entries = (grouped[role] || []).map do |row|
-        alias_record = row.person&.default_alias
-        {
-          name: row.raw_name.presence || alias_record&.name || row.raw_email,
-          email: alias_record&.email,
-          llm: row.source == "llm",
-          committer: row.source == CommitterReviewer::SOURCE
-        }
-      end
-
-      # dedupe by name, but a resolved (linked) entry wins over an unresolved
-      # duplicate of the same name -- otherwise a name colliding with an
-      # earlier unresolved row would silently drop its person link. Among
-      # resolved ones a parsed row beats a committer row beats an llm one.
-      deduped = entries.group_by { |entry| entry[:name].to_s.downcase }.map do |_, dups|
-        dups.min_by { |entry| [ entry[:email].present? ? 0 : 1, entry[:llm] ? 2 : (entry[:committer] ? 1 : 0) ] }
-      end
-
-      acc[role] = deduped if deduped.any?
-    end
+    @commit_summary = Topics::CommitSummary.new(commits, credit_sources: commit_credit_sources)
   end
 
   def slice_cached_entries(entries, cursor_param)

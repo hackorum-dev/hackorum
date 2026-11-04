@@ -652,31 +652,15 @@
   font-size: var(--font-size-sm);
 }
 
-/* shared by the thread sidebar block and the banner - a wrapping row of
+/* shared by the thread sidebar block and the run-it block - a wrapping row of
    badges/links at font-size-sm. Do not split this back into per-block copies. */
 .ci-thread-value,
-.ci-banner-status,
-.ci-banner-head {
+.ci-banner-status {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--spacing-2);
   font-size: var(--font-size-sm);
-}
-
-/* thread page CI banner. Tinted and accented rather than another card: it sits
-   directly above the messages and has to read as a notice about the site, not
-   as the first message in the thread. */
-.ci-banner {
-  border: var(--border-width) solid var(--color-border);
-  border-left: var(--border-width-reply) solid var(--color-primary-500);
-  border-radius: var(--border-radius-md);
-  background: var(--color-bg-hoverbox);
-  padding: var(--spacing-3);
-  margin-bottom: var(--spacing-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-2);
 }
 
 .ci-banner-lead {

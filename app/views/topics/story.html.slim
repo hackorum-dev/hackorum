@@ -1,0 +1,5 @@
+= turbo_frame_tag "topic-story-modal", target: "_top"
+  p.story-provenance
+    span.story-model-tag model-written
+    = "run #{@lineage.run.id} - may be wrong, links go to the source messages. Commit-by-commit LLM analysis is in the Commits dialog."
+  = render "topics/lineage_story", lineage: @lineage, chapters: @chapters, revert_shas: @revert_shas

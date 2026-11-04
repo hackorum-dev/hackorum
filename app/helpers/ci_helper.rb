@@ -526,6 +526,11 @@ module CiHelper
     status&.present? && ci_topic_icon(status.row).present?
   end
 
+  def ci_all_green?(row)
+    row.health_bucket.to_s == "applies" && row.ci_status == "success" &&
+      ci_frozen_note(row).nil? && row.latest_run_summary&.failed_tests.blank?
+  end
+
   # "patchset v3 (message #12)" - the index off the branch name, the number off
   # the numbering the thread page already built. Falls back to the index alone
   # rather than inventing a number.

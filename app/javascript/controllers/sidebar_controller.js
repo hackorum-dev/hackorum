@@ -175,6 +175,10 @@ export default class extends Controller {
       return
     }
 
+    if (link.dataset.modalTrigger) {
+      return
+    }
+
     this.closeMobile()
   }
 

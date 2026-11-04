@@ -1,0 +1,20 @@
+section.sidebar-block
+  .sidebar-block-head
+    span.sidebar-block-label Commitfest
+    = render "shared/modal_link", label: "Details ›", src: commitfest_details_topic_path(topic), frame_id: "topic-commitfest-modal", title: "Commitfest", subtitle: [ pluralize(summary.patches.size, "patch"), (summary.open_patches.any? ? "#{summary.open_patches.size} open" : (summary.all_closed? ? "all closed" : "none open")) ].join(" · "), link_class: "sidebar-block-more"
+  .sidebar-chips
+    - if summary.open_patches.any?
+      - summary.open_patches.map(&:status).uniq.each do |status|
+        span.sidebar-chip.is-attention = status
+    - else
+      - summary.final_statuses.each do |status|
+        span class=[ "sidebar-chip", (status == "Committed" ? "is-ok" : "is-muted") ] = status
+      - if summary.all_closed?
+        span.sidebar-chip.is-muted All entries closed
+  - parts = [ pluralize(summary.patches.size, "CF patch"), "last in #{summary.latest_commitfest_name}" ]
+  - parts << "moved #{pluralize(summary.moved_count, 'time')}" if summary.moved_count.positive?
+  .sidebar-muted = parts.join(" · ")
+  - summary.open_patches.each do |patch|
+    - line = "Reviewers: #{patch.reviewers.presence&.join(', ') || 'none yet'} · Committer: #{patch.committer || 'none'}"
+    - line += " · CF bot: needs rebase" if patch.ci_status == "needs_rebase"
+    .sidebar-muted = line

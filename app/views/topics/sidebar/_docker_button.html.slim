@@ -1,0 +1,6 @@
+- slug = topic.slug_in_database
+- ref = slug.present? ? "#{image.image_ref.rpartition(':').first}:#{slug}" : image.image_ref
+- cmd = ci_docker_command(ref)
+button.sidebar-button id=dom_id(topic, :docker_button) type="button" title=cmd data-controller="clipboard" data-action="click->clipboard#copy" data-clipboard-url-value=cmd
+  i.fas.fa-copy aria-hidden="true"
+  span docker run

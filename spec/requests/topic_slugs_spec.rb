@@ -52,7 +52,22 @@ RSpec.describe "Topic slugs", type: :request do
       patch topic_slug_path(topic), params: { topic: { slug: "New-Name" } }, headers: stream
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("slug_sidebar_topic_#{topic.id}")
+      expect(response.body).to include("sidebar-short-link")
       expect(topic.reload.slug).to eq("new-name")
+    end
+
+    it "refreshes the docker button with the new slug tag" do
+      repo_state = create(:patch_ci_repo_state, master_committed_at: Time.current)
+      branch = create(:patch_branch, topic: topic, message: message, branch_name: "t#{topic.id}_1",
+                      base_sha: repo_state.master_sha, pushed_at: 1.hour.ago, ci_status: "success")
+      create(:patch_ci_run, patch_branch: branch, status: "success",
+                            image_ref: "ghcr.io/hackorum-dev/postgres:t#{topic.id}", completed_at: Time.current)
+      sign_in_as(owner)
+
+      patch topic_slug_path(topic), params: { topic: { slug: "new-name" } }, headers: stream
+
+      button = Nokogiri::HTML(response.body).at_css("turbo-stream[target=docker_button_topic_#{topic.id}] template button")
+      expect(button["title"]).to include("ghcr.io/hackorum-dev/postgres:new-name")
     end
 
     it "redirects html requests back to the topic" do

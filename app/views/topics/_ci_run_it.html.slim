@@ -1,12 +1,9 @@
 - row = status.row
 - image = status.image_run
-.ci-banner.ci-badges
-  .ci-banner-head
-    span.ci-banner-tag
-      i.fa-solid.fa-flask-vial aria-hidden="true"
-      span Beta feature
+.ci-run-it.ci-badges
   p.ci-banner-lead
-    | Hackorum builds and tests every patch posted to the lists, not only commitfest submissions. This is Hackorum's own CI rather than the PostgreSQL project's, and it is still under testing - please report anything that looks wrong.
+    span.ci-banner-tag Beta feature
+    |  Hackorum builds and tests every patch posted to the lists, not only commitfest submissions. This is Hackorum's own CI rather than the PostgreSQL project's, and it is still under testing - please report anything that looks wrong.
   .ci-banner-status
     = ci_bucket_badge(row.health_bucket)
     - if row.ci_status.present?

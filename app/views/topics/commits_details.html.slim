@@ -1,0 +1,55 @@
+= turbo_frame_tag "topic-commits-modal", target: "_top"
+  - if @commit_summary.any?
+    .modal-split
+      .modal-main
+        - @commit_summary.clusters.each do |cluster|
+          section.commit-cluster
+            .modal-section-head.commit-cluster-head
+              h3.modal-section-title = month_range_label(cluster.last[:committed_at], cluster.first[:committed_at])
+              span.modal-section-count = pluralize(cluster.size, "commit")
+            - cluster.each do |group|
+              .commit-row.commit-sidebar-entry
+                = link_to group[:subject], commit_web_url(group[:sha]), target: "_blank", rel: "noopener", class: "commit-row-title commit-sidebar-link"
+                .commit-row-meta
+                  span.commit-row-date = group[:committed_at]&.strftime("%-d %b %Y")
+                  - if group[:committer_name].present?
+                    span.commit-sidebar-committer = group[:committer_name]
+                  span.commit-row-branches
+                    = render partial: "shared/branch_badges", locals: { branches: group[:branches] }
+                  - if @llm_commit_shas.include?(group[:sha])
+                    span.commit-sidebar-llm title="Linked to this thread by LLM analysis, no commit trailer" LLM
+                  - if Topics::CommitSummary.revert?(group)
+                    - reverted = @commit_summary.reverted_count(group)
+                    - if reverted.positive?
+                      span.commit-revert-tag title="Subject starts with Revert and the body names #{pluralize(reverted, 'commit')} linked to this thread" = "reverts #{pluralize(reverted, 'commit')} here"
+                    - else
+                      span.commit-revert-tag title="Subject starts with Revert" revert
+                - if (verdict = @commit_verdicts[group[:sha]])
+                  = render "topics/commit_llm", v: verdict, ordinals: @lineage.ordinals
+      aside.modal-side.commit-credits-side
+        h3.modal-side-heading = "Credits across #{pluralize(@commit_summary.count, 'commit')}"
+        - any_llm = false
+        - @credits.each do |role, entries|
+          .commit-credit-group
+            .commit-credit-role = role.humanize
+            - entries.each do |entry|
+              .commit-credit-row
+                - if entry.email.present?
+                  = link_to entry.name, person_path(entry.email), class: "commit-credit-link"
+                - else
+                  span.commit-credit-name = entry.name
+                - if entry.llm_only?
+                  - any_llm = true
+                  span.commit-credit-llm title="Credited by LLM analysis, not a commit trailer" LLM
+                - elsif entry.llm.positive?
+                  - any_llm = true
+                  span.commit-credit-llm title="#{entry.llm} of #{entry.total} from LLM analysis, the rest from trailers" = "#{entry.llm} LLM"
+                - if entry.committer
+                  span.commit-credit-committer title="Committed the patch, counted as its reviewer" committer
+                span.commit-credit-count = entry.total
+        - if any_llm
+          p.commit-credits-note
+            span.commit-credit-llm N LLM
+            |  means N of the credits come from LLM analysis, not from commit trailers.
+  - else
+    p.modal-empty No commits linked to this thread.

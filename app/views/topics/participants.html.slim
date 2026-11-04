@@ -1,0 +1,35 @@
+- activity = @participant_activity
+- max = @participants.first&.dig(:message_count).to_i
+- me = current_user&.person_id
+= turbo_frame_tag "topic-participants-modal", target: "_top"
+  .people-modal data-controller="list-filter"
+    = render "topics/sidebar/role_strip", activity: activity
+    input.people-filter type="search" placeholder="Filter people" aria-label="Filter people" data-action="input->list-filter#filter"
+    ul.people-list
+      - @participants.each do |participant|
+        - person = participant[:person]
+        - alias_record = participant[:alias]
+        - count = participant[:message_count].to_i
+        - first, last = @first_last[person.id]
+        li.people-row class=("is-you" if person.id == me) data-name=alias_record.name.downcase data-list-filter-target="item"
+          = image_tag alias_record.gravatar_url(size: 56), class: "people-avatar", alt: ""
+          span.people-name-cell
+            span.people-name
+              - link_class = [ "sidebar-participant-link", ("is-committer" if person.contributor_membership_types.include?("committer")) ].compact.join(" ")
+              = link_to alias_record.name, participant_topic_path(@topic, person_id: person.id, frame: "topic-participants-modal"), class: link_class, data: { turbo_frame: "topic-participants-modal" }
+            = membership_icons_html(person)
+            - if person.id == me
+              span.people-you you
+          span.people-role = activity.bucket_label(participant)
+          span.people-count
+            span.people-count-n = count
+            span.people-bar
+              span style="width: #{max.positive? ? (count * 100.0 / max).round : 0}%"
+          span.people-range
+            - if first
+              = link_to "##{@message_numbers[first.id]}", "#message-#{first.id}", data: { turbo: false }
+              = " · #{first.created_at.strftime('%-d %b %Y')}"
+              - if last != first
+                = " - "
+                = link_to "##{@message_numbers[last.id]}", "#message-#{last.id}", data: { turbo: false }
+                = " · #{last.created_at.strftime('%-d %b %Y')}"

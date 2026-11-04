@@ -1,0 +1,29 @@
+- total = @messages.size
+- first = @person_messages.first
+- last = @person_messages.last
+- display = @person.default_alias || first.sender_display_alias
+- labels = { "author" => "authored", "reviewer" => "reviewed", "tested_by" => "tested", "reported_by" => "reported", "co_author" => "co-authored" }
+.person-card data-controller="person-actions" data-person-actions-person-id-value=@person.id data-person-actions-name-value=display.name data-person-actions-timeline-value=timeline_topic_path(@topic, person: @person.id)
+  .person-card-head
+    = image_tag display.gravatar_url(size: 80), class: "person-card-avatar", alt: ""
+    div
+      = link_to display.name, person_path(display.email), class: "person-card-name"
+      - badge = @person.contributor_badge
+      - if badge.present?
+        .sidebar-muted = badge
+  .person-card-line = "#{pluralize(@person_messages.size, 'message')} · #{first.created_at.strftime('%-d %b %Y')} - #{last.created_at.strftime('%-d %b %Y')}"
+  .person-strip aria-hidden="true"
+    - @person_messages.each do |m|
+      span.person-strip-tick style="left: #{total > 1 ? ((@message_numbers[m.id] - 1) * 100.0 / (total - 1)).round(2) : 0}%"
+  .person-strip-axis
+    span #1
+    span where in the thread
+    span = "##{total}"
+  .person-card-actions
+    = link_to "First · ##{@message_numbers[first.id]}", "#message-#{first.id}", class: "sidebar-button", data: { turbo: false, action: "person-actions#closeDialogs" }
+    = link_to "Latest · ##{@message_numbers[last.id]}", "#message-#{last.id}", class: "sidebar-button", data: { turbo: false, action: "person-actions#closeDialogs" }
+    button.sidebar-button.sidebar-button-primary type="button" data-action="person-actions#stepThrough" Step through
+    button.sidebar-button type="button" data-action="person-actions#listAll" = "List all #{@person_messages.size}"
+  - credits = labels.filter_map { |role, word| n = @person_credits[role].to_i; "#{pluralize(n, 'commit')} #{word}" if n.positive? }
+  - if credits.any?
+    .sidebar-muted.person-card-credits = credits.join(", ")

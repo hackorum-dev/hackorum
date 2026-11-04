@@ -36,54 +36,118 @@ RSpec.describe "Thread page patchset lineage", type: :request do
     trailer_commit.commit_people.create!(role: "reviewer", raw_name: "Tess Committer", raw_email: "tess@example.com", source: "committer")
   end
 
-  it "hides everything without the feature" do
-    get topic_path(topic)
-    expect(response.body).not_to include("v1 then v2 landed")
+  it "hides lineage without the feature" do
+    get story_topic_path(topic)
+    expect(response).to have_http_status(:not_found)
+
+    get commits_details_topic_path(topic)
     expect(response.body).not_to include("Land the thing")
     expect(response.body).not_to include("Guessed Reviewer")
-    expect(response.body).not_to include("found in git")
     expect(response.body).not_to include("Guessed Author")
     expect(response.body).not_to include("commit-credit-llm")
-    expect(response.body).to include('Tess Committer<span class="commit-credit-committer" title="Committed the patch, counted as its reviewer">committer</span>')
-    expect(response.body).not_to include("lineage-review-committer")
-    get patchsets_sidebar_topic_path(topic)
+    expect(response.body).not_to include("commit-llm")
+    expect(response.body).to include("Tess Committer")
+    expect(response.body).to include('<span class="commit-credit-committer" title="Committed the patch, counted as its reviewer">committer</span>')
+
+    get topic_path(topic)
+    expect(response.body).not_to include("Patch story")
+
+    get patchsets_details_topic_path(topic)
     expect(response.body).not_to include("rebase")
   end
 
-  it "shows lineage, verdicts and the LLM badge with the feature" do
+  it "groups the story into chapters for long threads" do
+    user = create(:user)
+    create(:user_feature, user: user, feature: "patchset_lineage")
+    sign_in_as(user)
+    old = create(:message, topic: topic, created_at: 400.days.ago)
+    59.times { |i| create(:message, topic: topic, created_at: 300.days.ago + i.hours) }
+    run.update!(story: "early [msg:#{old.id}]\n\nlater [msg:#{m2.id}] in [commit:#{'d' * 40}]\n")
+    create(:commit_topic, topic: topic, commit: extra_commit, source: "llm", confidence: 0.9)
+
+    get story_topic_path(topic)
+    doc = Nokogiri::HTML(response.body)
+    chapters = doc.css("details.story-chapter")
+    expect(chapters.size).to eq(2)
+    expect(chapters.map { |c| c["open"] }.compact.size).to eq(2)
+    expect(chapters.first.at_css("summary").text).to include("1 entry")
+    expect(chapters.last.css(".story-dot.is-revert, .story-dot.is-commit").size).to eq(1)
+    expect(doc.at_css(".modal-side")).to be_nil
+  end
+
+  it "shows lineage, verdicts and the LLM badges with the feature" do
     user = create(:user)
     create(:user_feature, user: user, feature: "patchset_lineage")
     sign_in_as(user)
 
-    get topic_path(topic)
+    get story_topic_path(topic)
+    expect(response.body).to include("model-written")
+    expect(response.body).to include("run #{run.id}")
     expect(response.body).to include("<li>v1 then v2 landed as c</li><li>then a fixup followed</li>")
-    expect(response.body).to include("Land the thing")
-    expect(response.body).to include("commit-sidebar-llm")
-    expect(response.body).to include("modified")
-    expect(response.body).to include("Revert the thing")
-    expect(response.body).to include("found in git")
-    expect(response.body).to include("Still undecided")
-    expect(response.body).not_to include("Unrelated overlap")
-    expect(response.body).to include('class="lineage-change"')
-    expect(response.body).to include(">moderate</span>")
-    expect(response.body).to include("reviews: 3 of 4 reviewed the final version")
-    expect(response.body).to include("Alice")
-    expect(response.body).to include('<span class="lineage-review-llm" title="Found by the patchset lineage model, not a Reviewed-by trailer">LLM</span>')
-    expect(response.body).to include('<span class="lineage-review-confidence">80%</span>')
-    expect(response.body).to include('<span class="lineage-reviewer">Guessed Reviewer</span>')
-    expect(response.body).to include('Guessed Reviewer<span class="commit-credit-llm"')
-    expect(response.body.scan('class="lineage-review-llm"').size).to eq(1)
-    expect(response.body).to include(%(hunks from <a href="#message-#{m2.id}">#2</a> with a renamed helper))
-    expect(response.body).to include(%(looked at <a href="#message-#{m2.id}">#2</a>))
-    expect(response.body).to include("Guessed Author")
-    expect(response.body).to include('<span class="commit-credit-llm" title="Attributed by the patchset lineage model">LLM</span>')
-    expect(response.body).to include('<span class="lineage-review-committer" title="Committed the patch, counted as its reviewer">committer</span>')
-    expect(response.body).to include('Neil Committer<span class="commit-credit-committer"')
-    expect(response.body).to include('Tess Committer<span class="commit-credit-committer"')
+    expect(response.body).to include("Commit-by-commit LLM analysis is in the Commits dialog.")
+    expect(response.body).not_to include("Matched commits")
+    expect(response.body).not_to include("Land the thing")
+    expect(response.body).not_to include("commit-llm")
+    expect(response.body).not_to include("lineage-verdict")
+    expect(response.body).not_to include("Alice")
 
-    get patchsets_sidebar_topic_path(topic)
-    expect(response.body).to include("from #1")
-    expect(response.body).to include("rebase")
-    expect(response.body).to include("85%")
+    create(:commit_topic, topic: topic, commit: pending_commit)
+    get commits_details_topic_path(topic)
+    doc = Nokogiri::HTML(response.body)
+    rows = doc.css(".commit-row")
+    land = rows.find { |r| r.text.include?("Land the thing") }
+    block = land.at_css("details.commit-llm")
+    expect(block["open"]).to be_nil
+    summary = block.at_css("summary")
+    expect(summary.at_css(".commit-llm-verdict").text).to eq("modified before commit")
+    expect(summary.at_css(".commit-llm-change").text).to eq("moderate changes")
+    expect(summary.at_css(".commit-llm-change")["title"]).to include("moderate = local logic")
+    expect(summary.at_css(".commit-llm-source").text).to eq("from patchset #2")
+    expect(summary.at_css(".commit-llm-source a")["href"]).to eq("#message-#{m2.id}")
+    expect(summary.at_css(".commit-llm-reviews").text).to eq("3 of 4 reviewers saw the final version")
+    badge = summary.at_css(".commit-llm-confidence")
+    expect(badge.text).to eq("LLM 90%")
+    expect(badge["title"]).to eq("How sure the LLM analysis is about this match")
+    expect(block.at_css(".commit-llm-evidence").inner_html).to include(%(hunks from <a href="#message-#{m2.id}">#2</a> with a renamed helper))
+    reviewers = block.css(".commit-llm-reviewers li")
+    expect(reviewers.map { |li| li.at_css(".commit-llm-reviewer").text }).to eq([ "Alice", "Bob", "Guessed Reviewer", "Neil Committer" ])
+    expect(reviewers.map { |li| li.at_css(".commit-llm-coverage").text }).to eq([ "saw the final version", "saw an earlier version", "saw the final version", "saw the final version" ])
+    expect(reviewers[0].at_css(".commit-llm-src")).to be_nil
+    expect(reviewers[0].inner_html).to include(%(looked at <a href="#message-#{m2.id}">#2</a>))
+    expect(reviewers[1].at_css(".commit-llm-src").text).to eq("trailer")
+    llm = reviewers[2].at_css(".commit-llm-src")
+    expect(llm.text).to eq("LLM 80%")
+    expect(llm["title"]).to eq("Found by LLM analysis, not a Reviewed-by trailer")
+    neil = reviewers[3].at_css(".commit-llm-src")
+    expect(neil.text).to eq("committer")
+    expect(neil["title"]).to eq("Committed the patch, counted as its reviewer")
+    pending = rows.find { |r| r.text.include?("Still undecided") }
+    expect(pending.at_css(".commit-llm-verdict").text).to eq("undecided")
+    expect(pending.at_css(".commit-llm-reviews")).to be_nil
+    trailer = rows.find { |r| r.text.include?("Trailer-linked thing") }
+    expect(trailer.at_css(".commit-llm")).to be_nil
+    expect(response.body).not_to include("Unrelated overlap")
+
+    expect(response.body).to include("commit-sidebar-llm")
+    expect(land.at_css(".commit-sidebar-llm")["title"]).to eq("Linked to this thread by LLM analysis, no commit trailer")
+    expect(response.body).to include("Guessed Author")
+    expect(response.body).to include('<span class="commit-credit-llm" title="Credited by LLM analysis, not a commit trailer">LLM</span>')
+    expect(response.body).to include("Neil Committer").and include("Tess Committer")
+    credit_rows = Nokogiri::HTML(response.body).css(".commit-credit-row")
+    neil = credit_rows.find { |row| row.text.include?("Neil Committer") }
+    expect(neil.at_css(".commit-credit-name, .commit-credit-link").next_element["class"]).to eq("commit-credit-committer")
+    guessed = credit_rows.find { |row| row.text.include?("Guessed Reviewer") }
+    expect(guessed.at_css(".commit-credit-llm")["title"]).to eq("Credited by LLM analysis, not a commit trailer")
+
+    get topic_path(topic)
+    expect(response.body).to include("Patch story")
+
+    get patchsets_details_topic_path(topic)
+    cell = Nokogiri::HTML(response.body).css(".patchset-lineage").find { |c| c.text.include?("rebase") }
+    expect(cell.at_css(".patchset-step").text.squish).to eq("rebase of #1")
+    expect(cell.at_css(".patchset-step a")["href"]).to eq("#message-#{m1.id}")
+    expect(cell.at_css(".patchset-llm").text).to eq("LLM 85%")
+    expect(cell.at_css(".patchset-llm")["title"]).to eq("LLM analysis: how sure it is about this step")
+    expect(cell["title"]).to eq("same hunks")
   end
 end

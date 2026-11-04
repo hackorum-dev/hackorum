@@ -1,85 +1,17 @@
 - content_for :title, @topic.title
 
 - content_for :sidebar do
-  .sidebar
-    = render "topics/slug_sidebar", topic: @topic, ci_status: @ci_status
-    - if @commit_groups.present?
-      details.sidebar-section open=true
-        summary.sidebar-heading Commits
-        .sidebar-section
-          .commit-sidebar-list
-            - @commit_groups.each do |group|
-              .commit-sidebar-entry
-                = link_to group[:subject], commit_web_url(group[:sha]), target: "_blank", rel: "noopener", class: "commit-sidebar-link"
-                - if @lineage && @lineage.llm_commit_shas.include?(group[:sha])
-                  span.commit-sidebar-llm title="Linked by the patchset lineage model, not a commit trailer" LLM
-                .commit-sidebar-branches
-                  = render partial: "shared/branch_badges", locals: { branches: group[:branches] }
-                .commit-sidebar-meta
-                  - if group[:committer_name].present?
-                    span.commit-sidebar-committer = "Committed by #{group[:committer_name]}"
-                  span.commit-sidebar-date = absolute_time_display(group[:committed_at])
-
-    - if @lineage&.run
-      = render "topics/lineage_sidebar", lineage: @lineage
-
-    - if @commit_credits.present?
-      details.sidebar-section open=true
-        summary.sidebar-heading Credits
-        .sidebar-section
-          - @commit_credits.each do |role, entries|
-            .commit-credit-row
-              span.commit-credit-role = role.humanize
-              span.commit-credit-people
-                - entries.each_with_index do |entry, index|
-                  - separator = index.zero? ? "" : ", "
-                  = separator
-                  - if entry[:email].present?
-                    = link_to entry[:name], person_path(entry[:email]), class: "commit-credit-link"
-                  - else
-                    = entry[:name]
-                  - if entry[:llm]
-                    span.commit-credit-llm title="Attributed by the patchset lineage model" LLM
-                  - if entry[:committer]
-                    span.commit-credit-committer title="Committed the patch, counted as its reviewer" committer
-
+  .sidebar.topic-sidebar
+    = render "topics/sidebar/short_link", topic: @topic
+    - if @latest_patch
+      = render "topics/sidebar/patch_card", topic: @topic, ci_status: @ci_status, latest_patch: @latest_patch, message_numbers: @message_numbers, patch_stats: @latest_patchset_stats, patchset_count: @patchset_count, attachment_message_count: @attachment_message_count, lineage: @lineage
     - if ci_thread_visible?(@ci_status)
-      = render "topics/ci_sidebar", status: @ci_status, topic: @topic
-
-    - if @commitfest_sidebar_entries.present?
-      details.sidebar-section open=true
-        summary.sidebar-heading Commitfests
-        .sidebar-section
-          .commitfest-list
-            - @commitfest_sidebar_entries.each do |entry|
-              .commitfest-entry
-                .commitfest-entry-header
-                  = link_to entry[:commitfest_name], "https://commitfest.postgresql.org/#{entry[:commitfest_external_id]}/", target: "_blank", rel: "noopener", class: "commitfest-link"
-                  span.commitfest-status = entry[:status].presence || "Unknown"
-                - if entry[:patch_title].present?
-                  .commitfest-patch
-                    = link_to entry[:patch_title], "https://commitfest.postgresql.org/patch/#{entry[:patch_external_id]}/", target: "_blank", rel: "noopener", class: "commitfest-patch-link"
-                - if entry[:tags].present?
-                  .commitfest-tags
-                    - entry[:tags].each do |tag|
-                      span.commitfest-tag = tag
-
-    - if @commitfest_reviewers.present?
-      details.sidebar-section open=true
-        summary.sidebar-heading Reviewers
-        .sidebar-section
-          ul.commitfest-reviewers
-            - @commitfest_reviewers.each do |reviewer|
-              li = reviewer
-
-    - if @commitfest_committers.present?
-      details.sidebar-section open=true
-        summary.sidebar-heading Committer
-        .sidebar-section
-          ul.commitfest-committers
-            - @commitfest_committers.each do |committer|
-              li = committer
-
+      = render "topics/sidebar/ci", status: @ci_status, topic: @topic
+    - if @commitfest_summary.any?
+      = render "topics/sidebar/commitfest", topic: @topic, summary: @commitfest_summary
+    - if @commit_summary.any?
+      = render "topics/sidebar/commits", topic: @topic, summary: @commit_summary
+    = render "topics/sidebar/participants", activity: @participant_activity, topic: @topic
     - if @notes_by_message.present?
       - note_map = @notes_by_message
       - message_note_entries = note_map.keys.filter_map do |key|
@@ -91,8 +23,8 @@
         - [key, number, notes]
       - message_note_entries = message_note_entries.sort_by { |entry| entry[1] }
       - if message_note_entries.any?
-        details.sidebar-section open=true
-          summary.sidebar-heading Notes
+        details.sidebar-section
+          summary.sidebar-heading = "Notes · #{message_note_entries.size}"
           .sidebar-section
             ul.note-overview
               - message_note_entries.each do |message_id, number, notes|
@@ -100,120 +32,9 @@
                   = link_to "#message-#{message_id}", class: "note-overview-link" do
                     span.note-overview-target = "##{number}"
                     span.note-overview-count = "(#{notes.size})"
-
-    details.sidebar-section open=true
-      summary.sidebar-heading Participants
-      .sidebar-section
-        - if @participants.present?
-          .participants-list
-            - max_participants = 12
-            - @participants.first(max_participants).each do |participant|
-              = participant_row_html(participant: participant, avatar_size: 40)
-            - if @participants.size > max_participants
-              .participant-more "+ #{(@participants.size - max_participants)} more"
-        - else
-          p No participants yet
-
     - if user_signed_in?
       = render "topics/drafts_sidebar", drafts: @sidebar_drafts, message_numbers: @message_numbers
-
-    .sidebar-section-wrapper
-      .sidebar-heading Attachments
-      .sidebar-section
-        - if @has_patches
-          .download-patchset
-            = link_to latest_patchset_topic_path(@topic), class: "button download-button", download: "topic-#{@topic.id}-patchset.tar.gz", data: { turbo: false } do
-              i.fas.fa-download
-              span Download Latest Patchset
-            - if @latest_patchset_stats
-              .patchset-stats aria-label="Patchset line changes" title="Lines added and removed by this patchset"
-                span.patchset-added +#{@latest_patchset_stats[:added]}
-                span.patchset-removed -#{@latest_patchset_stats[:removed]}
-
-        details.attachments-details
-          summary Show all attachments
-          = turbo_frame_tag "attachments-sidebar-list", src: attachments_sidebar_topic_path(@topic), loading: :lazy
-
-        - if @has_patches
-          details.attachments-details
-            summary Show all patchsets
-            = turbo_frame_tag "patchsets-sidebar-list", src: patchsets_sidebar_topic_path(@topic), loading: :lazy
-
-
-    details.sidebar-section open=true
-      summary.sidebar-heading Thread Outline
-      - if @thread_outline.present?
-        .thread-outline data-controller="thread-outline"
-          - @thread_outline.chunk_while { |a, b| a[:branch_segment_index] == b[:branch_segment_index] }.each do |segment|
-            - first = segment.first
-            - first_msg = first[:message]
-            - segment_size = segment.size
-            - is_reply = first_msg.reply_to_id.present?
-            - branch_class = "branch-#{first[:branch_index]}"
-            - can_toggle = @has_multiple_branches && segment_size > 1
-            - details_classes = ["branch-details", branch_class, ("reply" if is_reply)].compact.join(" ")
-            - details_open = !@has_multiple_branches
-            - indent_px = first[:branch_depth].to_i * 10
-            - first_num = segment.first[:message_number]
-            - last_num = segment.last[:message_number]
-            - number_range = first_num == last_num ? "##{first_num}" : "##{first_num}...##{last_num}"
-            - participants = segment.map { |entry| entry[:message].sender_display_alias }.uniq(&:id).first(6)
-            - if can_toggle
-              details class=details_classes open=(details_open ? true : nil) style="margin-left: #{indent_px}px"
-                summary class="outline-summary" title="Toggle branch with #{segment_size} messages"
-                  .outline-content
-                    .outline-meta
-                      span.outline-number = number_range
-                      .outline-avatars
-                        - participants.each do |participant|
-                          = link_to person_path(participant.email), class: "outline-avatar-link" do
-                            = image_tag participant.gravatar_url(size: 24), class: "outline-avatar", alt: participant.name, title: participant.name
-                      - if is_reply
-                        span.outline-icon ↳
-                      span.branch-toggle = "▸"
-                      - if is_reply && first_msg.reply_to
-                        - parent_num = @message_numbers[first_msg.reply_to.id]
-                        span.outline-parent = "to #{first_msg.reply_to.sender_display_alias.name} (##{parent_num})"
-                    .outline-time = smart_time_display(first_msg.created_at)
-                - segment.each do |entry|
-                  - msg = entry[:message]
-                  - msg_display = msg.sender_display_alias
-                  - is_reply = msg.reply_to_id.present?
-                  - branch_class = "branch-#{entry[:branch_index]}"
-                  - item_indent = entry[:branch_depth].to_i * 10
-                  = link_to "#message-#{msg.id}", class: ["outline-item", ("reply" if is_reply), branch_class, ("branch-start" if entry[:branch_start])].compact.join(" ") do
-                    .outline-content
-                      .outline-meta
-                        span.outline-number = "##{entry[:message_number]}"
-                        = image_tag msg_display.gravatar_url(size: 32), class: "outline-avatar", alt: msg_display.name
-                        - if is_reply
-                          span.outline-icon ↳
-                        span.outline-author = msg_display.name
-                        - if is_reply && msg.reply_to
-                          - parent_num = @message_numbers[msg.reply_to.id]
-                          span.outline-parent = "to #{msg.reply_to.sender_display_alias.name} (##{parent_num})"
-                      .outline-time = smart_time_display(msg.created_at)
-            - else
-              - segment.each do |entry|
-                - msg = entry[:message]
-                - msg_display = msg.sender_display_alias
-                - is_reply = msg.reply_to_id.present?
-                - branch_class = "branch-#{entry[:branch_index]}"
-                - item_indent = entry[:branch_depth].to_i * 10
-                = link_to "#message-#{msg.id}", class: ["outline-item", ("reply" if is_reply), branch_class, ("branch-start" if entry[:branch_start])].compact.join(" "), style: "margin-left: #{item_indent}px" do
-                  .outline-content
-                    .outline-meta
-                      span.outline-number = "##{entry[:message_number]}"
-                      = image_tag msg_display.gravatar_url(size: 32), class: "outline-avatar", alt: msg_display.name
-                      - if is_reply
-                        span.outline-icon ↳
-                      span.outline-author = msg_display.name
-                      - if is_reply && msg.reply_to
-                        - parent_num = @message_numbers[msg.reply_to.id]
-                        span.outline-parent = "to #{msg.reply_to.sender_display_alias.name} (##{parent_num})"
-                    .outline-time = smart_time_display(msg.created_at)
-      - else
-        p No messages yet
+    = render "topics/sidebar/thread", topic: @topic, messages: @messages, message_numbers: @message_numbers, buckets: @activity_buckets, latest_patch: @latest_patch, unread_count: @unread_count
 
 .topic-header *visited_topic_attrs(@topic)
   .topic-title-section
@@ -234,13 +55,22 @@
           i.fas.fa-compress-arrows-alt
           |  Merge Topic
 
-- if ci_thread_visible?(@ci_status)
-  = render "topics/ci_banner", status: @ci_status, topic: @topic, message_numbers: @message_numbers
-
 - if user_signed_in? || @notes_by_message&.[](:thread).present?
   - thread_notes = @notes_by_message&.[](:thread) || []
   .thread-notes-container
     = render "notes/note_stack", topic: @topic, message: nil, notes: thread_notes
+
+.person-nav-bar hidden=true data-controller="person-nav" data-person-nav-messages-value=@person_messages_json data-person-nav-timeline-value=timeline_topic_path(@topic) data-action="person-nav:start@window->person-nav#start turbo:before-cache@document->person-nav#stop"
+  span.person-nav-text
+    | Stepping through
+    strong data-person-nav-target="name"
+  span.person-nav-position data-person-nav-target="position"
+  span.person-nav-spacer
+  button.person-nav-button type="button" data-person-nav-target="prev" data-action="person-nav#prev"
+  button.person-nav-button type="button" data-person-nav-target="next" data-action="person-nav#next"
+  button.person-nav-button type="button" data-action="person-nav#list" List
+  button.person-nav-button type="button" aria-label="Stop stepping" data-action="person-nav#stop"
+    i.fa-solid.fa-xmark aria-hidden="true"
 
 .messages-container.flat.asc data-controller="batch-loader" data-batch-loader-url-value=message_batch_topic_path(@topic) data-batch-loader-signed-in-value=(user_signed_in? ? true : false)
   - last_message = @messages.last

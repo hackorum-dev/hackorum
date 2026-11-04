@@ -8,6 +8,10 @@ module Lineage
       @run = PatchsetRun.current_for(topic.id)
     end
 
+    def self.llm_commit_shas(topic_id)
+      Commit.where(id: CommitTopic.llm.where(topic_id: topic_id).select(:commit_id)).pluck(:sha).to_set
+    end
+
     def story = @run&.story
 
     def lineage_by_message_id
@@ -24,11 +28,20 @@ module Lineage
 
       @verdicts ||= @run.verdicts.includes(:commit).select { |v| shown_on_thread?(v) }.map do |v|
         { sha: v.commit.sha, subject: v.commit.subject, verdict: v.verdict, confidence: v.confidence,
-          extra: v.extra, source_ordinal: v.source_message_id && @ordinals[v.source_message_id],
+          extra: v.extra, source_message_id: v.source_message_id, source_ordinal: v.source_message_id && @ordinals[v.source_message_id],
           evidence: v.evidence, origin: v.origin, change_level: v.change_level, reviews: v.reviews || [],
           reviewers_final: v.reviewers_final.to_i, reviewers_earlier: v.reviewers_earlier.to_i,
           reviewers_none: v.reviewers_none.to_i,
           reviewers_total: v.reviewers_final.to_i + v.reviewers_earlier.to_i + v.reviewers_none.to_i }
+      end
+    end
+
+    def verdicts_for_groups(summary)
+      by_sha = verdicts.index_by { |v| v[:sha] }
+      summary.groups.each_with_object({}) do |group, out|
+        shas = [ group[:sha], *summary.member_shas(group) ]
+        verdict = by_sha.values_at(*shas).compact.first
+        out[group[:sha]] = verdict if verdict
       end
     end
 
@@ -37,8 +50,7 @@ module Lineage
     end
 
     def llm_commit_shas
-      @llm_commit_shas ||= Commit.where(id: CommitTopic.llm.where(topic_id: @topic.id).select(:commit_id))
-                                 .pluck(:sha).to_set
+      @llm_commit_shas ||= self.class.llm_commit_shas(@topic.id)
     end
   end
 end

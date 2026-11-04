@@ -1,0 +1,41 @@
+- row = ci_status.row
+- attachment_message_count = local_assigns[:attachment_message_count]
+- image = ci_status.image_run
+section.sidebar-patch-card
+  .sidebar-patch-head
+    span.sidebar-patch-title Latest patchset
+    - if ci_thread_visible?(ci_status)
+      = render "shared/modal_link", label: "Hackorum CI · beta", src: patchsets_details_topic_path(topic, tab: "run"), frame_id: "topic-runit-modal", title: "Run this patch", subtitle: "Hackorum CI, beta", link_class: "sidebar-beta-tag", link_title: "What is this?"
+  .sidebar-patch-meta
+    = link_to "##{message_numbers[latest_patch.id]}", "#message-#{latest_patch.id}"
+    = " · #{latest_patch.created_at.strftime('%-d %b %Y')} · #{latest_patch.sender_display_alias.name}"
+  - if (file = latest_patch.attachments.find(&:patch_submission_candidate?))
+    .sidebar-patch-file title=file.file_name = file.file_name
+  - if patch_stats
+    .patchset-stats aria-label="Patchset line changes" title="Lines added and removed by this patchset"
+      span.patchset-added +#{patch_stats[:added]}
+      span.patchset-removed -#{patch_stats[:removed]}
+  = link_to latest_patchset_topic_path(topic), class: "sidebar-button sidebar-button-primary", download: "topic-#{topic.id}-patchset.tar.gz", data: { turbo: false } do
+    i.fas.fa-download aria-hidden="true"
+    span Download patchset
+  - if row&.pushed_at || image
+    .sidebar-patch-actions
+      - if row&.pushed_at
+        = link_to ci_github_branch_url(row.branch_name), class: "sidebar-button", target: "_blank", rel: "noopener" do
+          i.fas.fa-code-branch aria-hidden="true"
+          span Git branch
+      - if image
+        = render "topics/sidebar/docker_button", topic: topic, image: image
+  - if image && !ci_status.image_current?
+    .sidebar-patch-warning
+      i.fa-solid.fa-triangle-exclamation aria-hidden="true"
+      span = ci_image_mismatch_warning(ci_status, message_numbers)
+  - if lineage&.run
+    - story_label = capture do
+      span.sidebar-story-label
+        i.fas.fa-timeline aria-hidden="true"
+        |  Patch story
+      span.sidebar-story-tag model-written
+    = render "shared/modal_link", label: story_label, src: story_topic_path(topic), frame_id: "topic-story-modal", title: "Patch story", subtitle: [ "model-written", "run #{lineage.run.id}", lineage.run.model, lineage.run.finished_at&.strftime("%-d %b %Y") ].compact_blank.join(" · "), size: "lg", link_class: "sidebar-button sidebar-button-story"
+  .sidebar-patch-foot
+    = render "shared/modal_link", label: "#{pluralize(patchset_count, 'patchset')}, all attachments ›", src: patchsets_details_topic_path(topic), frame_id: "topic-patchsets-modal", title: "Patchsets and attachments", subtitle: [ pluralize(patchset_count, "patchset"), (pluralize(attachment_message_count, "message") + " with attachments" if attachment_message_count) ].compact.join(" · "), size: "lg", link_class: "sidebar-block-more"

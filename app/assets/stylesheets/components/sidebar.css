@@ -39,38 +39,6 @@
   margin-bottom: var(--spacing-8);
 }
 
-.sidebar .attachments-details summary {
-  list-style: none;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-2);
-  color: var(--color-text-link);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  padding: var(--spacing-2) var(--spacing-3);
-  border-radius: var(--border-radius-sm);
-  transition: background var(--transition-fast), color var(--transition-fast);
-}
-
-.sidebar .attachments-details summary::-webkit-details-marker {
-  display: none;
-}
-
-.sidebar .attachments-details summary::before {
-  content: "▸";
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-}
-
-.sidebar .attachments-details[open] summary::before {
-  content: "▾";
-}
-
-.sidebar .attachments-details summary:hover {
-  background: var(--color-bg-hover);
-}
-
 .sidebar-section.is-search-focus .sidebar-heading {
   background: linear-gradient(135deg, var(--color-bg-sidebar-header), var(--color-primary-2));
   border-radius: 999px;
@@ -277,14 +245,6 @@
   margin: var(--spacing-3) 0;
 }
 
-.sidebar .download-patchset {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-3);
-  margin-bottom: var(--spacing-4);
-}
-
 .sidebar .patchset-stats {
   display: inline-flex;
   align-items: center;
@@ -346,19 +306,6 @@
   color: var(--color-text-secondary);
 }
 
-.sidebar .commitfest-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-3);
-}
-
-.sidebar .commitfest-entry-header {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--spacing-2);
-  align-items: baseline;
-}
-
 .sidebar .commitfest-link,
 .sidebar .commitfest-patch-link {
   color: var(--color-text-link);
@@ -395,18 +342,6 @@
   border-radius: var(--border-radius-sm);
   font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
-}
-
-.sidebar .commitfest-reviewers,
-.sidebar .commitfest-committers {
-  list-style: none;
-  padding-left: 0;
-  margin: 0;
-}
-
-.sidebar .commitfest-reviewers li + li,
-.sidebar .commitfest-committers li + li {
-  margin-top: var(--spacing-1);
 }
 
 .sidebar .search-help-link {
@@ -604,19 +539,8 @@
 
 .commit-sidebar-llm,
 .commit-credit-llm,
-.lineage-review-llm,
-.commit-credit-committer,
-.lineage-review-committer {
+.commit-credit-committer {
   margin-left: var(--spacing-1);
-}
-
-.commit-sidebar-llm,
-.commit-credit-llm,
-.lineage-review-llm,
-.commit-credit-committer,
-.lineage-review-committer,
-.lineage-kind,
-.lineage-extra {
   display: inline-block;
   padding: 0 var(--spacing-1);
   border-radius: var(--border-radius-sm);
@@ -635,57 +559,8 @@
   margin-bottom: var(--spacing-1);
 }
 
-.lineage-verdict {
-  margin: var(--spacing-2) 0;
-}
-
-.lineage-verdict-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-2);
-}
-
-.lineage-verdict-meta,
 .lineage-run-meta,
 .patchset-lineage {
   font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
-}
-
-.lineage-evidence {
-  font-size: var(--font-size-xs);
-}
-
-.lineage-change {
-  display: inline-block;
-  padding: 0 var(--spacing-1);
-  border-radius: var(--border-radius-sm);
-  font-size: var(--font-size-xs);
-  background: var(--color-bg-hover, #eee);
-  color: var(--color-text-secondary);
-  cursor: help;
-}
-
-.lineage-reviews {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-}
-
-.lineage-reviews summary {
-  cursor: pointer;
-}
-
-.lineage-review-list {
-  margin: 0;
-  padding-left: var(--spacing-3);
-}
-
-.lineage-coverage {
-  margin-left: var(--spacing-1);
-  font-style: italic;
-}
-
-.lineage-review-confidence,
-.lineage-review-note {
-  margin-left: var(--spacing-1);
 }

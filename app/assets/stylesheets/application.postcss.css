@@ -11,6 +11,7 @@
 @import "components/navigation.css";
 @import "components/session.css";
 @import "components/sidebar.css";
+@import "components/topic-sidebar.css";
 @import "components/topics.css";
 @import "components/avatars.css";
 @import "components/participants.css";
@@ -18,6 +19,8 @@
 @import "components/message-skeleton.css";
 @import "components/composer.css";
 @import "components/confirm-modal.css";
+@import "components/modal.css";
+@import "components/timeline.css";
 @import "components/notes.css";
 @import "components/activities.css";
 @import "components/profile.css";

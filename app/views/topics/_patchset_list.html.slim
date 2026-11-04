@@ -1,0 +1,31 @@
+- if has_patch_branches
+  p.patchsets-ci = link_to "CI history", ci_topic_path(topic)
+- if patchset_messages.any?
+  ul.patchsets-list.modal-rows
+    - patchset_messages.each do |msg|
+      - number = message_numbers[msg.id]
+      li.patchset-entry
+        = link_to "##{message_dom_id(msg)}", class: "patchset-link", data: { turbo: false } do
+          span.patchset-target = "##{number}"
+          span.patchset-date = smart_time_display(msg.created_at)
+        span.patchset-sender title=msg.sender_display_alias&.name = msg.sender_display_alias&.name
+        span.patchset-lineage-cell
+          - if (l = lineage_by_message[msg.id])
+            - words, parent, tail = lineage_step_words(l[:step_kind], l[:parent_ordinal])
+            span.patchset-lineage title=lineage_plain(l[:reason], message_numbers)
+              span.patchset-step
+                = words
+                - if parent
+                  = " of "
+                  - parent_id = message_numbers.key(parent)
+                  = parent_id ? link_to("##{parent}", "#message-#{parent_id}", data: { turbo: false }) : "##{parent}"
+                  - if tail
+                    = " #{tail}"
+              span.patchset-llm title="LLM analysis: how sure it is about this step" = "LLM #{llm_percent(l[:confidence])}"
+        span.patchset-actions
+          - if (branch = patchset_branches[msg.id])
+            = ci_branch_link(branch, text: "", class_name: "patchset-branch")
+          = link_to message_patchset_path(msg), class: "patchset-download", data: { turbo: false }, "aria-label": "Download patchset ##{number}", title: "Download patchset ##{number}" do
+            i.fas.fa-download
+- else
+  p.modal-empty No patchsets in this thread

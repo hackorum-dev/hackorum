@@ -30,14 +30,14 @@
                       - credit[:roles].each do |role|
                         span class="activity-tag #{commit_role_tag_class(role)}" = commit_role_label(role)
                         - if credit[:llm_roles].include?(role)
-                          span.commit-credit-llm title="Attributed by the patchset lineage model" LLM
+                          span.commit-credit-llm title="Credited by LLM analysis, not a commit trailer" LLM
                         - if credit[:committer_roles].include?(role)
                           span.commit-credit-committer title="Committed the patch, counted as its reviewer" committer
               - else
                 - row[:roles].each do |role|
                   span class="activity-tag #{commit_role_tag_class(role)}" = commit_role_label(role)
                   - if row[:llm_roles].include?(role)
-                    span.commit-credit-llm title="Attributed by the patchset lineage model" LLM
+                    span.commit-credit-llm title="Credited by LLM analysis, not a commit trailer" LLM
                   - if row[:committer_roles].include?(role)
                     span.commit-credit-committer title="Committed the patch, counted as its reviewer" committer
               - if row[:backported]

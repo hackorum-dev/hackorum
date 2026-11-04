@@ -18,26 +18,7 @@ RSpec.describe "Thread sidebar commits", type: :request do
     expect(response.body).to include("Commits")
     expect(response.body).to include("Fix the vacuum leader race")
     expect(response.body).to include("https://github.com/postgres/postgres/commit/abc123def456")
-    expect(response.body).to include("REL_18_STABLE")
-    expect(response.body).to include("18.5")
     expect(response.body).to include("Alvaro Herrera")
-  end
-
-  it "collapses a backport into one entry with two badges" do
-    topic = create(:topic, :with_messages)
-    canonical = create(:commit, sha: "aaa1", subject: "Shared change", branches: [ "master" ],
-                                committed_at: 2.days.ago)
-    backport = create(:commit, sha: "bbb2", subject: "Shared change", branches: [ "REL_18_STABLE" ],
-                               released_in: "18.5", cherry_picked_from_sha: "aaa1",
-                               committed_at: 1.day.ago)
-    link_topic(topic, canonical)
-    link_topic(topic, backport)
-
-    get topic_path(topic)
-
-    expect(response.body.scan("Shared change").size).to eq(1)
-    expect(response.body).to include("master")
-    expect(response.body).to include("REL_18_STABLE")
   end
 
   it "shows credits and links resolved people" do
@@ -50,9 +31,9 @@ RSpec.describe "Thread sidebar commits", type: :request do
     commit.commit_people.create!(role: "reported_by", raw_name: "buildfarm member koel")
     link_topic(topic, commit)
 
-    get topic_path(topic)
+    get commits_details_topic_path(topic)
 
-    expect(response.body).to include("Credits")
+    expect(response.body).to include("Credits across")
     expect(response.body).to include("Tom Lane")
     expect(response.body).to include("/person/tgl@sss.pgh.pa.us")
     expect(response.body).to include("buildfarm member koel")
@@ -67,7 +48,7 @@ RSpec.describe "Thread sidebar commits", type: :request do
       link_topic(topic, commit)
     end
 
-    get topic_path(topic)
+    get commits_details_topic_path(topic)
 
     expect(response.body.scan("Tom Lane").size).to eq(1)
   end
@@ -77,6 +58,6 @@ RSpec.describe "Thread sidebar commits", type: :request do
 
     get topic_path(topic)
 
-    expect(response.body).not_to include("commit-sidebar-entry")
+    expect(Nokogiri::HTML(response.body).at_css("#topic-commits-modal")).to be_nil
   end
 end

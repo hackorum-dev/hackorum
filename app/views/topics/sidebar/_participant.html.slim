@@ -1,0 +1,17 @@
+- person = participant[:person]
+- alias_record = participant[:alias]
+- count = participant[:message_count].to_i
+- committer = person&.contributor_membership_types&.include?("committer")
+.sidebar-participant
+  = image_tag alias_record.gravatar_url(size: 48), class: "sidebar-participant-avatar", alt: ""
+  span.sidebar-participant-name
+    - link_class = [ "sidebar-participant-link", ("is-committer" if committer) ].compact.join(" ")
+    - if person
+      = render "shared/modal_link", label: alias_record.name, src: participant_topic_path(topic, person_id: person.id), frame_id: "topic-person-#{person.id}", title: alias_record.name, size: "sm", link_class: link_class
+    - else
+      span class=link_class = alias_record.name
+    = membership_icons_html(person)
+    - if local_assigns[:you_last]
+      span.sidebar-muted = "you · last ##{you_last}"
+  span.sidebar-participant-count = count
+  span.sidebar-participant-bar style="width: #{max.positive? ? (count * 100.0 / max).round : 0}%"

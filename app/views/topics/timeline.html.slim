@@ -1,0 +1,145 @@
+- chapters = @chapters.chapters
+- by_week = chapters.empty?
+- patch_count = @messages.count(&:is_patch_submission)
+- people = @participants
+- sections = chapters.any? ? chapters.map { |c| [ c.index, c.label, c.messages, c.commits ] } : [ [ 0, nil, @messages, @commit_summary.groups.select { |g| @messages.any? && g[:committed_at] } ] ]
+= turbo_frame_tag "topic-timeline-modal", target: "_top"
+  .timeline data-controller="timeline" data-timeline-chapter-value=(@selected_chapter || 0)
+    .timeline-band
+      p.timeline-meta
+        span
+          strong = @messages.size
+          = " #{'message'.pluralize(@messages.size)}"
+        span
+          strong = people.size
+          = " #{'person'.pluralize(people.size)}"
+        span
+          strong = patch_count
+          = " #{'patchset'.pluralize(patch_count)}"
+        - if @commit_summary.any?
+          span
+            strong = @commit_summary.count
+            = " #{'commit'.pluralize(@commit_summary.count)}"
+        - if @messages.any?
+          span = month_range_label(@messages.first.created_at, @messages.last.created_at)
+      - if chapters.any?
+        - max = @buckets.map(&:messages).max.to_i
+        - bucket_chapters = @buckets.map { |b| chapters.select { |c| c.first_at.to_date <= b.to && c.last_at.to_date >= b.from }.map(&:index) }
+        .timeline-overview
+          - @buckets.each_with_index do |bucket, i|
+            - tip = "#{bucket.label}: #{pluralize(bucket.messages, 'message')}"
+            - tip += ", #{pluralize(bucket.commits, 'commit')}" if bucket.commits.positive?
+            - tip += ", #{pluralize(bucket.reverts, 'revert')}" if bucket.reverts.positive?
+            button.timeline-bar-col type="button" title=tip data-timeline-target="bar" data-chapters=bucket_chapters[i].join(" ") data-action=("timeline#selectChapter" if bucket_chapters[i].any?) data-timeline-index-param=bucket_chapters[i].first tabindex="-1"
+              span.timeline-bar-track
+                span.timeline-bar style="height: #{max.positive? && bucket.messages.positive? ? [ (bucket.messages * 100.0 / max).round, 4 ].max : 0}%"
+              span class=[ "timeline-bar-commit", ("has-commit" if bucket.commits.positive?), ("has-revert" if bucket.reverts.positive?) ] = bucket.commits.positive? ? bucket.commits : ""
+        .timeline-overview-axis
+          span = @buckets.first.label
+          span = @buckets.last.label
+        .timeline-chapters
+          button.timeline-chapter-button.timeline-chapter-whole type="button" data-timeline-target="wholeButton" data-action="timeline#selectWhole" title="Every chapter, unfiltered"
+            span.timeline-chapter-label Whole thread
+            span.timeline-chapter-meta = "#{@messages.size} msgs"
+          - chapters.each do |chapter|
+            - meta = "#{chapter.size} msgs"
+            - meta += " · #{pluralize(chapter.commits.size, 'commit')}" if chapter.commits.any?
+            - meta += ", #{pluralize(chapter.reverts, 'revert')}" if chapter.reverts.positive?
+            button.timeline-chapter-button type="button" data-timeline-target="chapterButton" data-action="timeline#selectChapter" data-timeline-index-param=chapter.index data-label=chapter.label data-meta=meta style="flex-grow: #{[ chapter.size, 20 ].max}" title="#{chapter.label} · #{meta}"
+              span.timeline-chapter-label = chapter.label
+              span.timeline-chapter-meta = meta
+      - elsif @messages.any?
+        - first_at = @messages.first.created_at
+        - range = (@messages.last.created_at - first_at).to_f
+        .timeline-dots aria-hidden="true"
+          span.timeline-dots-line
+          - @messages.each do |m|
+            - left = range.positive? ? ((m.created_at - first_at) / range * 100).round(2) : 0
+            span class=[ "timeline-dot", ("is-patch" if m.is_patch_submission) ] style="left: #{left}%" title="##{@message_numbers[m.id]} #{m.sender_display_alias.name}"
+        .timeline-overview-axis
+          span = first_at.strftime("%-d %b %Y")
+          span = @messages.last.created_at.strftime("%-d %b %Y")
+    .timeline-body
+      aside.timeline-filters
+        .timeline-filter-group
+          span.timeline-filter-label Show
+          .timeline-filter-chips
+            - filters = [ [ "all", "All" ], [ "patch", "Patchsets" ] ]
+            - filters += [ [ "unread", "Unread" ], [ "noted", "My notes" ] ] if user_signed_in?
+            - filters.each do |key, label|
+              button.timeline-chip type="button" data-timeline-target="filterButton" data-action="timeline#setFilter" data-timeline-filter-param=key class=("is-active" if key == "all") = label
+        .timeline-filter-group
+          .timeline-filter-head
+            span.timeline-filter-label People
+            .timeline-link-group
+              button.timeline-link type="button" data-action="timeline#allPeople" All
+              button.timeline-link type="button" data-action="timeline#noPeople" None
+          - if people.size > 6
+            input.timeline-people-search type="search" placeholder="Filter #{people.size} people" aria-label="Filter people" data-action="input->timeline#filterPeople"
+          ul.timeline-people
+            - people.each do |p|
+              - pid = p[:person]&.id
+              li data-timeline-target="peopleItem" data-name=p[:alias].name.downcase
+                .timeline-person
+                  input type="checkbox" value=pid data-timeline-target="person" data-action="timeline#apply" aria-label=p[:alias].name checked=(@selected_person.nil? || @selected_person == pid)
+                  button.timeline-person-name type="button" data-action="timeline#only" title="Show only #{p[:alias].name}" = p[:alias].name
+                  button.timeline-person-only type="button" data-action="timeline#only" aria-label="Only #{p[:alias].name}" only
+                  span.timeline-person-count = p[:message_count]
+      .timeline-list
+        - if chapters.any?
+          .timeline-list-head
+            .timeline-list-title
+              strong data-timeline-target="title"
+              span.timeline-list-sub data-timeline-target="subtitle"
+            .timeline-list-nav
+              button.timeline-chip type="button" data-timeline-target="prevButton" data-action="timeline#prev" ‹ Prev
+              button.timeline-chip type="button" data-timeline-target="nextButton" data-action="timeline#next" Next ›
+        p.timeline-empty data-timeline-target="empty" hidden=true Nothing matches these filters.
+        p.timeline-empty data-timeline-target="noPeople" hidden=true Pick at least one person.
+        - sections.each do |index, label, messages, commits|
+          section.timeline-section data-timeline-target="chapter" data-index=index
+            - if label
+              h3.timeline-section-title = label
+            - previous_id = nil
+            - timeline_days(messages, commits, by_week: by_week).each do |day_label, entries|
+              - message_count = entries.count { |kind, _| kind == :message }
+              - names = entries.filter_map { |kind, item| item.sender_display_alias.name if kind == :message }.uniq
+              - busy = !by_week && message_count > 8
+              = content_tag(busy ? :details : :div, class: "timeline-day", data: { timeline_target: "day" }) do
+                - if busy
+                  summary.timeline-day-fold
+                    i.fa-solid.fa-chevron-right.timeline-fold-icon aria-hidden="true"
+                    span.timeline-day-fold-date = day_label
+                    span = pluralize(message_count, "message")
+                    span.timeline-day-fold-names = short_name_list(names, limit: 3)
+                - else
+                  .timeline-day-label = day_label
+                - entries.each do |kind, item|
+                  - if kind == :commit
+                    - revert = Topics::CommitSummary.revert?(item)
+                    .timeline-commit data-timeline-target="commit" class=("is-revert" if revert)
+                      span.timeline-num
+                      span.timeline-commit-icon
+                        i.fa-solid class=(revert ? "fa-rotate-left" : "fa-code-commit") aria-hidden="true"
+                      span.timeline-commit-text
+                        span.timeline-commit-verb Committed
+                        span.timeline-commit-subject = item[:subject]
+                      span.timeline-time = by_week ? item[:committed_at].strftime("%a %-d %b · %H:%M") : item[:committed_at].strftime("%H:%M")
+                  - else
+                    - m = item
+                    - who = m.sender_display_alias
+                    - far = m.reply_to_id && m.reply_to_id != previous_id && @message_numbers[m.reply_to_id]
+                    - previous_id = m.id
+                    - unread = user_signed_in? && !@read_message_ids&.dig(m.id)
+                    a.timeline-row href="#message-#{m.id}" data-turbo="false" data-timeline-target="row" data-person=m.sender_person_id data-patch=(m.is_patch_submission ? "1" : nil) data-unread=(unread ? "1" : nil) data-noted=(@my_noted_message_ids.include?(m.id) ? "1" : nil) class=("is-unread" if unread)
+                      span.timeline-num = "##{@message_numbers[m.id]}"
+                      = image_tag who.gravatar_url(size: 40), class: "timeline-avatar", alt: "", loading: "lazy"
+                      span.timeline-name = who.name
+                      span.timeline-tags
+                        - if m.is_patch_submission
+                          span.timeline-tag.timeline-tag-patch patch
+                        - if far
+                          span.timeline-tag.timeline-tag-reply = "↳ ##{far}"
+                        - if @noted_message_ids.include?(m.id)
+                          span.timeline-tag.timeline-tag-note note
+                      span.timeline-time title=m.created_at.strftime("%a %-d %b %Y %H:%M") = by_week ? m.created_at.strftime("%a %-d %b · %H:%M") : m.created_at.strftime("%H:%M")
