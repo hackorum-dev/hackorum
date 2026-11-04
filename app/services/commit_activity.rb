@@ -23,13 +23,15 @@ class CommitActivity
       ROLES.select { |role| credits.each_value.any? { |by_role| by_role.key?(role) } }
     end
 
-    def llm_roles
-      roles.select { |role| llm_role?(role) }
-    end
+    def llm_roles = roles.select { |role| source_role?(role, "llm") }
 
-    def llm_role?(role, person_id = nil)
+    def committer_roles = roles.select { |role| source_role?(role, CommitterReviewer::SOURCE) }
+
+    def llm_role?(role, person_id = nil) = source_role?(role, "llm", person_id)
+
+    def source_role?(role, source, person_id = nil)
       sets = (person_id ? [ credits[person_id] ] : credits.values).filter_map { |by_role| by_role&.dig(role) }
-      sets.any? && sets.all? { |sources| sources == Set["llm"] }
+      sets.any? && sets.all? { |sources| sources == Set[source] }
     end
   end
 
@@ -65,7 +67,8 @@ class CommitActivity
   def summary_in(range)
     rows = detail_rows_in(range)
     role_counts = ROLES.to_h { |role| [ role.to_sym, rows.count { |row| row[:roles].include?(role) } ] }
-    { total: rows.size, backported: rows.count { |row| row[:backported] } }.merge(role_counts)
+    { total: rows.size, backported: rows.count { |row| row[:backported] },
+      committer_reviewers: rows.count { |row| row[:member_credits].any? { |c| c[:committer_roles].include?("reviewer") } } }.merge(role_counts)
   end
 
   private
@@ -137,6 +140,7 @@ class CommitActivity
         committed_on: entry.committed_on,
         roles: entry.roles,
         llm_roles: entry.llm_roles,
+        committer_roles: entry.committer_roles,
         member_credits: member_credits_for(entry, people),
         branches: Commit.branch_badges([ commit ] + picked),
         backported: picked.any?,
@@ -153,7 +157,8 @@ class CommitActivity
       next unless person
 
       roles = ROLES.select { |role| by_role.key?(role) }
-      { person: person, roles: roles, llm_roles: roles.select { |role| entry.llm_role?(role, person_id) } }
+      { person: person, roles: roles, llm_roles: roles.select { |role| entry.llm_role?(role, person_id) },
+        committer_roles: roles.select { |role| entry.source_role?(role, CommitterReviewer::SOURCE, person_id) } }
     end
   end
 end

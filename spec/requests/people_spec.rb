@@ -251,6 +251,14 @@ RSpec.describe 'People profile', type: :request do
       expect(hero).to eq('1')
     end
 
+    it 'counts a committer-sourced review for everyone and says so' do
+      CommitPerson.create!(commit: create(:commit, branches: [ 'master' ]), role: 'reviewer', person_id: person.id, source: 'committer')
+      get person_path(person_alias.email)
+      expect(response.body[/credits-hero-value">([^<]+)</, 1]).to eq('2')
+      reviewer = Nokogiri::HTML(response.body).css('.credit-item').find { |item| item.at_css('.credit-item-label')&.text == 'Reviewer' }
+      expect(reviewer.text).to include('1 as committer')
+    end
+
     context 'with an llm-sourced credit' do
       before do
         CommitPerson.create!(commit: create(:commit), role: 'author', person_id: person.id, source: 'llm', confidence: 0.9)

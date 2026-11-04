@@ -12,7 +12,7 @@
     - else
       div.stat-tile title=tile[:title] = body
 
-.commit-credits title="#{number_with_delimiter(stats.commit_credits_total)} distinct commits on master; one commit can credit the same person in more than one role"
+.commit-credits title="#{number_with_delimiter(stats.commit_credits_total)} distinct commits on master; one commit can credit the same person in more than one role; reviews implied by committing someone else's patch are included and counted separately"
   .credits-hero
     span.credits-hero-value = number_with_delimiter(stats.commit_credits_total)
     span.credits-hero-label Commit credits
@@ -21,6 +21,8 @@
       div class=["credit-item", ("zero" if count.zero?)]
         span.credit-item-value = number_with_delimiter(count)
         span.credit-item-label = role.humanize
+        - if role == "reviewer" && stats.committer_reviewer_credits.positive?
+          span.notable-meta = "#{number_with_delimiter(stats.committer_reviewer_credits)} as committer"
     div class=["credit-item", ("zero" if stats.backport_credits.zero?)] title="Commits backported to a stable branch, credited as author"
       span.credit-item-value = number_with_delimiter(stats.backport_credits)
       span.credit-item-label Backports

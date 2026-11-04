@@ -977,7 +977,7 @@ class TopicsController < ApplicationController
     @commit_credits = commit_credits_for(commits, sources: commit_credit_sources)
   end
 
-  # role => [{ name:, email:, llm: }], deduplicated across a change and its backports.
+  # role => [{ name:, email:, llm:, committer: }], deduplicated across a change and its backports.
   def commit_credits_for(commits, sources: %w[parsed])
     return {} if commits.empty?
 
@@ -991,16 +991,17 @@ class TopicsController < ApplicationController
         {
           name: row.raw_name.presence || alias_record&.name || row.raw_email,
           email: alias_record&.email,
-          llm: row.source == "llm"
+          llm: row.source == "llm",
+          committer: row.source == CommitterReviewer::SOURCE
         }
       end
 
       # dedupe by name, but a resolved (linked) entry wins over an unresolved
       # duplicate of the same name -- otherwise a name colliding with an
       # earlier unresolved row would silently drop its person link. Among
-      # resolved ones a parsed row beats an llm one.
+      # resolved ones a parsed row beats a committer row beats an llm one.
       deduped = entries.group_by { |entry| entry[:name].to_s.downcase }.map do |_, dups|
-        dups.min_by { |entry| [ entry[:email].present? ? 0 : 1, entry[:llm] ? 1 : 0 ] }
+        dups.min_by { |entry| [ entry[:email].present? ? 0 : 1, entry[:llm] ? 2 : (entry[:committer] ? 1 : 0) ] }
       end
 
       acc[role] = deduped if deduped.any?

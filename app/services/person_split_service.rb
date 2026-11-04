@@ -30,8 +30,12 @@ class PersonSplitService
       Mention.where(alias_id: alias_ids).update_all(person_id: new_person.id)
 
       credits = CommitPerson.where(person_id: person.id)
-      credits.where("lower(trim(raw_email)) IN (?)", emails).update_all(person_id: new_person.id)
-      credits.where(raw_email: nil).update_all(person_id: nil)
+      by_email = credits.where("lower(trim(raw_email)) IN (?)", emails)
+      name_only = credits.where(raw_email: nil)
+      moved = by_email.or(name_only).distinct.pluck(:commit_id)
+      by_email.update_all(person_id: new_person.id)
+      name_only.update_all(person_id: nil)
+      moved.each_slice(1000) { |ids| CommitterReviewer.sync!(ids) }
 
       ContributorMembership.where(person_id: person.id, id: membership_ids).update_all(person_id: new_person.id)
 

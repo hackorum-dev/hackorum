@@ -57,9 +57,20 @@ RSpec.describe CommitImport::Importer do
       importer.run!
 
       people = Commit.find_by(sha: sha).commit_people
-      expect(people.where(role: "reviewer").pluck(:raw_name)).to eq([ "Tom Lane" ])
+      expect(people.parsed.where(role: "reviewer").pluck(:raw_name)).to eq([ "Tom Lane" ])
       expect(people.where(role: "author").pluck(:raw_name)).to eq([ "Dan Dev" ])
       expect(people.where(role: "committer").pluck(:raw_email)).to eq([ "fixture@example.com" ])
+    end
+
+    it "credits the committer as reviewer of a patch someone else authored" do
+      sha = fixture_repo.commit(subject: "Forwarded change", body: "Author: Dan Dev <dan@example.com>\n")
+      own = fixture_repo.commit(subject: "Own change", body: "Author: Fixture Committer <fixture@example.com>\n")
+
+      importer.run!
+
+      implied = Commit.find_by(sha: sha).commit_people.committer_sourced
+      expect(implied.pluck(:role, :raw_email)).to eq([ [ "reviewer", "fixture@example.com" ] ])
+      expect(Commit.find_by(sha: own).commit_people.committer_sourced).to be_empty
     end
 
     it "resolves person_id from an alias email" do
@@ -325,6 +336,20 @@ RSpec.describe CommitImport::Importer do
 
       expect(Commit.find_by(sha: sha).commit_people.find_by(role: "reviewer").person_id).to eq(person.id)
     end
+
+    it "drops the committer reviewer row when relinking shows the author is the committer" do
+      sha = fixture_repo.commit(subject: "x", body: "Author: Other Name <other@example.com>\n")
+      importer.run!
+      commit = Commit.find_by(sha: sha)
+      expect(commit.commit_people.committer_sourced.count).to eq(1)
+      person = create(:person)
+      create(:alias, name: "Other Name", email: "other@example.com", person: person)
+      create(:alias, name: "Fixture Committer", email: "fixture@example.com", person: person)
+
+      importer.relink_people!
+
+      expect(commit.commit_people.committer_sourced).to be_empty
+    end
   end
 
   describe "error handling" do
@@ -367,6 +392,17 @@ RSpec.describe CommitImport::Importer do
   end
 
   describe "#reparse!" do
+    it "recomputes the committer reviewer row" do
+      sha = fixture_repo.commit(subject: "x", body: "Author: Dan Dev <dan@example.com>\n")
+      importer.run!
+      commit = Commit.find_by(sha: sha)
+      commit.commit_people.committer_sourced.delete_all
+
+      importer.reparse!
+
+      expect(commit.commit_people.committer_sourced.count).to eq(1)
+    end
+
     it "re-derives people and links from stored bodies" do
       topic = create(:topic)
       create(:message, topic: topic, message_id: "abc-123@example.com")

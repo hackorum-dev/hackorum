@@ -53,6 +53,20 @@ RSpec.describe PersonMergeService do
       expect(commit_person.reload.person_id).to eq(target.id)
     end
 
+    it "drops the committer reviewer row once author and committer are one person" do
+      create(:alias, person: source, name: "Bee", email: "b@x")
+      create(:alias, person: target, name: "Ay", email: "a@x")
+      commit = create(:commit)
+      create(:commit_person, commit: commit, person: target, role: "committer", raw_name: "Ay", raw_email: "a@x", source: "parsed")
+      create(:commit_person, commit: commit, person: source, role: "author", raw_name: "Bee", raw_email: "b@x", source: "parsed")
+      CommitterReviewer.sync!([ commit.id ])
+      expect(commit.commit_people.committer_sourced.count).to eq(1)
+
+      merge
+
+      expect(commit.commit_people.committer_sourced).to be_empty
+    end
+
     it "merges contributor memberships without duplicating them" do
       create(:alias, person: source, name: "Old Name", email: "old@example.com")
       create(:alias, person: target, name: "Kept Name", email: "kept@example.com")

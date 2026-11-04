@@ -655,4 +655,80 @@ RSpec.describe Lineage::ResultIngestor do
       end
     end
   end
+
+  describe "committer as reviewer" do
+    let(:committer_person) { create(:person) }
+
+    before do
+      create(:commit_person, commit: commit, role: "committer", person: committer_person, raw_name: "Neil Conway", raw_email: "neil@example.com")
+    end
+
+    def implied = CommitPerson.committer_sourced.where(commit_id: commit.id)
+
+    def modified(**fields)
+      answer(verdict: "modified", confidence: 0.9).tap { |d| d["verdicts"][0].merge!("change_level" => "light", **fields) }
+    end
+
+    it "credits the committer when the model attributes the patch to someone else" do
+      ingest(modified)
+      expect(implied.sole).to have_attributes(role: "reviewer", person_id: committer_person.id)
+      row = run.reload.verdicts.first
+      expect(row.reviews).to eq([ { "reviewer" => "Neil Conway", "reviewed_message_ids" => [ m2.id ], "coverage" => "final",
+                                    "note" => "committed the patch", "source" => "committer" } ])
+      expect(row.reviewers_final).to eq(1)
+    end
+
+    it "writes nothing when the committer is the llm author, and removes a stale row on rerun" do
+      ingest(modified)
+      expect(implied.count).to eq(1)
+      neil = create(:alias, person: committer_person, name: "Neil Conway", email: "neil@example.com")
+      reply = create(:message, topic: topic, sender_alias: neil, created_at: 12.hours.ago)
+      ingest(modified("author_message_id" => reply.id))
+      expect(implied).to be_empty
+      expect(run.reload.verdicts.first.reviews).to eq([])
+    end
+
+    it "does not double a committer already in the trailer reviewers" do
+      index["candidates"][0].merge!("reviewers" => [ "Neil Conway" ], "committer_reviewers" => [ "Neil Conway" ])
+      create(:commit_person, commit: commit, role: "reviewer", person: committer_person, raw_name: "Neil Conway", raw_email: "neil@example.com")
+      data = modified
+      data["verdicts"][0]["reviews"] = [ review("Neil Conway", coverage: "none", ids: [], note: "silent") ]
+      ingest(data)
+      expect(implied).to be_empty
+      row = run.reload.verdicts.first
+      expect(row.reviews.map { |r| r["reviewer"] }).to eq([ "Neil Conway" ])
+      expect(row.reviews.first["coverage"]).to eq("final")
+    end
+
+    it "removes the committer row of a commit a rerun no longer judges" do
+      ingest(modified)
+      expect(implied.count).to eq(1)
+      expect(CommitTopic.llm.where(commit_id: commit.id, topic_id: topic.id)).to exist
+      other = create(:commit)
+      index["candidates"] << { "sha" => other.sha }
+      ingest(answer(sha: other.sha))
+      expect(CommitPerson.llm.where(commit_id: commit.id)).to be_empty
+      expect(implied).to be_empty
+    end
+
+    it "skips the mirror when a suggested reviewer already carries the committer's name" do
+      ingest(modified("suggested_reviews" => [ suggestion("Neil Conway") ]))
+      row = run.reload.verdicts.first
+      expect(row.reviews.map { |r| [ r["reviewer"], r["source"] ] }).to eq([ [ "Neil Conway", "llm" ] ])
+      expect(row.reviewers_final).to eq(1)
+    end
+
+    it "does not mirror onto a rejected verdict" do
+      create(:commit_person, commit: commit, role: "author", person: create(:person), raw_name: "Someone Else", raw_email: "else@example.com")
+      ingest(answer(verdict: "not_this_thread"))
+      expect(implied.sole).to have_attributes(role: "reviewer", person_id: committer_person.id)
+      expect(run.reload.verdicts.first.reviews).to eq([])
+    end
+
+    it "writes nothing without linking" do
+      ingest(modified, link: false)
+      expect(implied).to be_empty
+      expect(run.reload.verdicts.first.reviews).to eq([])
+    end
+  end
 end

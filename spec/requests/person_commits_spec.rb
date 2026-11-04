@@ -51,6 +51,21 @@ RSpec.describe 'Person commit activity', type: :request do
       expect(response.body).not_to include('>2023<')
     end
 
+    it 'lists committer-sourced reviews marked committer without any feature' do
+      other = create(:commit, subject: 'Committed for someone', branches: [ 'master' ],
+                              committed_at: Time.zone.local(2023, 5, 13, 11))
+      create(:commit_person, commit: other, person: person, role: 'reviewer', source: 'committer')
+
+      get person_commits_path('commits@example.com', year: 2023)
+
+      row = Nokogiri::HTML(response.body).css('table.commit-activity-table tbody tr').find { |tr| tr.text.include?('Committed for someone') }
+      marker = row.at_css('td:first-child .activity-tag + .commit-credit-committer')
+      expect(marker.text).to eq('committer')
+      expect(marker.previous_element.text).to match(/review/i)
+      box = Nokogiri::HTML(response.body).css('.summary-box').find { |b| b.at_css('.summary-box-label').text.match?(/review/i) }
+      expect(box.at_css('.summary-box-sub').text).to eq('1 as committer')
+    end
+
     context 'with the patchset_lineage feature' do
       let(:user) { create(:user) }
 

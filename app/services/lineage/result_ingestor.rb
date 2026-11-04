@@ -43,6 +43,9 @@ module Lineage
           CommitPerson.llm.where(commit_id: judged.map { |v| known[v["sha"]].id } | previously_linked).delete_all
           authors = attribute_authors!(judged, known)
           attribute_reviewers!(judged, known, authors)
+          ids = judged.map { |v| known[v["sha"]].id }
+          CommitterReviewer.sync!(ids | previously_linked)
+          CommitterReviews.mirror(@run.verdicts.where(commit_id: ids))
         end
       end
       @run

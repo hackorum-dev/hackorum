@@ -8,6 +8,7 @@ RSpec.describe "Thread page patchset lineage", type: :request do
   let(:extra_commit) { create(:commit, subject: "Revert the thing", sha: "d" * 40) }
   let(:other_commit) { create(:commit, subject: "Unrelated overlap", sha: "e" * 40) }
   let(:pending_commit) { create(:commit, subject: "Still undecided", sha: "f" * 40) }
+  let(:trailer_commit) { create(:commit, subject: "Trailer-linked thing", sha: "a" * 40) }
   let!(:run) { create(:patchset_run, topic: topic, story: "v1 then v2 landed as c\n\nthen a fixup followed\n") }
 
   before do
@@ -15,11 +16,13 @@ RSpec.describe "Thread page patchset lineage", type: :request do
     create(:patchset_lineage, patchset_run: run, topic: topic, message: m2, parent_message: m1, step_kind: "rebase", confidence: 0.85, reason: "same hunks")
     create(:commit_verdict, patchset_run: run, topic: topic, commit: commit, verdict: "modified", source_message: m2, confidence: 0.9,
                             change_level: "moderate", evidence: "hunks from [msg:#{m2.id}] with a renamed helper",
-                            reviewers_final: 2, reviewers_earlier: 1, reviewers_none: 0,
+                            reviewers_final: 3, reviewers_earlier: 1, reviewers_none: 0,
                             reviews: [ { "reviewer" => "Alice", "reviewed_message_ids" => [ m2.id ], "coverage" => "final", "note" => "looked at [msg:#{m2.id}]" },
                                        { "reviewer" => "Bob", "reviewed_message_ids" => [ m1.id ], "coverage" => "earlier", "note" => nil, "source" => "trailer" },
                                        { "reviewer" => "Guessed Reviewer", "reviewed_message_ids" => [ m2.id ], "coverage" => "final", "note" => "tested it",
-                                         "source" => "llm", "reviewer_message_id" => nil, "confidence" => 0.8 } ])
+                                         "source" => "llm", "reviewer_message_id" => nil, "confidence" => 0.8 },
+                                       { "reviewer" => "Neil Committer", "reviewed_message_ids" => [ m2.id ], "coverage" => "final",
+                                         "note" => "committed the patch", "source" => "committer" } ])
     create(:commit_verdict, patchset_run: run, topic: topic, commit: other_commit, verdict: "not_this_thread", origin: "overlap", confidence: 0.7)
     create(:commit_verdict, patchset_run: run, topic: topic, commit: pending_commit, verdict: "undecided", origin: "trailer", confidence: 0.5)
     create(:commit_topic, topic: topic, commit: commit, source: "llm", confidence: 0.9)
@@ -28,6 +31,9 @@ RSpec.describe "Thread page patchset lineage", type: :request do
                                  source: "llm", confidence: 0.9)
     commit.commit_people.create!(role: "reviewer", raw_name: "Guessed Reviewer", raw_email: "reviewer@example.com",
                                  source: "llm", confidence: 0.8)
+    commit.commit_people.create!(role: "reviewer", raw_name: "Neil Committer", raw_email: "neil@example.com", source: "committer")
+    create(:commit_topic, topic: topic, commit: trailer_commit)
+    trailer_commit.commit_people.create!(role: "reviewer", raw_name: "Tess Committer", raw_email: "tess@example.com", source: "committer")
   end
 
   it "hides everything without the feature" do
@@ -38,6 +44,8 @@ RSpec.describe "Thread page patchset lineage", type: :request do
     expect(response.body).not_to include("found in git")
     expect(response.body).not_to include("Guessed Author")
     expect(response.body).not_to include("commit-credit-llm")
+    expect(response.body).to include('Tess Committer<span class="commit-credit-committer" title="Committed the patch, counted as its reviewer">committer</span>')
+    expect(response.body).not_to include("lineage-review-committer")
     get patchsets_sidebar_topic_path(topic)
     expect(response.body).not_to include("rebase")
   end
@@ -58,7 +66,7 @@ RSpec.describe "Thread page patchset lineage", type: :request do
     expect(response.body).not_to include("Unrelated overlap")
     expect(response.body).to include('class="lineage-change"')
     expect(response.body).to include(">moderate</span>")
-    expect(response.body).to include("reviews: 2 of 3 reviewed the final version")
+    expect(response.body).to include("reviews: 3 of 4 reviewed the final version")
     expect(response.body).to include("Alice")
     expect(response.body).to include('<span class="lineage-review-llm" title="Found by the patchset lineage model, not a Reviewed-by trailer">LLM</span>')
     expect(response.body).to include('<span class="lineage-review-confidence">80%</span>')
@@ -69,6 +77,9 @@ RSpec.describe "Thread page patchset lineage", type: :request do
     expect(response.body).to include(%(looked at <a href="#message-#{m2.id}">#2</a>))
     expect(response.body).to include("Guessed Author")
     expect(response.body).to include('<span class="commit-credit-llm" title="Attributed by the patchset lineage model">LLM</span>')
+    expect(response.body).to include('<span class="lineage-review-committer" title="Committed the patch, counted as its reviewer">committer</span>')
+    expect(response.body).to include('Neil Committer<span class="commit-credit-committer"')
+    expect(response.body).to include('Tess Committer<span class="commit-credit-committer"')
 
     get patchsets_sidebar_topic_path(topic)
     expect(response.body).to include("from #1")

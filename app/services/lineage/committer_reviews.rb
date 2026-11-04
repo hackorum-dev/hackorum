@@ -35,5 +35,27 @@ module Lineage
       by = rows.group_by { |r| r["coverage"] }.transform_values(&:size)
       { reviewers_final: by.fetch("final", 0), reviewers_earlier: by.fetch("earlier", 0), reviewers_none: by.fetch("none", 0) }
     end
+
+    # mirrors the committer reviewer row (commit_people source committer) into
+    # committed verdicts; returns the verdicts that need it, writing when asked
+    def mirror(verdicts, write: true)
+      verdicts = verdicts.to_a
+      implied = CommitPerson.committer_sourced.where(commit_id: verdicts.map(&:commit_id))
+                            .includes(person: :default_alias).index_by(&:commit_id)
+      verdicts.select do |verdict|
+        row = implied[verdict.commit_id]
+        next false unless row && CommitVerdict::COMMITTED.include?(verdict.verdict)
+
+        reviewer = name(row)
+        next false if reviewer.blank? || Array(verdict.reviews).any? { |r| r["reviewer"].to_s.casecmp?(reviewer) }
+
+        if write
+          rows = Array(verdict.reviews) + [ { "reviewer" => reviewer, "reviewed_message_ids" => [ verdict.source_message_id ].compact,
+                                              "coverage" => "final", "note" => NOTE, "source" => CommitterReviewer::SOURCE } ]
+          verdict.update!(reviews: rows, **counts(rows))
+        end
+        true
+      end
+    end
   end
 end

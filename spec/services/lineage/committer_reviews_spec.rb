@@ -57,4 +57,57 @@ RSpec.describe Lineage::CommitterReviews do
       expect(described_class.counts(rows)).to eq(reviewers_final: 1, reviewers_earlier: 1, reviewers_none: 0)
     end
   end
+
+  describe ".mirror" do
+    let(:topic) { create(:topic) }
+    let(:run) { create(:patchset_run, topic: topic) }
+    let(:m) { create(:message, topic: topic, is_patch_submission: true) }
+    let(:commit) { create(:commit) }
+
+    before { create(:commit_person, commit: commit, role: "reviewer", source: CommitterReviewer::SOURCE, raw_name: "Neil Conway") }
+
+    def verdict_for(commit, verdict: "modified", reviews: [])
+      create(:commit_verdict, patchset_run: run, topic: topic, commit: commit, verdict: verdict, change_level: "light",
+                              source_message: m, confidence: 0.9, reviews: reviews)
+    end
+
+    it "writes the committer as a final reviewer and recounts" do
+      verdict = verdict_for(commit)
+
+      expect(described_class.mirror([ verdict ])).to eq([ verdict ])
+      verdict.reload
+      expect(verdict.reviews).to eq([ { "reviewer" => "Neil Conway", "reviewed_message_ids" => [ m.id ], "coverage" => "final",
+                                        "note" => described_class::NOTE, "source" => CommitterReviewer::SOURCE } ])
+      expect(verdict.reviewers_final).to eq(1)
+    end
+
+    it "only reports with write: false" do
+      verdict = verdict_for(commit)
+
+      expect(described_class.mirror(CommitVerdict.where(id: verdict.id), write: false)).to eq([ verdict ])
+      expect(verdict.reload.reviews).to eq([])
+    end
+
+    it "skips verdicts that are not committed" do
+      verdict = verdict_for(commit, verdict: "not_this_thread")
+
+      expect(described_class.mirror([ verdict ])).to eq([])
+      expect(verdict.reload.reviews).to eq([])
+    end
+
+    it "skips when the reviewer is already listed" do
+      existing = [ { "reviewer" => "neil conway", "reviewed_message_ids" => [], "coverage" => "earlier", "note" => "saw v1" } ]
+      verdict = verdict_for(commit, reviews: existing)
+
+      expect(described_class.mirror([ verdict ])).to eq([])
+      expect(verdict.reload.reviews).to eq(existing)
+    end
+
+    it "skips commits without a committer reviewer row" do
+      verdict = verdict_for(create(:commit))
+
+      expect(described_class.mirror([ verdict ])).to eq([])
+      expect(verdict.reload.reviews).to eq([])
+    end
+  end
 end

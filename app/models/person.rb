@@ -130,7 +130,9 @@ class Person < ApplicationRecord
     Topic.where(last_sender_person_id: old_person.id).update_all(last_sender_person_id: id)
     Message.where(sender_person_id: old_person.id).update_all(sender_person_id: id)
     Mention.where(person_id: old_person.id).update_all(person_id: id)
+    moved = CommitPerson.where(person_id: old_person.id).distinct.pluck(:commit_id)
     CommitPerson.where(person_id: old_person.id).update_all(person_id: id)
+    moved.each_slice(1000) { |ids| CommitterReviewer.sync!(ids) }
     TopicParticipant.where(person_id: old_person.id).where.not(topic_id: TopicParticipant.where(person_id: id).select(:topic_id)).update_all(person_id: id)
     TopicParticipant.where(person_id: old_person.id).delete_all
   end

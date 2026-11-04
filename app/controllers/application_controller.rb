@@ -40,7 +40,7 @@ class ApplicationController < ActionController::Base
   end
 
   def commit_credit_sources
-    lineage_visible? ? %w[parsed llm] : %w[parsed]
+    lineage_visible? ? %w[parsed committer llm] : %w[parsed committer]
   end
 
   def require_authentication

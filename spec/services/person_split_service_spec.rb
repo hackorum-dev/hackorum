@@ -50,6 +50,18 @@ RSpec.describe PersonSplitService do
     expect(kept.reload.person_id).to eq(person.id)
   end
 
+  it "resyncs committer reviewer rows of the moved credits" do
+    commit = create(:commit)
+    create(:commit_person, commit: commit, person: person, role: "committer", raw_name: "Bruce Momjian", raw_email: "bruce@momjian.us")
+    create(:commit_person, commit: commit, person: person, role: "author", raw_name: "Greg Stark", raw_email: "stark@mit.edu")
+    CommitterReviewer.sync!([ commit.id ])
+    expect(CommitPerson.committer_sourced.where(commit: commit)).to be_empty
+
+    split
+
+    expect(CommitPerson.committer_sourced.where(commit: commit).pluck(:person_id, :raw_name)).to eq([ [ person.id, "Bruce Momjian" ] ])
+  end
+
   it "moves only the given contributor memberships" do
     greg_membership = ContributorMembership.create!(person: person, contributor_type: "significant_contributor")
     bruce_membership = ContributorMembership.create!(person: person, contributor_type: "core_team")

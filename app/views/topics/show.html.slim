@@ -40,6 +40,8 @@
                     = entry[:name]
                   - if entry[:llm]
                     span.commit-credit-llm title="Attributed by the patchset lineage model" LLM
+                  - if entry[:committer]
+                    span.commit-credit-committer title="Committed the patch, counted as its reviewer" committer
 
     - if ci_thread_visible?(@ci_status)
       = render "topics/ci_sidebar", status: @ci_status, topic: @topic

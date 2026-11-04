@@ -604,13 +604,17 @@
 
 .commit-sidebar-llm,
 .commit-credit-llm,
-.lineage-review-llm {
+.lineage-review-llm,
+.commit-credit-committer,
+.lineage-review-committer {
   margin-left: var(--spacing-1);
 }
 
 .commit-sidebar-llm,
 .commit-credit-llm,
 .lineage-review-llm,
+.commit-credit-committer,
+.lineage-review-committer,
 .lineage-kind,
 .lineage-extra {
   display: inline-block;

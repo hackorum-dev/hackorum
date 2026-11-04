@@ -286,6 +286,24 @@ RSpec.describe CommitActivity do
       expect(rows.first[:llm_roles]).to eq([])
     end
 
+    it "marks committer-sourced reviewer credits and counts them in the summary" do
+      commit = create(:commit, branches: [ "master" ], committed_at: Time.zone.local(2023, 3, 1))
+      create(:commit_person, commit: commit, person: person, role: "reviewer", source: "committer")
+      activity = described_class.new(person_ids: [ person.id ], year: 2023, sources: %w[parsed committer])
+      range = Date.new(2023, 1, 1)..Date.new(2023, 12, 31)
+      row = activity.detail_rows_in(range).sole
+      expect(row[:roles]).to eq([ "reviewer" ])
+      expect(row[:committer_roles]).to eq([ "reviewer" ])
+      expect(row[:llm_roles]).to eq([])
+      expect(activity.summary_in(range)[:committer_reviewers]).to eq(1)
+
+      other_person = create(:person)
+      create(:commit_person, commit: commit, person: other_person, role: "reviewer")
+      team = described_class.new(person_ids: [ person.id, other_person.id ], year: 2023, sources: %w[parsed committer])
+      expect(team.detail_rows_in(range).sole[:committer_roles]).to eq([])
+      expect(team.summary_in(range)[:committer_reviewers]).to eq(1)
+    end
+
     it "flags llm-only roles when widened" do
       rows = described_class.new(person_ids: [ person.id ], year: year, sources: %w[parsed llm]).detail_rows_in(year_range)
 

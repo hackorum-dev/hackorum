@@ -101,6 +101,16 @@ class ProfileStats
     end
   end
 
+  def committer_reviewer_credits
+    @committer_reviewer_credits ||=
+      if @person_ids.empty? || !@sources.include?(CommitterReviewer::SOURCE)
+        0
+      else
+        CommitPerson.committer_sourced.joins(:commit).merge(Commit.on_master)
+                    .where(person_id: @person_ids, role: "reviewer").distinct.count(:commit_id)
+      end
+  end
+
   # Backported commits credited as author only - not reviews or any other role.
   def backport_credits
     @backport_credits ||=

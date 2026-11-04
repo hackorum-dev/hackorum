@@ -39,16 +39,20 @@ module CommitImport
       scope = CommitPerson.where(person_id: nil)
       scope = scope.joins(:commit).where(commits: { committed_at: since.. }) if since
 
+      touched = Set.new
       scope.in_batches(of: 1000) do |batch|
-        entries = batch.map { |row| { id: row.id, raw_name: row.raw_name, raw_email: row.raw_email } }
+        entries = batch.map do |row|
+          { id: row.id, commit_id: row.commit_id, raw_name: row.raw_name, raw_email: row.raw_email }
+        end
         resolve_person_ids(entries)
 
-        entries.select { |entry| entry[:person_id] }
-               .group_by { |entry| entry[:person_id] }
-               .each do |person_id, group|
+        resolved = entries.select { |entry| entry[:person_id] }
+        resolved.group_by { |entry| entry[:person_id] }.each do |person_id, group|
           CommitPerson.where(id: group.map { |entry| entry[:id] }).update_all(person_id: person_id)
         end
+        touched.merge(resolved.map { |entry| entry[:commit_id] })
       end
+      touched.each_slice(1000) { |ids| CommitterReviewer.sync!(ids) }
     end
 
     # Re-derives people, topic links and cherry-pick refs from STORED commit
@@ -187,6 +191,7 @@ module CommitImport
 
       resolve_person_ids(entries)
       CommitPerson.insert_all(entries)
+      CommitterReviewer.sync!(entries.map { |entry| entry[:commit_id] })
     end
 
     # Returns the set of topic ids the upserted rows touch, so the caller can
@@ -333,7 +338,7 @@ module CommitImport
     end
 
     # Wipes and re-adds the parsed rows per batch, committer row included.
-    # llm rows come from elsewhere and are left alone.
+    # llm rows come from elsewhere and are left alone; committer rows are recomputed.
     def rewrite_people(commits, parsed)
       CommitPerson.parsed.where(commit_id: commits.map(&:id)).delete_all
       entries = commits.flat_map do |commit|
@@ -350,6 +355,7 @@ module CommitImport
 
       resolve_person_ids(entries)
       CommitPerson.insert_all(entries)
+      CommitterReviewer.sync!(commits.map(&:id))
     end
 
     # May legitimately set NULL, clearing a value a parser fix no longer

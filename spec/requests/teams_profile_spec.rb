@@ -119,6 +119,17 @@ RSpec.describe "TeamsProfile", type: :request do
       expect(response.body).to include("Commit credits")
     end
 
+    it "counts committer-sourced reviews for everyone" do
+      team.update!(visibility: :visible)
+      member_alias = attach_verified_alias(member, email: "cr-member@example.com")
+      create(:message, topic: create(:topic, creator_alias: member_alias), sender: member_alias, sender_person_id: member.person.id)
+      CommitPerson.create!(commit: create(:commit, branches: [ "master" ]), role: "reviewer", person_id: member.person.id, source: "committer")
+
+      get team_profile_path("test-team")
+      expect(response.body[/credits-hero-value">([^<]+)</, 1]).to eq("1")
+      expect(response.body).to include("1 as committer")
+    end
+
     it "counts llm-sourced commit credits only with the patchset_lineage feature" do
       team.update!(visibility: :visible)
       member_alias = attach_verified_alias(member, email: "llm-member@example.com")

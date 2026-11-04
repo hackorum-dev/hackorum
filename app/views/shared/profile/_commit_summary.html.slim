@@ -16,3 +16,5 @@
         div class=["summary-box", ("zero" if count.zero?)]
           span.summary-box-value = number_with_delimiter(count)
           span.summary-box-label = commit_role_label(role)
+          - if role == "reviewer" && (summary[:committer_reviewers] || 0).positive?
+            span.summary-box-sub = "#{number_with_delimiter(summary[:committer_reviewers])} as committer"

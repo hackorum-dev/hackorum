@@ -311,6 +311,15 @@ RSpec.describe ProfileStats do
       )
     end
 
+    it "counts committer-sourced reviewer rows and reports them separately" do
+      commit = create(:commit, branches: [ "master" ])
+      CommitPerson.create!(commit: commit, role: "reviewer", person_id: person.id, source: "committer")
+      stats = described_class.new(person.id, sources: %w[parsed committer])
+      expect(stats.commit_credits_by_role["reviewer"]).to eq(1)
+      expect(stats.committer_reviewer_credits).to eq(1)
+      expect(described_class.new(person.id).committer_reviewer_credits).to eq(0)
+    end
+
     it "ignores llm-sourced rows" do
       commit = create(:commit)
       CommitPerson.create!(commit: commit, role: "author", person_id: person.id, source: "llm", confidence: 0.9)
