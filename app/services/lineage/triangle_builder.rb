@@ -24,15 +24,6 @@ module Lineage
       pairs
     end
 
-    def commit_scores(entries)
-      entries.flat_map do |entry|
-        @patchsets.map do |ps|
-          { sha: entry.sha, message_id: ps.message.id, ordinal: ps.ordinal,
-            metrics: entry.available ? metrics(ps.parsed, entry.parsed) : UNPARSED }
-        end
-      end
-    end
-
     private
 
     def metrics(earlier, later)

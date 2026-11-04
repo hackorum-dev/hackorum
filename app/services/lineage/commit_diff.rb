@@ -7,7 +7,7 @@ module Lineage
     end
 
     def fetch(commit_or_sha)
-      commit = commit_or_sha.is_a?(Commit) ? commit_or_sha : Commit.find_by(sha: commit_or_sha)
+      commit = commit_or_sha if commit_or_sha.is_a?(Commit)
       sha = commit ? commit.sha : commit_or_sha
       return Entry.new(commit: commit, sha: sha, available: false) unless @repo.rev_parse(sha)
 

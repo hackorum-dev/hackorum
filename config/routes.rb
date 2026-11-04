@@ -1,7 +1,9 @@
 Rails.application.routes.draw do
   namespace :admin do
     root "dashboard#show"
-    resources :patchset_runs, only: [ :index, :show ]
+    resources :patchset_runs, only: [ :index, :show ] do
+      post :requeue, on: :member
+    end
     resources :users, only: [ :index ] do
       member do
         post :toggle_admin
@@ -44,6 +46,16 @@ Rails.application.routes.draw do
         mount PgHero::Engine, at: "/pghero"
       end
     end
+  end
+
+  scope path: "api/lineage", module: "lineage_api", as: "api_lineage", defaults: { format: :json } do
+    resources :claims, only: [ :create, :destroy ] do
+      member do
+        get :bundle
+        post :result
+      end
+    end
+    get "queue", to: "queue#show"
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

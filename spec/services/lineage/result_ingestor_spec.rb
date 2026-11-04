@@ -419,6 +419,31 @@ RSpec.describe Lineage::ResultIngestor do
     expect(run.raw_result["story"]).to eq(data["story"])
   end
 
+  it "rejects verdicts and extra commits in lineage mode" do
+    found = create(:commit)
+    expect { ingest(answer, mode: "lineage") }.to raise_error(described_class::Error, /lineage mode/)
+    expect(run.reload.status).to eq("failed")
+
+    run.update!(status: "running", error: nil)
+    data = answer.merge("verdicts" => [], "extra_commits" => [ extra(found.sha) ])
+    expect { ingest(data, mode: "lineage") }.to raise_error(described_class::Error, /lineage mode/)
+    expect(run.reload.status).to eq("failed")
+    expect(run.verdicts.count).to eq(0)
+
+    run.update!(status: "running", error: nil)
+    ingest(answer.merge("verdicts" => [], "extra_commits" => []), mode: "lineage")
+    expect(run.reload.status).to eq("done")
+  end
+
+  it "keeps llm links and authors on a lineage-only ingest" do
+    create(:commit_topic, commit: commit, topic: topic, source: "llm", confidence: 0.9)
+    create(:commit_person, commit: commit, role: "author", source: "llm", confidence: 0.9)
+    ingest(answer.merge("verdicts" => [], "extra_commits" => []), mode: "lineage")
+    expect(run.reload.status).to eq("done")
+    expect(CommitTopic.llm.where(commit_id: commit.id, topic_id: topic.id).count).to eq(1)
+    expect(CommitPerson.llm.where(commit_id: commit.id, role: "author").count).to eq(1)
+  end
+
   it "rejects malformed extras" do
     found = create(:commit)
     bad = {

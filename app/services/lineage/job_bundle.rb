@@ -11,30 +11,26 @@ module Lineage
     ATTRIBUTION_START_RE = /\A\s*On .{0,200}\s*\z/
     ATTRIBUTION_END_RE = /\A.{0,200}wrote:\s*\z/
     ATTRIBUTION_RE = /\A\s*On .{0,200}wrote:\s*\z/
-    MODE_SECTION_RE = %r{^<!-- (full|trailer) -->\n(.*?)^<!-- /\1 -->\n}m
+    MODE_SECTION_RE = %r{^<!-- ([a-z ]+) -->\n(.*?)^<!-- /\1 -->\n}m
 
     def self.prompt_version = Digest::SHA256.hexdigest(File.read(PROMPT_PATH))[0, 12]
 
-    def initialize(run:, topic:, patchsets:, candidates:, pairs:, commit_scores:, branches:, previous:, repo_path:, mode:)
+    def initialize(run:, topic:, patchsets:, candidates:, pairs:, branches:, previous:, mode:)
       @run = run
       @topic = topic
       @patchsets = patchsets
       @candidates = candidates
       @pairs = pairs
-      @commit_scores = commit_scores
       @branches = branches
       @previous = previous
-      @repo_path = repo_path.to_s
       @mode = mode
     end
 
     def write(dir)
       messages = @topic.messages.includes(:sender, :attachments, sender_person: :default_alias).order(:created_at, :id).to_a
       write_messages(dir, messages)
-      write_commits(dir)
       File.write(File.join(dir, "index.json"), JSON.pretty_generate(index(messages)))
       File.write(File.join(dir, "pairs.json"), JSON.generate(@pairs.map { |p| p.transform_keys(&:to_s) }))
-      File.write(File.join(dir, "commit_scores.json"), JSON.generate(@commit_scores.map { |s| s.transform_keys(&:to_s) }))
       File.write(File.join(dir, "README.md"), readme(messages))
       messages.last&.id
     end
@@ -47,7 +43,6 @@ module Lineage
         "topic" => { "id" => @topic.id, "title" => @topic.title,
                      "lists" => @topic.mailing_lists.map(&:identifier),
                      "message_count" => messages.size },
-        "repo_path" => @repo_path,
         "mode" => @mode,
         "through_message_id" => messages.last&.id,
         "patchsets" => @patchsets.map { |p| patchset_entry(p, by_id) },
@@ -76,10 +71,9 @@ module Lineage
     end
 
     def candidate_entry(c)
-      commit = c[:entry].commit
+      commit = c[:commit]
       { "sha" => commit.sha, "subject" => commit.subject, "committed_at" => commit.committed_at.iso8601,
         "committer" => commit.committer_name, "origin" => c[:origin],
-        "diff_available" => c[:entry].available,
         "backports" => Array(c[:backports]).map(&:sha), "reviewers" => c[:reviewers] || [],
         "overlap" => c[:overlap]&.transform_keys(&:to_s) }
     end
@@ -115,20 +109,8 @@ module Lineage
       lines.join.gsub(/\n{3,}/, "\n\n")
     end
 
-    def write_commits(dir)
-      @candidates.each do |c|
-        entry = c[:entry]
-        next unless entry.available
-        cdir = File.join(dir, "commits", entry.commit.sha)
-        FileUtils.mkdir_p(cdir)
-        File.write(File.join(cdir, "message.txt"), entry.message_text)
-        File.binwrite(File.join(cdir, "diff.patch"), entry.diff_text)
-      end
-    end
-
     def readme(messages)
-      File.read(PROMPT_PATH)
-          .gsub(MODE_SECTION_RE) { Regexp.last_match(1) == @mode ? Regexp.last_match(2) : "" }
+      resolve_modes(File.read(PROMPT_PATH))
           .gsub("{{mode}}") { @mode }
           .gsub("{{run_id}}") { @run.id.to_s }
           .gsub("{{topic_id}}") { @topic.id.to_s }
@@ -136,7 +118,15 @@ module Lineage
           .gsub("{{message_count}}") { messages.size.to_s }
           .gsub("{{patchset_count}}") { @patchsets.size.to_s }
           .gsub("{{candidate_count}}") { @candidates.size.to_s }
-          .gsub("{{repo_path}}") { @repo_path }
+    end
+
+    # outer sections first, then the ones they contained
+    def resolve_modes(text)
+      loop do
+        out = text.gsub(MODE_SECTION_RE) { Regexp.last_match(1).split.include?(@mode) ? Regexp.last_match(2) : "" }
+        return out if out == text
+        text = out
+      end
     end
   end
 end

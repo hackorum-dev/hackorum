@@ -26,26 +26,4 @@ RSpec.describe Lineage::TriangleBuilder do
     p31 = pairs.find { |p| p[:later_message_id] == sets[2].message.id }
     expect(p31[:metrics]).to eq({ "unparsed" => true })
   end
-
-  it "scores commits against every patchset" do
-    topic = create(:topic)
-    sets = [ patchset(topic, 1, parsed("a.c", %w[x])) ]
-    commit = create(:commit)
-    entry = Lineage::CommitDiff::Entry.new(commit: commit, sha: commit.sha, available: true, message_text: "m", diff_text: "d", parsed: parsed("a.c", %w[x]))
-
-    scores = described_class.new(topic, sets).commit_scores([ entry ])
-    expect(scores.size).to eq(1)
-    expect(scores.first[:sha]).to eq(commit.sha)
-    expect(scores.first[:metrics]["added_jaccard"]).to eq(1.0)
-  end
-
-  it "marks unavailable commits unparsed and keeps the sha" do
-    topic = create(:topic)
-    sets = [ patchset(topic, 1, parsed("a.c", %w[x])) ]
-    entry = Lineage::CommitDiff::Entry.new(commit: nil, sha: "a" * 40, available: false)
-
-    scores = described_class.new(topic, sets).commit_scores([ entry ])
-    expect(scores.first[:sha]).to eq("a" * 40)
-    expect(scores.first[:metrics]).to eq({ "unparsed" => true })
-  end
 end

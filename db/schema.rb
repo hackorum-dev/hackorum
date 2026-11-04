@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_11_04_160000) do
+ActiveRecord::Schema[8.0].define(version: 2026_11_04_170000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -619,6 +619,11 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_04_160000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "failure_kind"
+    t.string "mode"
+    t.string "worker"
+    t.datetime "claimed_at"
+    t.jsonb "bundle_index"
+    t.index ["status", "claimed_at"], name: "index_patchset_runs_on_status_and_claimed_at"
     t.index ["topic_id", "created_at"], name: "index_patchset_runs_on_topic_id_and_created_at"
   end
 

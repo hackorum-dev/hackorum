@@ -7,11 +7,12 @@ module Lineage
     LEVELLED = %w[modified partial].freeze
     NOT_ASSESSED = { "reviewed_message_ids" => [], "coverage" => "none", "note" => "not assessed" }.freeze
 
-    def initialize(run:, index:, link_threshold: 0.8, link: true)
+    def initialize(run:, index:, link_threshold: 0.8, link: true, mode: nil)
       @run = run
       @index = index
       @threshold = link_threshold
       @link = link
+      @mode = mode
     end
 
     def call(result_path)
@@ -32,10 +33,11 @@ module Lineage
                                  verdict_rows(extras, known, extra: true))
         @run.finish!(status: "done", story: normalize(data["story"]), raw_result: data,
                      error: @notes.join("\n").presence)
-        if @link
+        judged = data["verdicts"] + extras
+        if @link && judged.any?
           previously_linked = CommitTopic.llm.where(topic_id: @run.topic_id).pluck(:commit_id)
-          link!(data["verdicts"] + extras, known)
-          attribute_authors!(data["verdicts"] + extras, known, previously_linked)
+          link!(judged, known)
+          attribute_authors!(judged, known, previously_linked)
         end
       end
       @run
@@ -65,6 +67,9 @@ module Lineage
       raise Error, "top level must be an object with lineage, verdicts, story" unless data.is_a?(Hash) &&
         data["lineage"].is_a?(Array) && data["verdicts"].is_a?(Array) && data["story"].is_a?(String)
       raise Error, "extra_commits must be an array" unless extras(data).is_a?(Array)
+      if @mode == "lineage" && (data["verdicts"].any? || extras(data).any?)
+        raise Error, "lineage mode allows no verdicts or extra_commits"
+      end
 
       seen = Set.new
       data["lineage"].each do |l|

@@ -104,6 +104,10 @@ Access:
     to create a container whose bind-mount source is missing rather than
     silently creating a directory)
   - `HACKORUM_GITHUB_TOKEN` (PAT, `actions:read` on `hackorum-dev/postgres`)
+- Lineage processor:
+  - `LINEAGE_API_TOKEN` (token for the lineage processor API under `/api/lineage`;
+    unset disables the routes. The processor machine runs `task lineage-processor`
+    with the same value in `.env.lineage`)
 - Gmail OAuth (Google sign-in + per-user "send email"):
   - `GOOGLE_CLIENT_ID`
   - `GOOGLE_CLIENT_SECRET`

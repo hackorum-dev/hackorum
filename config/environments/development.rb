@@ -102,4 +102,8 @@ Rails.application.configure do
   config.active_record.encryption.primary_key            = ENV["RAILS_AR_ENCRYPTION_PRIMARY_KEY"]
   config.active_record.encryption.deterministic_key      = ENV["RAILS_AR_ENCRYPTION_DETERMINISTIC_KEY"]
   config.active_record.encryption.key_derivation_salt    = ENV["RAILS_AR_ENCRYPTION_SALT"]
+
+  # the lineage processor calls the dev server by whatever name reaches it;
+  # the API is token-protected, so the Host check adds nothing there
+  config.host_authorization = { exclude: ->(request) { request.path.start_with?("/api/lineage") } }
 end

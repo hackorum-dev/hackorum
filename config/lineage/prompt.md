@@ -50,6 +50,15 @@ back to any earlier one, not just the previous. Mixed cases: pick the dominant
 kind and say so in `reason`. Read the patches before the discussion, the
 discussion explains the why, the patches are the what.
 
+<!-- lineage -->
+## Task 2: no commits
+
+This thread has no linked commit and is recent enough that a committed version
+would carry a Discussion trailer, so there is nothing to judge.
+`verdicts` and `extra_commits` must be `[]`. Do not search the checkout for commits.
+
+<!-- /lineage -->
+<!-- trailer full -->
 ## Task 2: commit verdicts
 
 One commit per change: judge the canonical commit, never report its backports
@@ -92,8 +101,9 @@ only candidates: judge them on the evidence, rejecting them is fine. Do not
 search the checkout for other commits; `extra_commits` must be `[]`.
 <!-- /trailer -->
 <!-- full -->
-The candidates are only candidates. They were found by changed-file overlap or
-by hand, both of which are wrong at times. Rejecting all of them, concluding
+There may be no candidates at all; for most threads of this age the job is
+Task 2b. Candidates, when present, are only candidates (found by hand or by
+overlap, wrong at times). Rejecting all of them, concluding
 that the thread was committed as some other commit you found in git, or saying
 you do not have enough confidence, are all correct answers when they are true.
 Do not invent a link to satisfy the list. If you find the real commit in git,
@@ -136,6 +146,7 @@ not that they approved it. The `reviewer` field must be copied exactly from the
 `reviewers` list. `note` is one sentence on what they did. Candidates with no
 reviewers: `reviews` is `[]`.
 
+<!-- /trailer full -->
 ## Task 4: story
 
 A short plain-text summary of how the thread progressed to its commits: which
@@ -182,5 +193,6 @@ commit mentioned (see Rules).
 - Threads above 150 messages: split the message reading across subagents by
   message range, keep the lineage decision yourself.
 - The final answer must be only the JSON object described by the output schema,
-  with one `lineage` entry per patchset, one `verdicts` entry per candidate, and
-  `extra_commits` for commits you verified yourself.
+  with one `lineage` entry per patchset, one `verdicts` entry per candidate
+  (none when there are no candidates), and `extra_commits` for commits you
+  verified yourself.

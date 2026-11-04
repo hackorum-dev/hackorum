@@ -3,7 +3,14 @@ require "json"
 
 module Lineage
   class CodexRunner
-    Result = Struct.new(:exit_code, :timed_out, :usage, :command, :failure_kind, :error_message, keyword_init: true)
+    ZERO_USAGE = { input_tokens: 0, cached_input_tokens: 0, output_tokens: 0 }.freeze
+    Result = Struct.new(:exit_code, :timed_out, :aborted, :usage, :command, :failure_kind, :error_message, keyword_init: true) do
+      def self.aborted(command)
+        new(exit_code: nil, timed_out: false, aborted: true, usage: ZERO_USAGE.dup, command: command,
+            failure_kind: "aborted", error_message: nil)
+      end
+    end
+    STDERR_TAIL_BYTES = 4000
 
     FAILURE_PATTERNS = {
       "capacity" => /capacity|rate limit|overloaded/i,
@@ -16,7 +23,7 @@ module Lineage
              "Your final message must be only the JSON object the output schema describes."
     KILL_GRACE = 10
 
-    attr_reader :model
+    attr_reader :model, :effort
 
     def initialize(repo_path:, model: nil, effort: nil, timeout: 1200,
                    codex_bin: ENV.fetch("CODEX_BIN", "codex"),
@@ -29,11 +36,13 @@ module Lineage
       @codex_bin = codex_bin
       @codex_home = codex_home.to_s
       @auth_path = auth_path
+      @aborted = false
     end
 
     def call(job_dir)
-      prepare_home!
       cmd = command(job_dir)
+      return Result.aborted(cmd) if @aborted
+      prepare_home!
       pid = Process.spawn({ "CODEX_HOME" => @codex_home }, *cmd,
                           pgroup: true,
                           in: File::NULL,
@@ -43,8 +52,20 @@ module Lineage
       exit_code = status&.exitstatus || (status&.termsig && 128 + status.termsig)
       events = File.join(job_dir, "events.jsonl")
       message = error_message(events)
-      Result.new(exit_code: exit_code, timed_out: timed_out, usage: usage(events), command: cmd,
+      Result.new(exit_code: exit_code, timed_out: timed_out, aborted: @aborted, usage: usage(events), command: cmd,
                  failure_kind: failure_kind(exit_code, timed_out, message), error_message: message)
+    end
+
+    # safe from a trap handler: just a flag, wait sends the signals; sticky, later calls do not spawn
+    def abort!
+      @aborted = true
+    end
+
+    def self.stderr_tail(job_dir)
+      path = File.join(job_dir, "stderr.txt")
+      return "" unless File.exist?(path)
+      text = File.read(path)
+      text.byteslice([ text.bytesize - STDERR_TAIL_BYTES, 0 ].max..).scrub.lines.last(20).join
     end
 
     def self.classify(message)
@@ -77,25 +98,33 @@ module Lineage
 
     def wait(pid)
       deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + @timeout
+      term_at = nil
+      timed_out = false
+      killed = false
       loop do
         _, status = Process.wait2(pid, Process::WNOHANG)
-        return [ status, false ] if status
-        if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
-          Process.kill("TERM", -pid) rescue Errno::ESRCH
-          KILL_GRACE.times do
-            sleep 1
-            _, status = Process.wait2(pid, Process::WNOHANG)
-            return [ status, true ] if status
-          end
-          Process.kill("KILL", -pid) rescue Errno::ESRCH
-          _, status = Process.wait2(pid)
-          return [ status, true ]
+        return [ status, timed_out ] if status
+        now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        if term_at.nil? && (@aborted || now > deadline)
+          timed_out = true unless @aborted
+          term_at = now
+          kill_group("TERM", pid)
+        elsif term_at && !killed && now > term_at + KILL_GRACE
+          kill_group("KILL", pid)
+          killed = true
         end
         sleep 1
       end
     end
 
+    def kill_group(sig, pid)
+      Process.kill(sig, -pid)
+    rescue Errno::ESRCH
+      nil
+    end
+
     def failure_kind(exit_code, timed_out, message)
+      return "aborted" if @aborted
       return "timeout" if timed_out
       return nil if exit_code == 0
       self.class.classify(message) || "codex"
@@ -110,7 +139,7 @@ module Lineage
     end
 
     def usage(events_path)
-      totals = { input_tokens: 0, cached_input_tokens: 0, output_tokens: 0 }
+      totals = ZERO_USAGE.dup
       events(events_path) do |event|
         next unless event["type"] == "turn.completed" && event["usage"].is_a?(Hash)
         totals.each_key { |k| totals[k] += event["usage"][k.to_s].to_i }
@@ -122,8 +151,8 @@ module Lineage
       message = nil
       events(events_path) do |event|
         text = case event["type"]
-               when "error" then event["message"]
-               when "turn.failed" then event.dig("error", "message")
+        when "error" then event["message"]
+        when "turn.failed" then event.dig("error", "message")
         end
         message = text if text.present?
       end

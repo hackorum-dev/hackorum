@@ -85,4 +85,48 @@ RSpec.describe Lineage::CodexRunner do
       expect { r.call(job) }.to raise_error(/auth file missing/)
     end
   end
+
+  it "aborts a running codex" do
+    Dir.mktmpdir do |dir|
+      job = File.join(dir, "job")
+      FileUtils.mkdir_p(job)
+      r = runner(dir)
+      thread = Thread.new { with_env("FAKE_CODEX_SLEEP" => "30") { r.call(job) } }
+      sleep 0.5
+      r.abort!
+      result = thread.value
+      expect(result.aborted).to be(true)
+      expect(result.failure_kind).to eq("aborted")
+      expect(result.timed_out).to be(false)
+    end
+  end
+
+  it "does not spawn once aborted" do
+    Dir.mktmpdir do |dir|
+      job = File.join(dir, "job")
+      FileUtils.mkdir_p(job)
+      r = runner(dir)
+      r.abort!
+      result = r.call(job)
+      expect(result.aborted).to be(true)
+      expect(result.failure_kind).to eq("aborted")
+      expect(result.exit_code).to be_nil
+      expect(result.usage).to eq(input_tokens: 0, cached_input_tokens: 0, output_tokens: 0)
+      expect(File.exist?(File.join(job, "stderr.txt"))).to be(false)
+    end
+  end
+
+  it "ignores abort with nothing running" do
+    Dir.mktmpdir do |dir|
+      expect { runner(dir).abort! }.not_to raise_error
+    end
+  end
+
+  it "reads a stderr tail" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "stderr.txt"), (1..30).map { |i| "line #{i}" }.join("\n"))
+      expect(described_class.stderr_tail(dir).lines.size).to eq(20)
+      expect(described_class.stderr_tail(File.join(dir, "nope"))).to eq("")
+    end
+  end
 end

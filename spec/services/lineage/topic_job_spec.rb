@@ -44,9 +44,20 @@ RSpec.describe Lineage::TopicJob do
       expect(run.model).to eq("fake")
       expect(run.lineages.count).to eq(2)
       expect(run.input_tokens).to eq(1)
+      expect(run.mode).to eq("full")
       expect(run.through_message_id).to eq(m2.id)
       expect(PatchsetPair.where(topic_id: topic.id).count).to eq(1)
       expect(File.exist?(File.join(run.job_dir, "index.json"))).to be(true)
+      expect(File.exist?(File.join(run.job_dir, "commit_scores.json"))).to be(true)
+    end
+  end
+
+  it "runs in the given mode" do
+    Dir.mktmpdir do |dir|
+      runner = fake_runner { |_| good_result }
+      run = job(dir, runner: runner, mode: "lineage", dry_run: true).call
+      expect(run.mode).to eq("lineage")
+      expect(File.read(File.join(run.job_dir, "README.md"))).to include("must be `[]`")
     end
   end
 

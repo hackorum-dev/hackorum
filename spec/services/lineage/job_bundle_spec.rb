@@ -16,14 +16,11 @@ RSpec.describe Lineage::JobBundle do
       patchset = Lineage::PatchsetEnumerator::Patchset.new(
         message: m1, ordinal: 2, dir: File.join(sets_dir, "002"), files: [ "0001-x.patch" ],
         parsed: Lineage::DiffParser::Result.new(files: [], subjects: [ "x" ]), parse_error: nil, nocfbot: false)
-      entry = Lineage::CommitDiff::Entry.new(commit: commit, available: true, message_text: "Add x\n",
-                                             diff_text: "diff --git a/x b/x\n", parsed: nil)
-
       described_class.new(run: run, topic: topic, patchsets: [ patchset ],
-                          candidates: [ { entry: entry, origin: "trailer", overlap: nil,
+                          candidates: [ { commit: commit, origin: "trailer", overlap: nil,
                                           backports: [ backport ], reviewers: [ "Some Reviewer" ] } ],
-                          pairs: [], commit_scores: [], branches: { m1.id => { status: "applied" } },
-                          previous: nil, repo_path: "/repo", mode: "trailer").write(dir)
+                          pairs: [], branches: { m1.id => { status: "applied" } },
+                          previous: nil, mode: "trailer").write(dir)
 
       index = JSON.parse(File.read(File.join(dir, "index.json")))
       expect(index["topic"]["id"]).to eq(topic.id)
@@ -33,19 +30,18 @@ RSpec.describe Lineage::JobBundle do
                                                    "backports" => [ "b" * 40 ], "reviewers" => [ "Some Reviewer" ])
       expect(index["mode"]).to eq("trailer")
       expect(index["through_message_id"]).to eq(m1.id)
+      expect(index).not_to have_key("repo_path")
 
       msg2 = File.read(File.join(dir, "messages", "002.txt"))
       expect(msg2).to include("Patchset: patchsets/002")
       expect(msg2).to include("Here is v1.")
       expect(msg2).not_to include("> first idea")
       expect(msg2).not_to include("wrote:")
-      expect(File.read(File.join(dir, "commits", "a" * 40, "message.txt"))).to eq("Add x\n")
       expect(JSON.parse(File.read(File.join(dir, "pairs.json")))).to eq([])
-      expect(JSON.parse(File.read(File.join(dir, "commit_scores.json")))).to eq([])
       expect(index).not_to include("pairs", "commit_scores")
       readme = File.read(File.join(dir, "README.md"))
       expect(readme).to include("Row pattern recognition")
-      expect(readme).to include("/repo")
+      expect(readme).to include("{{repo_path}}")
       expect(described_class.prompt_version).to match(/\A[0-9a-f]{12}\z/)
     end
   end
@@ -56,8 +52,8 @@ RSpec.describe Lineage::JobBundle do
            body: "Reply.\nOn Tue, Jan 1, 2025 at 10:00 AM Some Body <s@example.com>\nwrote:\n> q\nKeep.\n-----Original Message-----\nold stuff\n")
     run = create(:patchset_run, topic: topic, status: "running")
     Dir.mktmpdir do |dir|
-      described_class.new(run: run, topic: topic, patchsets: [], candidates: [], pairs: [], commit_scores: [],
-                          branches: {}, previous: nil, repo_path: "/repo", mode: "full").write(dir)
+      described_class.new(run: run, topic: topic, patchsets: [], candidates: [], pairs: [],
+                          branches: {}, previous: nil, mode: "full").write(dir)
       text = File.read(File.join(dir, "messages", "001.txt"))
       expect(text).to include("Reply.", "Keep.")
       expect(text).not_to include("wrote:", "On Tue", "old stuff", "Original Message")
@@ -70,8 +66,8 @@ RSpec.describe Lineage::JobBundle do
 
     def readme(mode)
       Dir.mktmpdir do |dir|
-        described_class.new(run: run, topic: topic, patchsets: [], candidates: [], pairs: [], commit_scores: [],
-                            branches: {}, previous: nil, repo_path: "/repo", mode: mode).write(dir)
+        described_class.new(run: run, topic: topic, patchsets: [], candidates: [], pairs: [],
+                            branches: {}, previous: nil, mode: mode).write(dir)
         return File.read(File.join(dir, "README.md"))
       end
     end
@@ -81,38 +77,54 @@ RSpec.describe Lineage::JobBundle do
       File.write(Lineage::JobBundle::PROMPT_PATH, <<~MD)
         # Mode {{mode}}
         common
+        <!-- trailer full -->
         <!-- trailer -->
         trailer only
         <!-- /trailer -->
         <!-- full -->
         full only
         <!-- /full -->
+        judged
+        <!-- /trailer full -->
+        <!-- lineage -->
+        lineage only
+        <!-- /lineage -->
         tail
       MD
     end
 
     it "keeps only the trailer section in trailer mode" do
-      text = readme("trailer")
-      expect(text).to eq("# Mode trailer\ncommon\ntrailer only\ntail\n")
+      expect(readme("trailer")).to eq("# Mode trailer\ncommon\ntrailer only\njudged\ntail\n")
     end
 
     it "keeps only the full section in full mode" do
-      text = readme("full")
-      expect(text).to eq("# Mode full\ncommon\nfull only\ntail\n")
+      expect(readme("full")).to eq("# Mode full\ncommon\nfull only\njudged\ntail\n")
+    end
+
+    it "keeps only the lineage section in lineage mode" do
+      expect(readme("lineage")).to eq("# Mode lineage\ncommon\nlineage only\ntail\n")
     end
   end
 
-  it "renders the shipped prompt without markers in both modes" do
+  it "renders the shipped prompt without markers in all modes" do
     topic = create(:topic)
     run = create(:patchset_run, topic: topic, status: "running")
-    %w[trailer full].each do |mode|
+    %w[trailer full lineage].each do |mode|
       Dir.mktmpdir do |dir|
-        described_class.new(run: run, topic: topic, patchsets: [], candidates: [], pairs: [], commit_scores: [],
-                            branches: {}, previous: nil, repo_path: "/repo", mode: mode).write(dir)
-        text = File.read(File.join(dir, "README.md"))
-        expect(text).not_to include("<!--", "{{")
-        expect(text.include?("Task 2b")).to be(mode == "full")
-        expect(text.include?("take that as given")).to be(mode == "trailer")
+        described_class.new(run: run, topic: topic, patchsets: [], candidates: [], pairs: [],
+                            branches: {}, previous: nil, mode: mode).write(dir)
+        readme = File.read(File.join(dir, "README.md"))
+        expect(readme).not_to include("<!--")
+        expect(readme.scan(/\{\{\w+\}\}/).uniq).to eq([ "{{repo_path}}" ])
+        expect(readme.include?("Task 2b")).to be(mode == "full")
+        expect(readme.include?("## Task 3")).to be(mode != "lineage")
+        expect(readme.include?("take that as given")).to be(mode == "trailer")
+        if mode == "lineage"
+          expect(readme).not_to include("## Task 2: commit verdicts")
+          expect(readme).to include("`verdicts` and `extra_commits` must be `[]`")
+        else
+          expect(readme).to include("## Task 2: commit verdicts")
+        end
       end
     end
   end

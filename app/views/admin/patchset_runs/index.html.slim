@@ -7,6 +7,9 @@
     - @status_counts.sort.each do |status, n|
       span.commit-sidebar-meta = "#{status}: #{n}  "
   p
+    - @queue_counts.each do |phase, c|
+      span.commit-sidebar-meta = "#{phase}: #{c[:remaining]} remaining, #{c[:claimed]} claimed, #{c[:done]} done  "
+  p
     = link_to "newest", admin_patchset_runs_path
     |  /
     = link_to "slowest", admin_patchset_runs_path(sort: "duration")
@@ -19,6 +22,8 @@
         th Run
         th Topic
         th Status
+        th Mode
+        th Worker
         th Model
         th Duration
         th Tokens in/cached/out
@@ -30,6 +35,8 @@
           td = link_to run.id, admin_patchset_run_path(run)
           td = link_to run.topic.title, topic_path(run.topic)
           td = run.status
+          td = run.mode
+          td = run.worker
           td = run.model
           td = run.duration_s ? "#{run.duration_s.round}s" : ""
           td = "#{run.input_tokens}/#{run.cached_input_tokens}/#{run.output_tokens}"

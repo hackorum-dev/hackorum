@@ -9,6 +9,9 @@
       th Status
       td = @run.status
     tr
+      th Mode / worker
+      td = "#{@run.mode} / #{@run.worker}"
+    tr
       th Model / effort / prompt
       td = "#{@run.model} / #{@run.effort} / #{@run.prompt_version}"
     tr
@@ -26,6 +29,8 @@
         th = @run.status == "done" ? "Notes" : "Error"
         td
           pre = @run.error
+  - if Admin::PatchsetRunsController::REQUEUEABLE.include?(@run.status)
+    = button_to "Requeue", requeue_admin_patchset_run_path(@run), method: :post, class: "button-secondary button-small", data: { turbo_confirm: "Delete this run so the topic is picked up again?" }
 
   h2 Story
   pre = lineage_text(@run.story, ordinals)

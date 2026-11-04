@@ -203,6 +203,28 @@ tasks:
           -v "$HACKORUM_SSH_KEY":/run/hackorum_deploy_key:ro,z
           web bash -c "mkdir -p /root/.ssh && install -m 600 /run/hackorum_deploy_key /root/.ssh/deploy_key && git config --global --add safe.directory \"*\" && bin/orchestrator {{.CLI_ARGS}}"'
 
+  lineage-processor:
+    desc: 'Run the lineage processor on the host against a hackorum server (LINEAGE_SERVER and LINEAGE_API_TOKEN from .env.lineage, codex via mise shim, postgres checkout at ./postgres). Flags after --, e.g. task lineage-processor -- --phase trailer --limit 5, or -- --stats.'
+    interactive: true
+    dotenv: ['.env.lineage']
+    preconditions:
+      - sh: '[ -n "$LINEAGE_SERVER" ]'
+        msg: 'LINEAGE_SERVER is not set - put it in .env.lineage (see .env.lineage.example)'
+      - sh: '[ -n "$LINEAGE_API_TOKEN" ]'
+        msg: 'LINEAGE_API_TOKEN is not set - put it in .env.lineage'
+      - sh: '[ -n "$RAILS_AR_ENCRYPTION_PRIMARY_KEY" ]'
+        msg: 'RAILS_AR_ENCRYPTION_PRIMARY_KEY is not set - put any 32+ char value in .env.lineage (development boot insists on it)'
+      - sh: '[ -n "$RAILS_AR_ENCRYPTION_DETERMINISTIC_KEY" ]'
+        msg: 'RAILS_AR_ENCRYPTION_DETERMINISTIC_KEY is not set - put any 32+ char value in .env.lineage (development boot insists on it)'
+      - sh: '[ -n "$RAILS_AR_ENCRYPTION_SALT" ]'
+        msg: 'RAILS_AR_ENCRYPTION_SALT is not set - put any 32+ char value in .env.lineage (development boot insists on it)'
+      - sh: test -d ./postgres/.git
+        msg: 'postgres checkout not found at ./postgres'
+      - sh: command -v codex >/dev/null
+        msg: 'codex not on PATH (mise shim missing?)'
+    cmds:
+      - 'mise exec -- bundle exec ruby script/lineage_processor.rb {{.CLI_ARGS}}'
+
   psql:
     desc: Open psql against the dev DB
     interactive: true

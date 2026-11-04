@@ -29,6 +29,7 @@ OptionParser.new do |o|
   o.on("--link-threshold F", Float, "confidence floor for commit_topics llm rows (default 0.8)") { |v| options[:link_threshold] = v }
   o.on("--no-link", "never write commit_topics rows") { options[:link] = false }
   o.on("--no-apply", "skip ApplyOne for patchsets without branches") { options[:apply] = false }
+  o.on("--mode MODE", %w[trailer full lineage], "trailer|full|lineage (default from the candidates)") { |v| options[:mode] = v }
   o.on("--dry-run", "build bundles and metrics only") { options[:dry_run] = true }
   o.on("--clean", "delete job dirs of done runs and exit") { options[:clean] = true }
   o.on("--stats", "summarize runs and exit") { options[:stats] = true }
@@ -122,7 +123,7 @@ run_pool = lambda do
                             jobs_root: options[:jobs_root], worktrees_dir: options[:worktrees],
                             runner: worker[:runner], apply: options[:apply], link: options[:link],
                             link_threshold: options[:link_threshold], dry_run: options[:dry_run],
-                            worktree_name: "lineage#{worker[:index]}").call
+                            mode: options[:mode], worktree_name: "lineage#{worker[:index]}").call
     end
   end
 
