@@ -25,6 +25,10 @@ details.sidebar-section open=true
                 li
                   span.lineage-reviewer = r["reviewer"]
                   span.lineage-coverage = r["coverage"]
+                  - if r["source"] == "llm"
+                    span.lineage-review-llm title="Found by the patchset lineage model, not a Reviewed-by trailer" LLM
+                    - if r["confidence"]
+                      span.lineage-review-confidence = "#{(r["confidence"].to_f * 100).round}%"
                   - if r["note"].present?
                     span.lineage-review-note = lineage_text(r["note"], lineage.ordinals)
         - if v[:evidence].present?

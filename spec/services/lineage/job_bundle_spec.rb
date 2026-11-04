@@ -117,7 +117,9 @@ RSpec.describe Lineage::JobBundle do
         expect(readme).not_to include("<!--")
         expect(readme.scan(/\{\{\w+\}\}/).uniq).to eq([ "{{repo_path}}" ])
         expect(readme.include?("Task 2b")).to be(mode == "full")
-        expect(readme.include?("## Task 3")).to be(mode != "lineage")
+        expect(readme.include?("## Task 3: review coverage")).to be(mode != "lineage")
+        expect(readme.include?("## Task 3b")).to be(mode != "lineage")
+        expect(readme.include?("`suggested_reviews`")).to be(mode != "lineage")
         expect(readme.include?("take that as given")).to be(mode == "trailer")
         if mode == "lineage"
           expect(readme).not_to include("## Task 2: commit verdicts")
@@ -132,5 +134,8 @@ RSpec.describe Lineage::JobBundle do
   it "ships a valid result schema" do
     schema = JSON.parse(File.read(Lineage::JobBundle::SCHEMA_PATH))
     expect(schema["required"]).to eq(%w[lineage verdicts extra_commits story])
+    %w[verdicts extra_commits].each do |key|
+      expect(schema.dig("properties", key, "items", "required")).to include("suggested_reviews")
+    end
   end
 end

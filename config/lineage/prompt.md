@@ -121,7 +121,7 @@ Use `extra_commits` only for commits you verified in the checkout; it has no
 `not_this_thread` or `undecided`, so a commit you are not sure about goes to
 `story` instead. Never put a candidate sha or a backport sha in
 `extra_commits`. A found commit has no `reviewers` list, so its `reviews` is
-`[]`.
+`[]` and the reviewers you find go to `suggested_reviews` (Task 3b).
 <!-- /full -->
 
 ## Task 3: review coverage
@@ -148,6 +148,40 @@ whether or not the thread shows it. Still list the patchsets they reviewed and
 say in `note` what they did in the thread, if anything. The `reviewer` field
 must be copied exactly from the `reviewers` list. `note` is one sentence on what they did. Candidates with no
 reviewers: `reviews` is `[]`.
+
+## Task 3b: reviewers you found
+
+A commit with an empty `reviewers` list has no Reviewed-by trailer, so name its
+reviewers yourself in `suggested_reviews`: for every candidate with an empty
+`reviewers` list and a verdict of `as_is`, `modified`, `partial` or
+`from_discussion`, and for every entry of `extra_commits`. The bar is the one
+committers use for Reviewed-by. A person counts when, in a message dated before
+the commit (`committed_at` in index.json, or the committer date in git for
+commits you found), they reported a problem in the patch, tested it and reported
+the result, said it looked good, or proposed a change the author took. A person
+the commit message itself credits as a reviewer counts too, even without a
+message in this thread; for one with no review in this thread `coverage` is
+`final`, `reviewed_message_ids` is `[]`, and `note` says where the credit comes
+from. A person does not count for pings, "needs rebase", cfbot or commitfest
+status notes, or anything written after the commit date; the patch's authors
+(the sender of the source patchset, `author_name`, any co-author) and the
+committer are never reviewers of their own commit. Each commit gets its own
+list: in a thread with several commits, reviewing a different patch series or
+sub-feature is not reviewing this commit, while reviewing an earlier version of
+the same patch is (`earlier`).
+
+One entry per person per commit. `reviewer` is the name as it appears in the
+thread, or in the commit message. `reviewer_message_id` is the id of a message
+that person sent in this thread, preferably the review itself (the `id` in the
+`Message:` line, not the `#N` ordinal); it is how we identify them, so null only
+when they never posted in this thread. `reviewed_message_ids` and `coverage`
+follow the Task 3 definitions, with `final` and `earlier` the only values, and
+`reviewed_message_ids` is `[]` when the commit came from an inline patch with no
+patchset entry. A person with no review activity is not listed. `confidence` is
+per entry. `note` is one sentence on what they did, with reference tokens.
+
+`suggested_reviews` is `[]` for candidates with a non-empty `reviewers` list and
+for verdicts of `not_this_thread` or `undecided`.
 
 <!-- /trailer full -->
 ## Task 4: story
@@ -202,8 +236,9 @@ rebases that changed nothing, unless they mark the start of a new phase.
 
 - Every `message_id`, `parent_message_id`, `source_message_id` and entry of
   `reviewed_message_ids` in your answer is the `message_id` field from
-  index.json, never the NNN ordinal. `author_message_id` may be any message of
-  the thread, by the id in its header.
+  index.json, never the NNN ordinal. `author_message_id` and
+  `reviewer_message_id` may be any message of the thread, by the id in its
+  header.
 - Whenever you refer to a message write `[msg:<message_id>]`, and to a commit
   `[commit:<full sha>]`; the UI turns these into links. Never write bare message
   numbers or shas in reason, evidence, note or story, and cite a patchset by

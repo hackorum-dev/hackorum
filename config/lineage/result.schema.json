@@ -24,7 +24,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["sha", "verdict", "source_message_id", "author_name", "author_message_id", "confidence", "evidence", "change_level", "reviews"],
+        "required": ["sha", "verdict", "source_message_id", "author_name", "author_message_id", "confidence", "evidence", "change_level", "reviews", "suggested_reviews"],
         "properties": {
           "sha": { "type": "string" },
           "verdict": { "type": "string", "enum": ["as_is", "modified", "partial", "from_discussion", "not_this_thread", "undecided"] },
@@ -47,6 +47,22 @@
                 "note": { "type": "string" }
               }
             }
+          },
+          "suggested_reviews": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["reviewer", "reviewer_message_id", "reviewed_message_ids", "coverage", "confidence", "note"],
+              "properties": {
+                "reviewer": { "type": "string" },
+                "reviewer_message_id": { "type": ["integer", "null"] },
+                "reviewed_message_ids": { "type": "array", "items": { "type": "integer" } },
+                "coverage": { "type": "string", "enum": ["final", "earlier"] },
+                "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+                "note": { "type": "string" }
+              }
+            }
           }
         }
       }
@@ -56,7 +72,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["sha", "verdict", "source_message_id", "author_name", "author_message_id", "confidence", "evidence", "change_level", "reviews"],
+        "required": ["sha", "verdict", "source_message_id", "author_name", "author_message_id", "confidence", "evidence", "change_level", "reviews", "suggested_reviews"],
         "properties": {
           "sha": { "type": "string" },
           "verdict": { "type": "string", "enum": ["as_is", "modified", "partial", "from_discussion"] },
@@ -76,6 +92,22 @@
                 "reviewer": { "type": "string" },
                 "reviewed_message_ids": { "type": "array", "items": { "type": "integer" } },
                 "coverage": { "type": "string", "enum": ["final", "earlier", "none"] },
+                "note": { "type": "string" }
+              }
+            }
+          },
+          "suggested_reviews": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["reviewer", "reviewer_message_id", "reviewed_message_ids", "coverage", "confidence", "note"],
+              "properties": {
+                "reviewer": { "type": "string" },
+                "reviewer_message_id": { "type": ["integer", "null"] },
+                "reviewed_message_ids": { "type": "array", "items": { "type": "integer" } },
+                "coverage": { "type": "string", "enum": ["final", "earlier"] },
+                "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
                 "note": { "type": "string" }
               }
             }

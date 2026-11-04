@@ -603,12 +603,14 @@
 }
 
 .commit-sidebar-llm,
-.commit-credit-llm {
+.commit-credit-llm,
+.lineage-review-llm {
   margin-left: var(--spacing-1);
 }
 
 .commit-sidebar-llm,
 .commit-credit-llm,
+.lineage-review-llm,
 .lineage-kind,
 .lineage-extra {
   display: inline-block;
@@ -679,6 +681,7 @@
   font-style: italic;
 }
 
+.lineage-review-confidence,
 .lineage-review-note {
   margin-left: var(--spacing-1);
 }

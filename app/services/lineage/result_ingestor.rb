@@ -5,7 +5,8 @@ module Lineage
     Error = Class.new(StandardError)
 
     LEVELLED = %w[modified partial].freeze
-    NOT_ASSESSED = { "reviewed_message_ids" => [], "coverage" => "none", "note" => "not assessed" }.freeze
+    SUGGESTED_COVERAGES = %w[final earlier].freeze
+    NOT_ASSESSED = { "reviewed_message_ids" => [], "coverage" => "none", "note" => "not assessed", "source" => "trailer" }.freeze
 
     def initialize(run:, index:, link_threshold: 0.8, link: true, mode: nil)
       @run = run
@@ -13,12 +14,14 @@ module Lineage
       @threshold = link_threshold
       @link = link
       @mode = mode
+      @suggestions = {}
     end
 
     def call(result_path)
       data = parse(result_path)
       validate!(data)
       @notes = []
+      @suggestions = {}
       extras = dedupe_extras(data)
       found = Commit.where(sha: extras.map { |v| v["sha"] }).index_by(&:sha)
       extras, missing = extras.partition { |v| found.key?(v["sha"]) }
@@ -37,7 +40,9 @@ module Lineage
         if @link && judged.any?
           previously_linked = CommitTopic.llm.where(topic_id: @run.topic_id).pluck(:commit_id)
           link!(judged, known)
-          attribute_authors!(judged, known, previously_linked)
+          CommitPerson.llm.where(commit_id: judged.map { |v| known[v["sha"]].id } | previously_linked).delete_all
+          authors = attribute_authors!(judged, known)
+          attribute_reviewers!(judged, known, authors)
         end
       end
       @run
@@ -60,6 +65,7 @@ module Lineage
     def candidate_commits = @candidate_commits ||= Commit.where(sha: candidates.keys).index_by(&:sha)
     def extras(data) = data.fetch("extra_commits", [])
     def reviews(v) = v.fetch("reviews", nil) || []
+    def suggested(v) = v.fetch("suggested_reviews", nil) || []
     def message_ids = @message_ids ||= @run.topic.chronological_message_ids
     def topic_message_ids = @topic_message_ids ||= message_ids.to_set
 
@@ -113,6 +119,7 @@ module Lineage
       check_confidence!(v["confidence"], what)
       check_change_level!(v, what)
       check_reviews!(v, what)
+      check_suggested!(v, what)
     end
 
     def check_confidence!(value, what)
@@ -134,10 +141,26 @@ module Lineage
         raise Error, "review entry must be an object for #{what}" unless r.is_a?(Hash)
         raise Error, "bad reviewer #{r['reviewer'].inspect} for #{what}" unless r["reviewer"].is_a?(String) && r["reviewer"].present?
         raise Error, "bad coverage #{r['coverage']} for #{what}" unless CommitVerdict::COVERAGES.include?(r["coverage"])
-        ids = r["reviewed_message_ids"]
-        raise Error, "reviewed_message_ids must be an array for #{what}" unless ids.is_a?(Array)
-        ids.each { |id| raise Error, "unknown reviewed message #{id} for #{what}" unless patchset_ids.include?(id) }
+        check_reviewed_ids!(r["reviewed_message_ids"], what)
       end
+    end
+
+    def check_suggested!(v, what)
+      raise Error, "suggested_reviews must be an array for #{what}" unless suggested(v).is_a?(Array)
+      suggested(v).each do |r|
+        raise Error, "suggested review entry must be an object for #{what}" unless r.is_a?(Hash)
+        raise Error, "bad suggested reviewer #{r['reviewer'].inspect} for #{what}" unless r["reviewer"].is_a?(String) && r["reviewer"].present?
+        mid = r["reviewer_message_id"]
+        raise Error, "unknown reviewer_message_id #{mid} for #{what}" unless mid.nil? || topic_message_ids.include?(mid)
+        raise Error, "bad coverage #{r['coverage']} for suggested reviewer in #{what}" unless SUGGESTED_COVERAGES.include?(r["coverage"])
+        check_reviewed_ids!(r["reviewed_message_ids"], what)
+        check_confidence!(r["confidence"], "suggested reviewer #{r['reviewer']} in #{what}")
+      end
+    end
+
+    def check_reviewed_ids!(ids, what)
+      raise Error, "reviewed_message_ids must be an array for #{what}" unless ids.is_a?(Array)
+      ids.each { |id| raise Error, "unknown reviewed message #{id} for #{what}" unless patchset_ids.include?(id) }
     end
 
     def dedupe_extras(data)
@@ -159,7 +182,7 @@ module Lineage
 
     def reference_shas(data, known)
       texts = data["lineage"].map { |l| l["reason"] } + [ story_text(data) ] +
-              (data["verdicts"] + extras(data)).flat_map { |v| [ v["evidence"] ] + reviews(v).map { |r| r["note"] } }
+              (data["verdicts"] + extras(data)).flat_map { |v| [ v["evidence"] ] + reviews(v).map { |r| r["note"] } + suggested(v).map { |r| r["note"] } }
       hexes = texts.compact.flat_map { |t| t.to_s.scan(References::SHA) }.map(&:downcase).uniq - known.keys
       known.keys.to_set | Commit.where(sha: hexes).pluck(:sha)
     end
@@ -178,7 +201,8 @@ module Lineage
 
     def verdict_rows(list, known, extra:)
       list.map do |v|
-        rows = extra ? reviews(v).map { |r| review_row(r, r["reviewer"]) } : candidate_reviews(v)
+        @notes << "reviews ignored for extra #{v['sha']}: no trailer reviewers, use suggested_reviews" if extra && reviews(v).any?
+        rows = (extra ? [] : candidate_reviews(v)) + suggested_rows(v, extra: extra)
         { patchset_run_id: @run.id, topic_id: @run.topic_id, commit_id: known[v["sha"]].id,
           verdict: v["verdict"], source_message_id: v["source_message_id"], extra: extra,
           author_name: v["author_name"]&.strip, author_message_id: v["author_message_id"],
@@ -206,7 +230,28 @@ module Lineage
 
     def review_row(r, name)
       { "reviewer" => name, "reviewed_message_ids" => r["reviewed_message_ids"],
-        "coverage" => r["coverage"], "note" => normalize(r["note"]) }
+        "coverage" => r["coverage"], "note" => normalize(r["note"]), "source" => "trailer" }
+    end
+
+    # misplaced suggestions: note and drop, do not fail a paid run
+    def suggested_rows(v, extra:)
+      list = suggested(v)
+      return [] if list.empty?
+
+      reason =
+        if !CommitVerdict::COMMITTED.include?(v["verdict"]) then "verdict #{v['verdict']}"
+        elsif !extra && (candidates[v["sha"]]["reviewers"] || []).any? then "has trailer reviewers"
+        end
+      if reason
+        @notes << "suggested reviewers ignored for #{v['sha']}: #{reason}"
+        return []
+      end
+
+      @suggestions[v["sha"]] = list.uniq { |r| r["reviewer"].squish.downcase }.map do |r|
+        { "reviewer" => r["reviewer"].squish, "reviewed_message_ids" => r["reviewed_message_ids"].uniq, "coverage" => r["coverage"],
+          "note" => normalize(r["note"]), "source" => "llm", "reviewer_message_id" => r["reviewer_message_id"],
+          "confidence" => r["confidence"].to_f }
+      end
     end
 
     def link!(judged, known)
@@ -228,15 +273,10 @@ module Lineage
     end
 
     # The author the model named wins, then the sender of the source patchset
-    # (so from_discussion needs a named author); parsed rows beat both. A commit
-    # judged under two topics keeps whichever run wrote last.
-    def attribute_authors!(judged, known, previously_linked)
-      CommitPerson.llm.where(commit_id: judged.map { |v| known[v["sha"]].id } | previously_linked).delete_all
-      eligible = judged.select do |v|
-        CommitVerdict::COMMITTED.include?(v["verdict"]) && v["confidence"].to_f >= @threshold &&
-          (v["source_message_id"] || v["author_message_id"] || v["author_name"])
-      end
-      return if eligible.empty?
+    # (so from_discussion needs a named author); parsed rows beat both.
+    def attribute_authors!(judged, known)
+      eligible = credited(judged).select { |v| v["source_message_id"] || v["author_message_id"] || v["author_name"] }
+      return [] if eligible.empty?
 
       ids = eligible.map { |v| known[v["sha"]].id }
       authored = CommitPerson.parsed.where(commit_id: ids, role: "author").distinct.pluck(:commit_id).to_set
@@ -250,13 +290,45 @@ module Lineage
         author.merge(commit_id: commit_id, role: "author", source: "llm", confidence: v["confidence"].to_f)
       end
       CommitPerson.insert_all(rows) if rows.any?
+      rows
+    end
+
+    def credited(judged)
+      judged.select { |v| CommitVerdict::COMMITTED.include?(v["verdict"]) && v["confidence"].to_f >= @threshold }
+    end
+
+    # sender of reviewer_message_id, then a name match among the thread's
+    # senders, then the bare name; nobody already credited on the commit gets a second row
+    def attribute_reviewers!(judged, known, authors)
+      wanted = credited(judged).flat_map do |v|
+        @suggestions.fetch(v["sha"], []).select { |r| r["confidence"] >= @threshold }.map { |r| [ known[v["sha"]].id, r ] }
+      end
+      return if wanted.empty?
+
+      taken = CommitPerson.parsed.where(commit_id: wanted.map(&:first).uniq)
+                          .map { |p| { commit_id: p.commit_id, person_id: p.person_id, raw_name: p.raw_name } }
+                          .concat(authors).group_by { |p| p[:commit_id] }
+      messages = Message.where(id: wanted.filter_map { |_, r| r["reviewer_message_id"] }).includes(:sender).index_by(&:id)
+      rows = wanted.filter_map do |commit_id, r|
+        person = (message = messages[r["reviewer_message_id"]]) ? sender_of(message) : named_person(r["reviewer"])
+        next if taken.fetch(commit_id, []).any? { |p| same_person?(p, person) }
+
+        person.merge(commit_id: commit_id, role: "reviewer", source: "llm", confidence: r["confidence"])
+      end
+      rows = rows.group_by { |row| [ row[:commit_id], row[:person_id] || row[:raw_name].downcase ] }
+                 .values.map { |dups| dups.max_by { |row| row[:confidence] } }
+      CommitPerson.insert_all(rows) if rows.any?
+    end
+
+    def same_person?(a, b)
+      (b[:person_id] && a[:person_id] == b[:person_id]) || a[:raw_name].to_s.strip.casecmp?(b[:raw_name].to_s.strip)
     end
 
     def author_of(v, messages)
       if (message = messages[v["author_message_id"]])
         sender_of(message)
       elsif v["author_name"].present?
-        named_author(v["author_name"])
+        named_person(v["author_name"])
       elsif (message = messages[v["source_message_id"]])
         sender_of(message)
       end
@@ -266,7 +338,7 @@ module Lineage
       { person_id: message.sender_person_id, raw_name: message.sender.name, raw_email: message.sender.email }
     end
 
-    def named_author(name)
+    def named_person(name)
       matches = senders_by_name.fetch(name.strip.downcase, [])
       if matches.map(&:last).uniq.one?
         found, email, person_id = matches.first

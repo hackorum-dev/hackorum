@@ -356,6 +356,11 @@ RSpec.describe Lineage::ResultIngestor do
     { "reviewer" => name, "reviewed_message_ids" => ids || [ m2.id ], "coverage" => coverage, "note" => note }
   end
 
+  def suggestion(name, message: nil, coverage: "final", ids: nil, confidence: 0.9, note: "found a bug")
+    { "reviewer" => name, "reviewer_message_id" => message, "reviewed_message_ids" => ids || [ m2.id ],
+      "coverage" => coverage, "confidence" => confidence, "note" => note }
+  end
+
   it "matches reviewers to trailers, drops strangers, pads the rest as not assessed" do
     index["candidates"][0]["reviewers"] = [ "Alice Smith", "Bob Jones", "Dan Hill" ]
     data = answer
@@ -364,9 +369,9 @@ RSpec.describe Lineage::ResultIngestor do
     ingest(data)
     row = run.reload.verdicts.first
     expect(row.reviews).to eq([
-      { "reviewer" => "Alice Smith", "reviewed_message_ids" => [ m2.id ], "coverage" => "final", "note" => "looked at it" },
-      { "reviewer" => "Bob Jones", "reviewed_message_ids" => [], "coverage" => "none", "note" => "not assessed" },
-      { "reviewer" => "Dan Hill", "reviewed_message_ids" => [ m1.id ], "coverage" => "earlier", "note" => "looked at it" }
+      { "reviewer" => "Alice Smith", "reviewed_message_ids" => [ m2.id ], "coverage" => "final", "note" => "looked at it", "source" => "trailer" },
+      { "reviewer" => "Bob Jones", "reviewed_message_ids" => [], "coverage" => "none", "note" => "not assessed", "source" => "trailer" },
+      { "reviewer" => "Dan Hill", "reviewed_message_ids" => [ m1.id ], "coverage" => "earlier", "note" => "looked at it", "source" => "trailer" }
     ])
     expect(row).to have_attributes(reviewers_final: 1, reviewers_earlier: 1, reviewers_none: 1)
     expect(run.error).to eq("reviewer not in trailers: Carol King for #{commit.sha}")
@@ -380,20 +385,20 @@ RSpec.describe Lineage::ResultIngestor do
     ingest(data)
     row = run.reload.verdicts.first
     expect(row.reviews).to eq([
-      { "reviewer" => "Alice Smith", "reviewed_message_ids" => [ m2.id ], "coverage" => "final", "note" => "committed the patch; silent in the thread" },
-      { "reviewer" => "Bob Jones", "reviewed_message_ids" => [ m1.id ], "coverage" => "earlier", "note" => "looked at it" }
+      { "reviewer" => "Alice Smith", "reviewed_message_ids" => [ m2.id ], "coverage" => "final", "note" => "committed the patch; silent in the thread", "source" => "trailer" },
+      { "reviewer" => "Bob Jones", "reviewed_message_ids" => [ m1.id ], "coverage" => "earlier", "note" => "looked at it", "source" => "trailer" }
     ])
     expect(row).to have_attributes(reviewers_final: 1, reviewers_earlier: 1, reviewers_none: 0)
   end
 
-  it "accepts any reviewer name on extras" do
+  it "drops reviews on extras with a note" do
     found = create(:commit)
     ex = extra(found.sha).merge("reviews" => [ review("Someone Else") ])
     ingest(answer.merge("extra_commits" => [ ex ]))
     row = run.verdicts.find_by(commit_id: found.id)
-    expect(row.reviews.map { |r| r["reviewer"] }).to eq([ "Someone Else" ])
-    expect(row.reviewers_final).to eq(1)
-    expect(run.reload.error).to be_nil
+    expect(row.reviews).to eq([])
+    expect(row.reviewers_final).to eq(0)
+    expect(run.reload.error).to eq("reviews ignored for extra #{found.sha}: no trailer reviewers, use suggested_reviews")
   end
 
   it "rejects malformed reviews" do
@@ -486,6 +491,168 @@ RSpec.describe Lineage::ResultIngestor do
       expect { ingest(answer.merge("extra_commits" => extras)) }.to raise_error(described_class::Error), name
       expect(run.reload.status).to eq("failed"), name
       expect(run.verdicts.count).to eq(0), name
+    end
+  end
+
+  describe "suggested reviewers" do
+    it "stores them as llm rows, dedupes by name, normalizes notes and counts them" do
+      data = answer
+      data["verdicts"][0]["suggested_reviews"] = [
+        suggestion(" Carol King "), suggestion("carol  king", coverage: "earlier"),
+        suggestion("Dan Hill", coverage: "earlier", ids: [ m1.id ], confidence: 0.6, note: "tested message #{m1.id}") ]
+      ingest(data)
+      row = run.reload.verdicts.first
+      expect(row.reviews).to eq([
+        { "reviewer" => "Carol King", "reviewed_message_ids" => [ m2.id ], "coverage" => "final", "note" => "found a bug",
+          "source" => "llm", "reviewer_message_id" => nil, "confidence" => 0.9 },
+        { "reviewer" => "Dan Hill", "reviewed_message_ids" => [ m1.id ], "coverage" => "earlier", "note" => "tested [msg:#{m1.id}]",
+          "source" => "llm", "reviewer_message_id" => nil, "confidence" => 0.6 } ])
+      expect(row).to have_attributes(reviewers_final: 1, reviewers_earlier: 1, reviewers_none: 0)
+      expect(run.error).to be_nil
+    end
+
+    it "ignores them on a commit with trailer reviewers or a rejected verdict, with a note" do
+      index["candidates"][0]["reviewers"] = [ "Alice Smith" ]
+      data = answer
+      data["verdicts"][0]["reviews"] = [ review("Alice Smith") ]
+      data["verdicts"][0]["suggested_reviews"] = [ suggestion("Carol King") ]
+      ingest(data)
+      expect(run.reload.verdicts.first.reviews.map { |r| r["reviewer"] }).to eq([ "Alice Smith" ])
+      expect(run.error).to eq("suggested reviewers ignored for #{commit.sha}: has trailer reviewers")
+
+      index["candidates"][0].delete("reviewers")
+      data = answer(verdict: "not_this_thread")
+      data["verdicts"][0]["suggested_reviews"] = [ suggestion("Carol King") ]
+      ingest(data)
+      expect(run.reload.verdicts.first.reviews).to eq([])
+      expect(run.error).to eq("suggested reviewers ignored for #{commit.sha}: verdict not_this_thread")
+    end
+
+    it "takes them on extras" do
+      found = create(:commit)
+      ex = extra(found.sha).merge("suggested_reviews" => [ suggestion("Someone Else") ])
+      ingest(answer.merge("extra_commits" => [ ex ]))
+      row = run.verdicts.find_by(commit_id: found.id)
+      expect(row.reviews.sole).to include("reviewer" => "Someone Else", "source" => "llm")
+      expect(row.reviewers_final).to eq(1)
+      expect(run.reload.error).to be_nil
+    end
+
+    it "takes suggestions on an extra that also sent reviews" do
+      found = create(:commit)
+      ex = extra(found.sha).merge("reviews" => [ review("Someone Else") ], "suggested_reviews" => [ suggestion("Someone Else") ])
+      ingest(answer.merge("extra_commits" => [ ex ]))
+      row = run.verdicts.find_by(commit_id: found.id)
+      expect(row.reviews.sole).to include("reviewer" => "Someone Else", "source" => "llm")
+      expect(run.reload.error).to eq("reviews ignored for extra #{found.sha}: no trailer reviewers, use suggested_reviews")
+    end
+
+    it "fails on a malformed list even where it would be dropped" do
+      data = answer(verdict: "not_this_thread")
+      data["verdicts"][0]["suggested_reviews"] = [ suggestion("Carol King", coverage: "none") ]
+      expect { ingest(data) }.to raise_error(described_class::Error, /coverage/)
+      expect(run.reload.status).to eq("failed")
+    end
+
+    it "rejects malformed entries" do
+      stranger = create(:message)
+      bad = {
+        "not an array" => "nope",
+        "non-hash entry" => [ 1 ],
+        "blank reviewer" => [ suggestion(" ") ],
+        "coverage none" => [ suggestion("Carol King", coverage: "none") ],
+        "unknown reviewer message" => [ suggestion("Carol King", message: stranger.id) ],
+        "unknown reviewed message" => [ suggestion("Carol King", ids: [ 0 ]) ],
+        "ids not an array" => [ suggestion("Carol King", ids: m2.id) ],
+        "bad confidence" => [ suggestion("Carol King", confidence: 1.5) ]
+      }
+      bad.each do |name, list|
+        run.update!(status: "running", error: nil)
+        data = answer
+        data["verdicts"][0]["suggested_reviews"] = list
+        expect { ingest(data) }.to raise_error(described_class::Error), name
+        expect(run.reload.status).to eq("failed"), name
+        expect(run.verdicts.count).to eq(0), name
+      end
+      run.update!(status: "running", error: nil)
+      found = create(:commit)
+      ex = extra(found.sha).merge("suggested_reviews" => [ suggestion("Carol King", coverage: "none") ])
+      expect { ingest(answer.merge("extra_commits" => [ ex ])) }.to raise_error(described_class::Error, /coverage/)
+    end
+
+    describe "commit_people rows" do
+      def llm_reviewers(c = commit) = CommitPerson.llm.where(commit_id: c.id, role: "reviewer")
+
+      def suggested(*entries, verdict: "as_is", confidence: 0.9)
+        answer(verdict: verdict, confidence: confidence).tap { |d| d["verdicts"][0]["suggested_reviews"] = entries }
+      end
+
+      it "credits the sender of reviewer_message_id with the entry confidence" do
+        reply = create(:message, topic: topic, created_at: 12.hours.ago)
+        ingest(suggested(suggestion("Whoever", message: reply.id, confidence: 0.85)))
+        expect(llm_reviewers.sole).to have_attributes(person_id: reply.sender_person_id, raw_name: reply.sender.name,
+                                                      raw_email: reply.sender.email, confidence: 0.85)
+      end
+
+      it "resolves a bare name among the senders, else keeps the raw name" do
+        carol = create(:alias, name: "Carol King", email: "carol@example.org")
+        create(:message, topic: topic, sender_alias: carol, created_at: 12.hours.ago)
+        ingest(suggested(suggestion(" carol king "), suggestion("Dan Drifter")))
+        rows = llm_reviewers.order(:id).to_a
+        expect(rows.first).to have_attributes(person_id: carol.person_id, raw_name: "Carol King", raw_email: "carol@example.org")
+        expect(rows.last).to have_attributes(person_id: nil, raw_name: "Dan Drifter", raw_email: nil)
+      end
+
+      it "writes nothing below either threshold, on a rejected verdict, or without linking" do
+        ingest(suggested(suggestion("Carol King", confidence: 0.7)))
+        expect(llm_reviewers).to be_empty
+        ingest(suggested(suggestion("Carol King"), confidence: 0.7))
+        expect(llm_reviewers).to be_empty
+        ingest(suggested(suggestion("Carol King"), verdict: "not_this_thread"))
+        expect(llm_reviewers).to be_empty
+        ingest(suggested(suggestion("Carol King")), link: false)
+        expect(llm_reviewers).to be_empty
+      end
+
+      it "skips anyone with a parsed credit on the commit" do
+        reply = create(:message, topic: topic, created_at: 12.hours.ago)
+        create(:commit_person, commit: commit, role: "author", source: "parsed", person: Person.find(reply.sender_person_id), raw_name: "S. Body")
+        create(:commit_person, commit: commit, role: "committer", source: "parsed", person: nil, raw_name: "Dan Hill")
+        create(:commit_person, commit: commit, role: "tested_by", source: "parsed", person: nil, raw_name: "Tess Tester")
+        ingest(suggested(suggestion("Somebody", message: reply.id), suggestion("dan hill"), suggestion("tess tester"), suggestion("Carol King")))
+        expect(llm_reviewers.pluck(:raw_name)).to eq([ "Carol King" ])
+      end
+
+      it "does not credit the llm author as reviewer too" do
+        data = suggested(suggestion("Patch Sender", message: m2.id), verdict: "modified")
+        data["verdicts"][0]["change_level"] = "light"
+        ingest(data)
+        expect(CommitPerson.llm.where(commit_id: commit.id).pluck(:role)).to eq([ "author" ])
+      end
+
+      it "keeps the higher confidence when two names resolve to the same person" do
+        reply = create(:message, topic: topic, created_at: 12.hours.ago)
+        ingest(suggested(suggestion("Carol King", message: reply.id, confidence: 0.85),
+                         suggestion("C. King", message: reply.id, confidence: 0.95)))
+        expect(llm_reviewers.sole).to have_attributes(person_id: reply.sender_person_id, confidence: 0.95)
+      end
+
+      it "replaces its rows on re-ingest and drops rows of commits an earlier run linked" do
+        other = create(:commit)
+        create(:commit_topic, commit: other, topic: topic, source: "llm", confidence: 0.9)
+        create(:commit_person, commit: other, role: "reviewer", source: "llm", confidence: 0.9)
+        ingest(suggested(suggestion("Carol King", confidence: 0.85)))
+        ingest(suggested(suggestion("Carol King", confidence: 0.95)))
+        expect(llm_reviewers.pluck(:confidence)).to eq([ 0.95 ])
+        expect(llm_reviewers(other)).to be_empty
+      end
+
+      it "credits reviewers of extra commits" do
+        found = create(:commit)
+        ex = extra(found.sha).merge("suggested_reviews" => [ suggestion("Someone Else") ])
+        ingest(answer.merge("extra_commits" => [ ex ]))
+        expect(llm_reviewers(found).sole).to have_attributes(raw_name: "Someone Else", confidence: 0.9)
+      end
     end
   end
 end

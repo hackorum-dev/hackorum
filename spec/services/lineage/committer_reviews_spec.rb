@@ -51,5 +51,10 @@ RSpec.describe Lineage::CommitterReviews do
       rows = [ { "coverage" => "final" }, { "coverage" => "final" }, { "coverage" => "none" } ]
       expect(described_class.counts(rows)).to eq(reviewers_final: 2, reviewers_earlier: 0, reviewers_none: 1)
     end
+
+    it "counts llm and trailer rows alike" do
+      rows = [ { "coverage" => "final", "source" => "trailer" }, { "coverage" => "earlier", "source" => "llm" } ]
+      expect(described_class.counts(rows)).to eq(reviewers_final: 1, reviewers_earlier: 1, reviewers_none: 0)
+    end
   end
 end

@@ -15,21 +15,26 @@ RSpec.describe "Thread page patchset lineage", type: :request do
     create(:patchset_lineage, patchset_run: run, topic: topic, message: m2, parent_message: m1, step_kind: "rebase", confidence: 0.85, reason: "same hunks")
     create(:commit_verdict, patchset_run: run, topic: topic, commit: commit, verdict: "modified", source_message: m2, confidence: 0.9,
                             change_level: "moderate", evidence: "hunks from [msg:#{m2.id}] with a renamed helper",
-                            reviewers_final: 1, reviewers_earlier: 1, reviewers_none: 0,
+                            reviewers_final: 2, reviewers_earlier: 1, reviewers_none: 0,
                             reviews: [ { "reviewer" => "Alice", "reviewed_message_ids" => [ m2.id ], "coverage" => "final", "note" => "looked at [msg:#{m2.id}]" },
-                                       { "reviewer" => "Bob", "reviewed_message_ids" => [ m1.id ], "coverage" => "earlier", "note" => nil } ])
+                                       { "reviewer" => "Bob", "reviewed_message_ids" => [ m1.id ], "coverage" => "earlier", "note" => nil, "source" => "trailer" },
+                                       { "reviewer" => "Guessed Reviewer", "reviewed_message_ids" => [ m2.id ], "coverage" => "final", "note" => "tested it",
+                                         "source" => "llm", "reviewer_message_id" => nil, "confidence" => 0.8 } ])
     create(:commit_verdict, patchset_run: run, topic: topic, commit: other_commit, verdict: "not_this_thread", origin: "overlap", confidence: 0.7)
     create(:commit_verdict, patchset_run: run, topic: topic, commit: pending_commit, verdict: "undecided", origin: "trailer", confidence: 0.5)
     create(:commit_topic, topic: topic, commit: commit, source: "llm", confidence: 0.9)
     create(:commit_verdict, patchset_run: run, topic: topic, commit: extra_commit, verdict: "from_discussion", confidence: 0.85, extra: true)
     commit.commit_people.create!(role: "author", raw_name: "Guessed Author", raw_email: "guessed@example.com",
                                  source: "llm", confidence: 0.9)
+    commit.commit_people.create!(role: "reviewer", raw_name: "Guessed Reviewer", raw_email: "reviewer@example.com",
+                                 source: "llm", confidence: 0.8)
   end
 
   it "hides everything without the feature" do
     get topic_path(topic)
     expect(response.body).not_to include("v1 then v2 landed")
     expect(response.body).not_to include("Land the thing")
+    expect(response.body).not_to include("Guessed Reviewer")
     expect(response.body).not_to include("found in git")
     expect(response.body).not_to include("Guessed Author")
     expect(response.body).not_to include("commit-credit-llm")
@@ -53,8 +58,13 @@ RSpec.describe "Thread page patchset lineage", type: :request do
     expect(response.body).not_to include("Unrelated overlap")
     expect(response.body).to include('class="lineage-change"')
     expect(response.body).to include(">moderate</span>")
-    expect(response.body).to include("reviews: 1 of 2 reviewed the final version")
+    expect(response.body).to include("reviews: 2 of 3 reviewed the final version")
     expect(response.body).to include("Alice")
+    expect(response.body).to include('<span class="lineage-review-llm" title="Found by the patchset lineage model, not a Reviewed-by trailer">LLM</span>')
+    expect(response.body).to include('<span class="lineage-review-confidence">80%</span>')
+    expect(response.body).to include('<span class="lineage-reviewer">Guessed Reviewer</span>')
+    expect(response.body).to include('Guessed Reviewer<span class="commit-credit-llm"')
+    expect(response.body.scan('class="lineage-review-llm"').size).to eq(1)
     expect(response.body).to include(%(hunks from <a href="#message-#{m2.id}">#2</a> with a renamed helper))
     expect(response.body).to include(%(looked at <a href="#message-#{m2.id}">#2</a>))
     expect(response.body).to include("Guessed Author")
