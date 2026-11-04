@@ -18,6 +18,9 @@ RSpec.describe Lineage::BundleWriter do
     commit = create(:commit)
     backport = create(:commit, cherry_picked_from_sha: commit.sha, branches: [ "REL_17_STABLE" ])
     create(:commit_person, commit: commit, role: "reviewer", raw_name: "Rev One", source: "parsed")
+    boss = create(:person)
+    create(:commit_person, commit: commit, role: "committer", raw_name: "Boss", person: boss, source: "parsed")
+    create(:commit_person, commit: backport, role: "reviewer", raw_name: "The Boss", person: boss, source: "parsed")
     create(:patch_branch, topic: topic, message: m1, status: "applied", base_sha: "c" * 40)
     linked = create(:commit)
     create(:commit_topic, topic: topic, commit: linked, source: "llm", confidence: 0.9)
@@ -30,8 +33,9 @@ RSpec.describe Lineage::BundleWriter do
       expect(index["through_message_id"]).to eq(m2.id)
       expect(index["patchsets"]).to eq([ { "message_id" => m1.id }, { "message_id" => m2.id } ])
       expect(index["candidates"]).to eq([
-        { "sha" => commit.sha, "origin" => "trailer", "backports" => [ backport.sha ], "reviewers" => [ "Rev One" ] },
-        { "sha" => linked.sha, "origin" => "previous", "backports" => [], "reviewers" => [] } ])
+        { "sha" => commit.sha, "origin" => "trailer", "backports" => [ backport.sha ], "reviewers" => [ "Rev One", "The Boss" ],
+          "committer_reviewers" => [ "The Boss" ] },
+        { "sha" => linked.sha, "origin" => "previous", "backports" => [], "reviewers" => [], "committer_reviewers" => [] } ])
 
       disk = JSON.parse(File.read(File.join(dir, "index.json")))
       expect(disk["patchsets"].first["branch"]).to include("status" => "applied", "base_sha" => "c" * 40)

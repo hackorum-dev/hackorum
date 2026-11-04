@@ -142,8 +142,11 @@ at, never the id of their own reply; `[]` when coverage is `none`), and
 When the verdict has no source patchset (`from_discussion`, `not_this_thread`,
 `undecided`), judge coverage against the last patchset of the thread.
 A Reviewed-by trailer in PostgreSQL means the person spent time on the patch,
-not that they approved it. The `reviewer` field must be copied exactly from the
-`reviewers` list. `note` is one sentence on what they did. Candidates with no
+not that they approved it. A reviewer who is also the candidate's `committer`
+is always `final`: committing the patch means reviewing the committed version,
+whether or not the thread shows it. Still list the patchsets they reviewed and
+say in `note` what they did in the thread, if anything. The `reviewer` field
+must be copied exactly from the `reviewers` list. `note` is one sentence on what they did. Candidates with no
 reviewers: `reviews` is `[]`.
 
 <!-- /trailer full -->

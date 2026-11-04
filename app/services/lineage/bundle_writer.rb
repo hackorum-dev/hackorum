@@ -21,7 +21,8 @@ module Lineage
         "patchsets" => patchsets.map { |p| { "message_id" => p.message.id } },
         "candidates" => entries.map { |c|
           { "sha" => c[:commit].sha, "origin" => c[:origin],
-            "backports" => c[:backports].map(&:sha), "reviewers" => c[:reviewers] }
+            "backports" => c[:backports].map(&:sha), "reviewers" => c[:reviewers],
+            "committer_reviewers" => c[:committer_reviewers] }
         } }
     end
 
@@ -61,12 +62,13 @@ module Lineage
 
     def with_reviewers(candidates)
       ids = candidates.flat_map { |c| [ c[:commit], *c[:backports] ].map(&:id) }
-      names = CommitPerson.parsed.where(commit_id: ids, role: "reviewer").includes(person: :default_alias)
-                          .group_by(&:commit_id)
-                          .transform_values { |rows| rows.map { |r| r.raw_name.presence || r.person&.default_alias&.name } }
+      people = CommitPerson.parsed.where(commit_id: ids, role: [ "reviewer", CommitPerson::COMMITTER ])
+                           .includes(person: :default_alias).group_by(&:commit_id)
       candidates.map do |c|
-        reviewers = [ c[:commit], *c[:backports] ].flat_map { |commit| names[commit.id] || [] }.compact.uniq
-        c.merge(reviewers: reviewers)
+        commits = [ c[:commit], *c[:backports] ]
+        rows = commits.flat_map { |commit| people[commit.id] || [] }
+        reviewers = rows.select { |r| r.role == "reviewer" }.map { |r| CommitterReviews.name(r) }.compact.uniq
+        c.merge(reviewers: reviewers, committer_reviewers: CommitterReviews.names(commits, rows))
       end
     end
   end

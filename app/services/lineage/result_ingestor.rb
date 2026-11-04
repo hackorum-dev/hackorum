@@ -167,20 +167,18 @@ module Lineage
     def verdict_rows(list, known, extra:)
       list.map do |v|
         rows = extra ? reviews(v).map { |r| review_row(r, r["reviewer"]) } : candidate_reviews(v)
-        counts = rows.group_by { |r| r["coverage"] }.transform_values(&:size)
         { patchset_run_id: @run.id, topic_id: @run.topic_id, commit_id: known[v["sha"]].id,
           verdict: v["verdict"], source_message_id: v["source_message_id"], extra: extra,
           author_name: v["author_name"]&.strip, author_message_id: v["author_message_id"],
           origin: extra ? "extra" : (candidates[v["sha"]]["origin"] || "trailer"),
-          change_level: v["change_level"], reviews: rows,
-          reviewers_final: counts.fetch("final", 0), reviewers_earlier: counts.fetch("earlier", 0),
-          reviewers_none: counts.fetch("none", 0),
+          change_level: v["change_level"], reviews: rows, **CommitterReviews.counts(rows),
           confidence: v["confidence"].to_f, evidence: normalize(v["evidence"]) }
       end
     end
 
     def candidate_reviews(v)
-      names = (candidates[v["sha"]]["reviewers"] || []).index_by { |n| n.strip.downcase }
+      candidate = candidates[v["sha"]]
+      names = (candidate["reviewers"] || []).index_by { |n| n.strip.downcase }
       kept = {}
       reviews(v).each do |r|
         name = names[r["reviewer"].strip.downcase]
@@ -190,7 +188,8 @@ module Lineage
           kept[name] ||= review_row(r, name)
         end
       end
-      names.values.map { |name| kept[name] || NOT_ASSESSED.merge("reviewer" => name) }
+      rows = names.values.map { |name| kept[name] || NOT_ASSESSED.merge("reviewer" => name) }
+      CommitterReviews.apply(rows, candidate["committer_reviewers"] || [], v["source_message_id"])
     end
 
     def review_row(r, name)

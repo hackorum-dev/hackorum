@@ -372,6 +372,20 @@ RSpec.describe Lineage::ResultIngestor do
     expect(run.error).to eq("reviewer not in trailers: Carol King for #{commit.sha}")
   end
 
+  it "counts a committer credited as reviewer as final whatever the model said" do
+    index["candidates"][0].merge!("reviewers" => [ "Alice Smith", "Bob Jones" ], "committer_reviewers" => [ "Alice Smith" ])
+    data = answer
+    data["verdicts"][0]["reviews"] = [ review("Alice Smith", coverage: "none", ids: [], note: "silent in the thread"),
+                                       review("Bob Jones", coverage: "earlier", ids: [ m1.id ]) ]
+    ingest(data)
+    row = run.reload.verdicts.first
+    expect(row.reviews).to eq([
+      { "reviewer" => "Alice Smith", "reviewed_message_ids" => [ m2.id ], "coverage" => "final", "note" => "committed the patch; silent in the thread" },
+      { "reviewer" => "Bob Jones", "reviewed_message_ids" => [ m1.id ], "coverage" => "earlier", "note" => "looked at it" }
+    ])
+    expect(row).to have_attributes(reviewers_final: 1, reviewers_earlier: 1, reviewers_none: 0)
+  end
+
   it "accepts any reviewer name on extras" do
     found = create(:commit)
     ex = extra(found.sha).merge("reviews" => [ review("Someone Else") ])

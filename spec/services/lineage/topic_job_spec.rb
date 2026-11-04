@@ -157,7 +157,8 @@ RSpec.describe Lineage::TopicJob do
                                              { commit: backport, origin: "previous", overlap: nil } ]).call
       expect(seen["patchsets"]).to eq([ { "message_id" => m1.id }, { "message_id" => m2.id } ])
       expect(seen["candidates"]).to eq([ { "sha" => canonical.sha, "origin" => "trailer",
-                                           "backports" => [ backport.sha ], "reviewers" => [ "Alice" ] } ])
+                                           "backports" => [ backport.sha ], "reviewers" => [ "Alice" ],
+                                           "committer_reviewers" => [] } ])
     end
   end
 
