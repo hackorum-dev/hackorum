@@ -96,6 +96,7 @@ module ApplicationHelper
 
   def display_name_for_user(user)
     return "Unknown" unless user
+    return "Deleted user" if user.deleted_at
     user.primary_alias&.name || user.username || "User ##{user.id}"
   end
 

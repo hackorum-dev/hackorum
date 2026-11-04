@@ -14,6 +14,13 @@ RSpec.describe "Help", type: :request do
   end
 
   describe "GET /help/:slug" do
+    it "renders the privacy policy with the anchors other pages link to" do
+      get help_path("privacy")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include('id="deleting-your-account"', 'id="recipients"', 'href="#recipients"')
+    end
+
     context "with valid slug" do
       it "returns the help page" do
         get help_path("search")

@@ -5,7 +5,8 @@ class HelpController < ApplicationController
 
   PAGES = {
     "search" => "Advanced Search Guide",
-    "account-linking" => "Account Linking & Multiple Emails"
+    "account-linking" => "Account Linking & Multiple Emails",
+    "privacy" => "Privacy Policy"
   }.freeze
 
   def index

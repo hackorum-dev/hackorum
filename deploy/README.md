@@ -233,12 +233,14 @@ can send. In the Google Cloud Console for the OAuth client referenced by
   default for new users.
 
 ## Backups (monthly SQL dumps)
-The database dumps are split into public and private data, written to a Docker volume mounted at `/dumps` inside the Postgres container. Each month overwrites the same two files:
-- `public/public-YYYY-MM.sql.gz` (full schema + data, excluding private tables)
-- `public/private-schema-YYYY-MM.sql.gz` (schema-only for private tables)
-- `private/private-YYYY-MM.sql.gz` (data-only for private tables)
+The database dumps are split into public and private data, written to a Docker volume mounted at `/dumps` inside the Postgres container:
+- `public/schema-YYYY-MM.sql.gz` (full schema, no data)
+- `public/public-data-YYYY-MM.sql.gz` (data, excluding private tables)
+- `private/private-data-YYYY-MM.sql.gz` (data for private tables only)
 
 The table list lives in `deploy/backup/private_tables.txt` and is used for both dumps.
+`aliases` is split by row: the public dump only gets addresses seen in the archive, without the account link, the private dump adds the rest.
+Dumps older than `RETENTION_DAYS` (default 365, as promised in the privacy policy) are deleted on each run.
 If you enable the `dumps.hackorum.dev` site in Caddy, only `/dumps/public` is mounted read-only in the Caddy container, so private dumps remain inaccessible.
 
 Run (from `deploy/`):

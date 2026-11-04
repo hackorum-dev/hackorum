@@ -1,6 +1,10 @@
 .settings-page
   h1 Delete account
-  p This will detach all your emails and delete your login methods. Archive data remains.
+  p This will delete your login methods, private notes, saved searches, read state and other account data, and detach your emails from the account. Global notes stay, shown as written by "Deleted user". Public archive data (mailing list messages, commits) remains.
+  p
+    | See
+    =< link_to "the privacy policy", help_path('privacy', anchor: 'deleting-your-account')
+    |  for the details.
   p This action is permanent.
 
   = form_with url: settings_deletion_path, method: :post, data: { turbo: false } do

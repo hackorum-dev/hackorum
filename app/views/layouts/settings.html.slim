@@ -25,6 +25,9 @@
         i.fas.fa-paper-plane
         span My emails
       .settings-nav-divider
+      = link_to help_path('privacy'), class: "settings-nav-link" do
+        i.fas.fa-user-shield
+        span Privacy Policy
       = link_to settings_deletion_path, class: settings_nav_link_class(:deletion, danger: true) do
         i.fas.fa-exclamation-triangle
         span Delete Account
