@@ -24,6 +24,17 @@
     .message-body
       = render_message_body(@draft.body)
 
+    - attachments = @draft.draft_attachments.listing.to_a
+    - if attachments.any?
+      ul.sent-attachments
+        - attachments.each do |a|
+          li
+            i.fa-solid.fa-paperclip
+            '
+            = a.file_name
+            '
+            span.muted = number_to_human_size(a.byte_size)
+
     .sent-footer
       - if @draft.sent_message
         = link_to "View in topic",

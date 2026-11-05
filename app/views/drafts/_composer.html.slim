@@ -20,6 +20,7 @@
       .composer-field
         = f.label :body, "Message"
         = f.text_area :body, data: { reply_composer_target: "body" }, rows: 14, placeholder: "Type your reply…"
+    = render "drafts/attachments", draft: draft
     - if draft.last_send_error.present?
       .composer-error-banner
         i.fa-solid.fa-triangle-exclamation

@@ -65,4 +65,14 @@ RSpec.describe AccountDeletionService do
     expect(Identity.where(user_id: user.id)).to be_empty
     expect(Net::HTTP).to have_received(:post_form).with(URI("https://oauth2.googleapis.com/revoke"), token: "r-tok")
   end
+
+  it "deletes drafts and their attachments" do
+    draft = create(:outgoing_draft, user: user)
+    create(:draft_attachment, outgoing_draft: draft)
+
+    call
+
+    expect(OutgoingDraft.where(user_id: user.id)).to be_empty
+    expect(DraftAttachment.where(outgoing_draft_id: draft.id)).to be_empty
+  end
 end

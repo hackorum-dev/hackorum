@@ -365,6 +365,67 @@ RSpec.describe EmailIngestor do
       }.to change { Message.count }.by(1)
       expect(pending.reload.state).to eq(Message::STATE_PENDING)
     end
+
+    context "with a short body and attachments" do
+      let(:pending_body) { "v3 attached." }
+      let(:echo_file_name) { "v3-0001-fix.patch" }
+      let(:raw_echo) {
+        <<~EML
+          From: Sender <sender@example.com>
+          To: pgsql-test@example.com
+          Subject: [PGSQL] Re: Topic
+          Message-ID: <#{gmail_echo_id}>
+          In-Reply-To: <#{parent_id}>
+          References: <#{parent_id}>
+          Date: #{Time.current.rfc2822}
+          MIME-Version: 1.0
+          Content-Type: multipart/mixed; boundary="b"
+
+          --b
+          Content-Type: text/plain; charset=UTF-8
+
+          #{pending_body}
+
+          --b
+          Content-Type: text/x-patch; charset=US-ASCII
+          Content-Disposition: attachment; filename="#{echo_file_name}"
+
+          diff --git a/x b/x
+          --b--
+        EML
+      }
+
+      before { create(:attachment, message: pending, file_name: "v3-0001-fix.patch") }
+
+      it "matches on attachment names" do
+        expect {
+          described_class.new.ingest_raw(raw_echo, mailing_list: list)
+        }.not_to change { [ Message.count, Attachment.count ] }
+        expect(pending.reload.message_id).to eq(gmail_echo_id)
+      end
+
+      context "when the pending body is empty" do
+        let(:pending_body) { "" }
+
+        it "matches on attachment names" do
+          expect {
+            described_class.new.ingest_raw(raw_echo, mailing_list: list)
+          }.not_to change { Message.count }
+          expect(pending.reload.message_id).to eq(gmail_echo_id)
+        end
+      end
+
+      context "when attachment names differ" do
+        let(:echo_file_name) { "v4-0001-fix.patch" }
+
+        it "does not match" do
+          expect {
+            described_class.new.ingest_raw(raw_echo, mailing_list: list)
+          }.to change { Message.count }.by(1)
+          expect(pending.reload.state).to eq(Message::STATE_PENDING)
+        end
+      end
+    end
   end
 
   describe "#fallback_thread_lookup scoped to list" do

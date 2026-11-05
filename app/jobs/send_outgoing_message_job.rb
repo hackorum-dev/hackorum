@@ -39,6 +39,9 @@ class SendOutgoingMessageJob < ApplicationJob
         sent_via_identity_id: draft.identity_id,
         sent_to_address:      rfc.recipient
       )
+      draft.draft_attachments.order(:id).each do |a|
+        msg.attachments.create!(file_name: a.file_name, content_type: a.content_type, body: a.body)
+      end
       draft.update_columns(
         status:             OutgoingDraft::STATUS_SENT,
         sent_message_id:    msg.id,

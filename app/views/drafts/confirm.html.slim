@@ -16,6 +16,14 @@
       .confirm-row
         strong Subject
         .confirm-value = @draft.subject
+      - attachments = @draft.draft_attachments.listing.to_a
+      - if attachments.any?
+        .confirm-row
+          strong Attachments
+          .confirm-value
+            = attachments.map(&:file_name).join(", ")
+            '
+            span.muted = "(#{number_to_human_size(attachments.sum(&:byte_size))})"
 
       - unless Rails.env.production?
         .dev-warning

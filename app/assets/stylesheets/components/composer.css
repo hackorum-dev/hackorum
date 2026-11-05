@@ -162,3 +162,81 @@
   0%, 100% { transform: translateX(0); opacity: 0.7; }
   50%      { transform: translateX(3px); opacity: 1; }
 }
+
+.composer-attachments {
+  margin: 0 0 var(--spacing-4);
+  font-size: var(--font-size-sm);
+}
+
+.composer-attachment-list {
+  list-style: none;
+  margin: 0 0 var(--spacing-2);
+  padding: 0;
+}
+
+.composer-attachment {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-1) 0;
+}
+
+.composer-attachment-name {
+  overflow-wrap: anywhere;
+}
+
+.composer-attachment-size,
+.composer-attachments-total {
+  color: var(--color-text-muted);
+}
+
+.composer-attachment form {
+  margin: 0;
+}
+
+.composer-attachment-remove {
+  background: none;
+  border: 0;
+  padding: 0 var(--spacing-1);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.composer-attachment-remove:hover {
+  color: var(--color-danger);
+}
+
+.composer-attachments-error {
+  margin: 0 0 var(--spacing-2);
+  color: var(--color-danger);
+}
+
+.composer-attachments-error:empty {
+  display: none;
+}
+
+.composer-attachments-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+}
+
+.composer-attach-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  cursor: pointer;
+  color: var(--color-primary-500);
+}
+
+.composer-attach-button input[hidden] {
+  display: none;
+}
+
+.sent-attachments {
+  list-style: none;
+  padding: 0;
+  margin: var(--spacing-4) 0;
+}

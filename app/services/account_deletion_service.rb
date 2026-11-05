@@ -31,6 +31,7 @@ class AccountDeletionService
   attr_reader :user
 
   def delete_account_data
+    OutgoingDraft.where(user_id: user.id).delete_all
     Identity.where(user_id: user.id).delete_all
     TeamMember.where(user_id: user.id).delete_all
     UserToken.where(user_id: user.id).delete_all
@@ -40,7 +41,6 @@ class AccountDeletionService
     MessageReadRange.where(user_id: user.id).delete_all
     ThreadAwareness.where(user_id: user.id).delete_all
     Activity.where(user_id: user.id).delete_all
-    OutgoingDraft.where(user_id: user.id).delete_all
     SavedSearchPreference.where(user_id: user.id).delete_all
     SavedSearch.where(user_id: user.id).destroy_all
     NoteMention.where(mentionable_type: "User", mentionable_id: user.id).delete_all

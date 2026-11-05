@@ -28,7 +28,8 @@ class EmailIngestor
       reply_to_message_id: reply_to_message_id,
       from_addresses: extract_from_emails(m),
       echo_body: body,
-      echo_sent_at: sent_at
+      echo_sent_at: sent_at,
+      echo_file_names: stored_attachments(m).map { |a| a.filename&.delete("\0") }
     )
     if pending_echo
       pending_echo.update_columns(message_id: message_id) if pending_echo.message_id != message_id
@@ -188,13 +189,17 @@ class EmailIngestor
     end
   end
 
-  def handle_attachments(m, msg)
-    m.attachments.each do |a|
-      next if a[:content_type].nil?
-      next if a[:content_type].decoded.match(/^application\/pgp-signature;/)
-      next if a[:content_type].decoded.match(/^application\/x-pkcs7-signature/)
-      next if a[:content_type].decoded.match(/^text\/x-vcard/)
+  def stored_attachments(m)
+    m.attachments.reject do |a|
+      a[:content_type].nil? ||
+        a[:content_type].decoded.match?(/^application\/pgp-signature;/) ||
+        a[:content_type].decoded.match?(/^application\/x-pkcs7-signature/) ||
+        a[:content_type].decoded.match?(/^text\/x-vcard/)
+    end
+  end
 
+  def handle_attachments(m, msg)
+    stored_attachments(m).each do |a|
       Attachment.create!(
         message: msg,
         file_name: a.filename&.delete("\0"),
@@ -321,7 +326,7 @@ class EmailIngestor
   PENDING_ECHO_WINDOW = 24.hours
   PENDING_ECHO_MIN_BODY = 20
 
-  def find_pending_echo(reply_to_message_id:, from_addresses:, echo_body:, echo_sent_at:)
+  def find_pending_echo(reply_to_message_id:, from_addresses:, echo_body:, echo_sent_at:, echo_file_names: [])
     return nil if from_addresses.empty?
 
     scope = Message.pending
@@ -338,12 +343,20 @@ class EmailIngestor
     return nil if candidates.empty?
 
     echo_normalized = normalize_for_body_match(echo_body)
-    return nil if echo_normalized.blank?
+    echo_names = echo_file_names.compact.sort
+    pending_names = Attachment.where(message_id: candidates.map(&:id)).pluck(:message_id, :file_name)
+                              .group_by(&:first).transform_values { |rows| rows.map(&:last).compact.sort }
 
     matches = candidates.select do |c|
       pending_normalized = normalize_for_body_match(c.body)
-      next false if pending_normalized.length < PENDING_ECHO_MIN_BODY
-      echo_normalized.include?(pending_normalized)
+      if pending_normalized.length >= PENDING_ECHO_MIN_BODY
+        echo_normalized.include?(pending_normalized)
+      elsif pending_names.key?(c.id)
+        echo_names.any? && pending_names[c.id] == echo_names &&
+          (pending_normalized.empty? || echo_normalized.include?(pending_normalized))
+      else
+        false
+      end
     end
 
     matches.size == 1 ? matches.first : nil

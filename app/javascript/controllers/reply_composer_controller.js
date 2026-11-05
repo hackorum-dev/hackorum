@@ -56,8 +56,11 @@ export default class extends Controller {
   }
 
   disableForm() {
-    this.formTarget.querySelectorAll("input, textarea, button").forEach(el => {
-      el.disabled = true
+    const scopes = [this.formTarget, ...this.element.querySelectorAll(".composer-attachments")]
+    scopes.forEach(scope => {
+      scope.querySelectorAll("input, textarea, button").forEach(el => {
+        el.disabled = true
+      })
     })
   }
 

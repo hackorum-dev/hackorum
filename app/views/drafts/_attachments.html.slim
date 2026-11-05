@@ -1,0 +1,23 @@
+- error = local_assigns[:error]
+- attachments = draft.draft_attachments.listing.to_a
+- total = attachments.sum(&:byte_size)
+.composer-attachments id="draft-attachments-#{draft.id}" data-controller="draft-attachments" data-draft-attachments-url-value=draft_attachments_path(draft) data-draft-attachments-remaining-value=(OutgoingDraft::MAX_ATTACHMENT_BYTES - total)
+  - if attachments.any?
+    ul.composer-attachment-list
+      - attachments.each do |a|
+        li.composer-attachment
+          i.fa-solid.fa-paperclip
+          span.composer-attachment-name = a.file_name
+          span.composer-attachment-size = number_to_human_size(a.byte_size)
+          = button_to draft_attachment_path(draft, a), method: :delete,
+                      class: "composer-attachment-remove",
+                      title: "Remove #{a.file_name}",
+                      aria: { label: "Remove #{a.file_name}" } do
+            i.fa-solid.fa-xmark
+  p.composer-attachments-error data-draft-attachments-target="error" = error
+  .composer-attachments-bar
+    label.composer-attach-button
+      i.fa-solid.fa-paperclip
+      |  Attach files
+      input type="file" multiple=true hidden=true data-draft-attachments-target="input" data-action="change->draft-attachments#upload"
+    span.composer-attachments-total = "#{number_to_human_size(total)} of #{attachment_mb(OutgoingDraft::MAX_ATTACHMENT_BYTES)}"

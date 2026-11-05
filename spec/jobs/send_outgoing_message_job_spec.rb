@@ -28,6 +28,31 @@ RSpec.describe SendOutgoingMessageJob do
     allow(Outgoing::MessageBuilder).to receive(:build).with(draft).and_return(builder_result)
   end
 
+  it 'copies draft attachments onto the pending message' do
+    create(:draft_attachment, outgoing_draft: draft, file_name: 'fix.patch',
+           content_type: 'text/x-diff', content: "diff --git a/x b/x\n+ok\n")
+    allow(Gmail::SendClient).to receive(:send_raw).and_return({ "id" => "g" })
+
+    described_class.new.perform(draft.id)
+
+    msg = Message.find_by!(message_id: '<m@x>')
+    expect(msg.attachments.map { |a| [ a.file_name, a.content_type, a.decoded_body ] })
+      .to eq([ [ 'fix.patch', 'text/x-diff', "diff --git a/x b/x\n+ok\n" ] ])
+    expect(topic.reload.has_attachments).to be true
+    expect(draft.reload.draft_attachments.count).to eq(1)
+  end
+
+  it 'keeps draft attachments when the send fails permanently' do
+    create(:draft_attachment, outgoing_draft: draft)
+    allow(Gmail::SendClient).to receive(:send_raw).and_raise(Gmail::PermanentError, 'bad request')
+
+    expect { described_class.new.perform(draft.id) }.not_to change(Attachment, :count)
+
+    draft.reload
+    expect(draft).to be_idle
+    expect(draft.draft_attachments.count).to eq(1)
+  end
+
   it 'creates a pending message and marks the draft sent on success' do
     allow(Gmail::SendClient).to receive(:send_raw).and_return({ "id" => "g" })
 

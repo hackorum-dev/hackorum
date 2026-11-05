@@ -182,6 +182,40 @@ RSpec.describe DraftsController, type: :request do
       expect(response.body).to include('Send to 3 recipients')
       expect(response.body).to include('Bob &lt;bob@x&gt;')
     end
+
+    it 'lists attachments with the total' do
+      create(:draft_attachment, outgoing_draft: draft, file_name: 'fix.patch', content: 'abc')
+      with_env('HACKORUM_DEV_REPLY_TO' => 'test@example.com') do
+        get confirm_draft_path(draft)
+        expect(response.body).to include('<strong>Attachments</strong>')
+        expect(response.body).to include('fix.patch')
+      end
+    end
+
+    it 'has no attachments row without attachments' do
+      with_env('HACKORUM_DEV_REPLY_TO' => 'test@example.com') do
+        get confirm_draft_path(draft)
+        expect(response.body).not_to include('<strong>Attachments</strong>')
+      end
+    end
+  end
+
+  describe 'GET /drafts/:id/edit' do
+    let(:draft) {
+      create(:outgoing_draft, user: user, topic: topic,
+             reply_to_message: parent, identity: identity, sender_alias: sender)
+    }
+
+    it 'renders the attachments block outside the autosave form' do
+      create(:draft_attachment, outgoing_draft: draft, file_name: 'fix.patch', content: 'abc')
+      get edit_draft_path(draft)
+      expect(response).to be_successful
+      html = Nokogiri::HTML(response.body)
+      block = html.at_css("#draft-attachments-#{draft.id}")
+      expect(block).to be_present
+      expect(block.ancestors('form')).to be_empty
+      expect(block.text).to include('fix.patch', 'Attach files', 'of 2 MB')
+    end
   end
 
   describe 'POST /drafts/:id/send_now' do
@@ -258,6 +292,16 @@ RSpec.describe DraftsController, type: :request do
       other = create(:outgoing_draft, status: 'sent', sent_at: 1.minute.ago)
       get draft_path(other)
       expect(response).to have_http_status(:not_found)
+    end
+
+    it 'lists attachments of a sent draft without links' do
+      create(:draft_attachment, outgoing_draft: sent_draft, file_name: 'fix.patch', content: 'abc')
+      get draft_path(sent_draft)
+      html = Nokogiri::HTML(response.body)
+      item = html.css('.sent-attachments li').find { |li| li.text.include?('fix.patch') }
+      expect(item).to be_present
+      expect(item.text).to include('3 Bytes')
+      expect(item.css('a')).to be_empty
     end
   end
 

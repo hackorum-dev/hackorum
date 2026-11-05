@@ -134,4 +134,44 @@ RSpec.describe Outgoing::MessageBuilder do
       expect(mail.content_type).to include('charset=UTF-8') | include('charset=utf-8')
     end
   end
+
+  it 'stays single-part without attachments' do
+    mail = Mail.new(described_class.build(build_draft).encoded)
+    expect(mail.multipart?).to be false
+    expect(mail.attachments).to be_empty
+  end
+
+  context 'with attachments' do
+    let(:patch_bytes) { "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-old\n+new\n" }
+    let(:blob_bytes)  { (0..255).map(&:chr).join.b }
+
+    def built_mail
+      draft = build_draft
+      create(:draft_attachment, outgoing_draft: draft, file_name: 'fix.patch',
+             content_type: 'text/x-diff', content: patch_bytes)
+      create(:draft_attachment, outgoing_draft: draft, file_name: 'blob.bin',
+             content_type: nil, content: blob_bytes)
+      Mail.new(described_class.build(draft).encoded)
+    end
+
+    it 'is multipart/mixed with the text part first' do
+      mail = built_mail
+      expect(mail.mime_type).to eq('multipart/mixed')
+      text = mail.parts.first
+      expect(text.mime_type).to eq('text/plain')
+      expect(text.content_type_parameters['charset']).to match(/\Autf-8\z/i)
+      expect(text.decoded.strip).to eq('hi')
+    end
+
+    it 'carries name, type and exact bytes of each file' do
+      mail = built_mail
+      expect(mail.attachments.map(&:filename)).to eq(%w[fix.patch blob.bin])
+
+      patch, blob = mail.attachments
+      expect(patch.mime_type).to eq('text/x-diff')
+      expect(patch.decoded).to eq(patch_bytes)
+      expect(blob.mime_type).to eq('application/octet-stream')
+      expect(blob.decoded.b).to eq(blob_bytes)
+    end
+  end
 end

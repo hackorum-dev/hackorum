@@ -24,10 +24,24 @@ module Outgoing
         to         recipients.to
         subject    draft.subject
         message_id msg_id
-        body       draft.body
       end
       mail.cc = recipients.cc if recipients.cc.any?
-      mail.content_type "text/plain; charset=UTF-8"
+
+      attachments = draft.draft_attachments.order(:id).to_a
+      if attachments.empty?
+        mail.body draft.body
+        mail.content_type "text/plain; charset=UTF-8"
+      else
+        text = Mail::Part.new
+        text.content_type "text/plain; charset=UTF-8"
+        text.body draft.body
+        mail.add_part text
+        attachments.each do |a|
+          mail.add_file(filename: a.file_name, content: a.decoded_body,
+                        mime_type: a.content_type.presence || "application/octet-stream")
+        end
+      end
+
       mail.in_reply_to = draft.reply_to_message.message_id.to_s.gsub(/[<>]/, "")
       mail.references  = build_references(draft.reply_to_message)
 

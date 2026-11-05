@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_11_04_170000) do
+ActiveRecord::Schema[8.0].define(version: 2026_11_05_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -251,6 +251,17 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_04_170000) do
     t.index ["contributor_type"], name: "index_contributor_memberships_on_contributor_type"
     t.index ["person_id", "contributor_type"], name: "index_contributor_memberships_unique", unique: true
     t.index ["person_id"], name: "index_contributor_memberships_on_person_id"
+  end
+
+  create_table "draft_attachments", force: :cascade do |t|
+    t.bigint "outgoing_draft_id", null: false
+    t.string "file_name", null: false
+    t.string "content_type"
+    t.text "body", null: false
+    t.integer "byte_size", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["outgoing_draft_id"], name: "index_draft_attachments_on_outgoing_draft_id"
   end
 
   create_table "global_tags", force: :cascade do |t|
@@ -1066,6 +1077,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_04_170000) do
   add_foreign_key "commitfest_patch_topics", "commitfest_patches"
   add_foreign_key "commitfest_patch_topics", "topics"
   add_foreign_key "contributor_memberships", "people"
+  add_foreign_key "draft_attachments", "outgoing_drafts", on_delete: :cascade
   add_foreign_key "global_tags", "users", column: "created_by_id"
   add_foreign_key "identities", "users"
   add_foreign_key "mentions", "aliases"

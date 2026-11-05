@@ -4,6 +4,7 @@ class OutgoingDraft < ApplicationRecord
   STATUS_SENT    = "sent"
 
   STATUSES = [ STATUS_IDLE, STATUS_SENDING, STATUS_SENT ].freeze
+  MAX_ATTACHMENT_BYTES = 2.megabytes
 
   belongs_to :user
   belongs_to :topic
@@ -11,6 +12,7 @@ class OutgoingDraft < ApplicationRecord
   belongs_to :sender_alias, class_name: "Alias"
   belongs_to :identity
   belongs_to :sent_message, class_name: "Message", optional: true
+  has_many :draft_attachments, dependent: :delete_all
 
   validates :subject, presence: true
   validates :status, inclusion: { in: STATUSES }
@@ -33,6 +35,8 @@ class OutgoingDraft < ApplicationRecord
   def sending? = status == STATUS_SENDING
   def sent?    = status == STATUS_SENT
   def active?  = idle? || sending?
+
+  def attachment_bytes = draft_attachments.sum(:byte_size)
 
   def failed? = idle? && last_send_error.present?
 
