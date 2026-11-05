@@ -27,8 +27,10 @@
               span.role-badge Enabled
             - elsif @user.admin?
               span.role-badge Inherited (admin)
-            - else
+            - elsif @team_sources[name.to_s].blank?
               | —
+            - @team_sources.fetch(name.to_s, []).each do |team|
+              span.role-badge = "via #{team}"
           td
             - if @enrolled.include?(name.to_s)
               = button_to "Disable", admin_user_feature_path(@user, name), method: :delete, class: "button-secondary button-small"

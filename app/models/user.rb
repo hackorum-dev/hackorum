@@ -61,7 +61,12 @@ class User < ApplicationRecord
   end
 
   def has_feature?(name)
-    admin? || user_features.exists?(feature: name.to_s)
+    name = name.to_s
+    admin? ||
+      user_features.exists?(feature: name) ||
+      TeamFeature.joins(team: :team_members)
+                 .where(feature: name, team_members: { user_id: id })
+                 .exists?
   end
 
   def mentionable_by?(mentioner)

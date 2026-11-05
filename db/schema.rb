@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_11_05_120000) do
+ActiveRecord::Schema[8.0].define(version: 2026_11_05_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -890,6 +890,14 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_05_120000) do
     t.index ["interval_start"], name: "index_stats_weekly_on_interval_start", unique: true
   end
 
+  create_table "team_features", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.string "feature", null: false
+    t.datetime "created_at", null: false
+    t.index ["team_id", "feature"], name: "index_team_features_on_team_id_and_feature", unique: true
+    t.index ["team_id"], name: "index_team_features_on_team_id"
+  end
+
   create_table "team_members", force: :cascade do |t|
     t.bigint "team_id", null: false
     t.bigint "user_id", null: false
@@ -1128,6 +1136,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_05_120000) do
   add_foreign_key "saved_search_preferences", "users"
   add_foreign_key "saved_searches", "teams"
   add_foreign_key "saved_searches", "users"
+  add_foreign_key "team_features", "teams", on_delete: :cascade
   add_foreign_key "team_members", "teams"
   add_foreign_key "team_members", "users"
   add_foreign_key "thread_awarenesses", "topics"

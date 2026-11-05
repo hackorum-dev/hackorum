@@ -9,15 +9,22 @@ class Admin::FeaturesController < Admin::BaseController
 
   def index
     @features = Feature::ALL
-    @counts = UserFeature.group(:feature).count
+    @user_counts = Feature.names.to_h { |name| [ name.to_s, Feature.access_by_user(name).size ] }
+    @team_counts = TeamFeature.group(:feature).count
   end
 
   def show
     @label = Feature.label(@feature)
-    @enrolled_users = User.joins(:user_features)
-                          .where(user_features: { feature: @feature })
-                          .includes(person: :default_alias)
-                          .order(:username)
+    @access = Feature.access_by_user(@feature)
+    @users = User.where(id: @access.keys)
+                 .includes(person: :default_alias)
+                 .order(:username)
+    @teams = Team.joins(:team_features)
+                 .where(team_features: { feature: @feature })
+                 .left_joins(:team_members)
+                 .group("teams.id")
+                 .select("teams.*, COUNT(team_members.id) AS member_count")
+                 .order(:name)
   end
 
   private

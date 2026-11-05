@@ -205,5 +205,45 @@ RSpec.describe User, type: :model do
       create(:user_feature, user: user, feature: "email_sending")
       expect(user.has_feature?("email_sending")).to be true
     end
+
+    context "via team" do
+      let(:user) { create(:user) }
+      let(:team) { create(:team) }
+
+      before { create(:team_member, team: team, user: user) }
+
+      it "returns true when the user's team has the feature" do
+        create(:team_feature, team: team, feature: "email_sending")
+        expect(user.has_feature?(:email_sending)).to be true
+      end
+
+      it "returns false for a different feature on the team" do
+        create(:team_feature, team: team, feature: "patchset_lineage")
+        expect(user.has_feature?(:email_sending)).to be false
+      end
+
+      it "returns false when only another team has the feature" do
+        create(:team_feature, team: create(:team), feature: "email_sending")
+        expect(user.has_feature?(:email_sending)).to be false
+      end
+
+      it "returns false after leaving the team" do
+        create(:team_feature, team: team, feature: "email_sending")
+        TeamMember.where(team: team, user: user).destroy_all
+        expect(user.has_feature?(:email_sending)).to be false
+      end
+
+      it "returns false after the team is unenrolled" do
+        create(:team_feature, team: team, feature: "email_sending")
+        team.team_features.destroy_all
+        expect(user.has_feature?(:email_sending)).to be false
+      end
+
+      it "returns false after the team is destroyed" do
+        create(:team_feature, team: team, feature: "email_sending")
+        team.destroy
+        expect(user.has_feature?(:email_sending)).to be false
+      end
+    end
   end
 end

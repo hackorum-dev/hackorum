@@ -71,4 +71,79 @@ RSpec.describe "Admin::Features", type: :request do
       expect(target.user_features.where(feature: "email_sending")).not_to exist
     end
   end
+
+  describe "POST /admin/features/:name/team_enrollments" do
+    let!(:team) { create(:team, name: "reviewers") }
+
+    it "enables the feature for a team" do
+      post admin_feature_team_enrollments_path("email_sending"), params: { team_name: "reviewers" }
+      expect(team.team_features.where(feature: "email_sending")).to exist
+    end
+
+    it "matches the team name case-insensitively" do
+      post admin_feature_team_enrollments_path("email_sending"), params: { team_name: "Reviewers" }
+      expect(team.team_features.where(feature: "email_sending")).to exist
+    end
+
+    it "is idempotent" do
+      2.times { post admin_feature_team_enrollments_path("email_sending"), params: { team_name: "reviewers" } }
+      expect(team.team_features.count).to eq(1)
+    end
+
+    it "reports an error for an unknown team" do
+      post admin_feature_team_enrollments_path("email_sending"), params: { team_name: "nope" }
+      expect(flash[:alert]).to be_present
+      expect(TeamFeature.count).to eq(0)
+    end
+
+    it "404s on unknown feature" do
+      post admin_feature_team_enrollments_path("bogus"), params: { team_name: "reviewers" }
+      expect(response.status).to eq(404)
+    end
+
+    it "rejects non-admins" do
+      sign_in_as(create(:user))
+      post admin_feature_team_enrollments_path("email_sending"), params: { team_name: "reviewers" }
+      expect(response).to have_http_status(:found)
+      expect(TeamFeature.count).to eq(0)
+    end
+  end
+
+  describe "DELETE /admin/features/:name/team_enrollments/:team_id" do
+    it "removes the team enrollment" do
+      team = create(:team)
+      create(:team_feature, team: team, feature: "email_sending")
+      delete admin_feature_team_enrollment_path("email_sending", team)
+      expect(team.team_features.where(feature: "email_sending")).not_to exist
+    end
+  end
+
+  describe "team-derived access display" do
+    let(:team) { create(:team, name: "reviewers") }
+    let(:member) { create(:user, username: "frank") }
+
+    before do
+      create(:team_member, team: team, user: member)
+      create(:team_feature, team: team, feature: "email_sending")
+    end
+
+    it "shows the team and the member with source on the show page" do
+      get admin_feature_path("email_sending")
+      expect(response.body).to include("reviewers")
+      expect(response.body).to include("frank")
+      expect(response.body).to include("via reviewers")
+      expect(response.body).not_to include(admin_feature_enrollment_path("email_sending", member))
+    end
+
+    it "shows a remove button for a user with direct access" do
+      create(:user_feature, user: member, feature: "email_sending")
+      get admin_feature_path("email_sending")
+      expect(response.body).to include(admin_feature_enrollment_path("email_sending", member))
+    end
+
+    it "counts team-derived users on the index" do
+      get admin_features_path
+      expect(response.body).to match(%r{Email sending</td><td>1</td><td>1</td>})
+    end
+  end
 end

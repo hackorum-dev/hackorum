@@ -7,11 +7,13 @@
     thead
       tr
         th Feature
-        th Enrolled users
+        th Users with access
+        th Teams
         th
     tbody
       - @features.each do |name, label|
         tr
           td = label
-          td = @counts[name.to_s] || 0
+          td = @user_counts[name.to_s]
+          td = @team_counts[name.to_s] || 0
           td = link_to "Manage", admin_feature_path(name), class: "button-secondary button-small"

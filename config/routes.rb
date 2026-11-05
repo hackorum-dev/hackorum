@@ -40,6 +40,7 @@ Rails.application.routes.draw do
     resources :saved_searches
     resources :features, only: [ :index, :show ], param: :name do
       resources :enrollments, only: [ :create, :destroy ], param: :user_id, controller: "feature_enrollments"
+      resources :team_enrollments, only: [ :create, :destroy ], param: :team_id, controller: "feature_team_enrollments"
     end
     if defined?(PgHero)
       constraints AdminConstraint.new do

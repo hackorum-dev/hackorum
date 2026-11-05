@@ -48,4 +48,27 @@ RSpec.describe "Admin::UserFeatures", type: :request do
       expect(target.user_features.where(feature: "email_sending")).not_to exist
     end
   end
+
+  describe "team-derived features" do
+    let(:team) { create(:team, name: "reviewers") }
+
+    before do
+      create(:team_member, team: team, user: target)
+      create(:team_feature, team: team, feature: "email_sending")
+    end
+
+    it "shows the team source" do
+      get admin_user_features_path(target)
+      expect(response.body).to include("via reviewers")
+      expect(response.body).to include(admin_user_features_path(target, feature: :email_sending))
+    end
+
+    it "shows both direct and team source" do
+      create(:user_feature, user: target, feature: "email_sending")
+      get admin_user_features_path(target)
+      expect(response.body).to include("Enabled")
+      expect(response.body).to include("via reviewers")
+      expect(response.body).to include(admin_user_feature_path(target, :email_sending))
+    end
+  end
 end

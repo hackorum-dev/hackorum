@@ -14,20 +14,51 @@
       = f.submit "Enroll", class: "button-primary"
 
   .settings-section
-    h2 Enrolled users
-    - if @enrolled_users.any?
+    h2 Enable for team
+    = form_with url: admin_feature_team_enrollments_path(@feature), method: :post, local: true, class: "email-form", data: { turbo: false } do |f|
+      .form-group
+        = f.label :team_name, "Team name"
+        = f.text_field :team_name, required: true
+      = f.submit "Enable", class: "button-primary"
+
+  .settings-section
+    h2 Teams
+    - if @teams.any?
+      table.email-table
+        thead
+          tr
+            th Team
+            th Members
+            th
+        tbody
+          - @teams.each do |t|
+            tr
+              td = t.name
+              td = t.member_count
+              td
+                = button_to "Remove", admin_feature_team_enrollment_path(@feature, t), method: :delete, data: { turbo_confirm: "Remove for all members of #{t.name}?" }, class: "button-danger button-small"
+    - else
+      p No teams enrolled.
+
+  .settings-section
+    h2 Users with access
+    - if @users.any?
       table.email-table
         thead
           tr
             th Username
             th Email
+            th Source
             th
         tbody
-          - @enrolled_users.each do |u|
+          - @users.each do |u|
+            - src = @access[u.id]
             tr
               td = u.username || "—"
               td = u.person&.default_alias&.email || "—"
+              td = ([ ("direct" if src[:direct]) ] + src[:teams].map { |t| "via #{t}" }).compact.join(", ")
               td
-                = button_to "Remove", admin_feature_enrollment_path(@feature, u), method: :delete, data: { turbo_confirm: "Remove enrollment?" }, class: "button-danger button-small"
+                - if src[:direct]
+                  = button_to "Remove", admin_feature_enrollment_path(@feature, u), method: :delete, data: { turbo_confirm: "Remove enrollment?" }, class: "button-danger button-small"
     - else
-      p No users enrolled yet.
+      p No users have access yet.
