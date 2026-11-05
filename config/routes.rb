@@ -61,6 +61,11 @@ Rails.application.routes.draw do
 
   get "up" => "rails/health#show", as: :rails_health_check
 
+  if Hackorum::Metrics.enabled?
+    require "yabeda/prometheus/exporter"
+    mount Yabeda::Prometheus::Exporter => "/metrics"
+  end
+
   if Rails.env.development?
     get "preview/maintenance" => ->(env) {
       PendingMigrationCatcher.new(nil).send(:render_maintenance_page)

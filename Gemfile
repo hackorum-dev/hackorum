@@ -93,3 +93,8 @@ gem "rack-mini-profiler"
 
 # Mountable Postgres insights (uses pg_stat_statements)
 gem "pghero"
+
+# Prometheus metrics, exported only when METRICS_ENABLED=1
+gem "yabeda-rails", require: false
+gem "yabeda-puma-plugin", require: false
+gem "yabeda-prometheus", require: false

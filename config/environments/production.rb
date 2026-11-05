@@ -71,19 +71,30 @@ Rails.application.configure do
     from: ENV.fetch("MAIL_FROM", "noreply@hackorum.dev")
   }
 
-  # SMTP server configuration (Mailgun)
-  smtp_username = ENV["SMTP_USERNAME"]
-  smtp_password = ENV["SMTP_PASSWORD"]
-
-  config.action_mailer.smtp_settings = {
+  # SMTP: Mailgun on the old deploy, the compose-internal mailserver on the new
+  # one. Defaults reproduce the old behavior exactly.
+  smtp_choice = lambda do |name, default, allowed|
+    value = ENV.fetch(name, default).to_s.strip.downcase
+    raise ArgumentError, "#{name} must be one of #{allowed.join(', ')}, got #{value.inspect}" unless allowed.include?(value)
+    value
+  end
+  smtp_auth     = smtp_choice.call("SMTP_AUTHENTICATION", "plain", %w[plain login cram_md5 none])
+  smtp_starttls = smtp_choice.call("SMTP_STARTTLS", "auto", %w[auto always none])
+  smtp_verify   = smtp_choice.call("SMTP_OPENSSL_VERIFY", "peer", %w[peer none])
+  smtp_settings = {
     address: ENV.fetch("SMTP_ADDRESS", "smtp.eu.mailgun.org"),
-    port: ENV.fetch("SMTP_PORT", "587").to_i,
-    domain: ENV.fetch("SMTP_DOMAIN", "hackorum.dev"),
-    user_name: smtp_username,
-    password: smtp_password,
-    authentication: :plain,
-    enable_starttls_auto: true
+    port:    ENV.fetch("SMTP_PORT", "587").to_i,
+    domain:  ENV.fetch("SMTP_DOMAIN", "hackorum.dev"),
+    enable_starttls_auto: smtp_starttls == "auto",
+    enable_starttls:      smtp_starttls == "always",
+    openssl_verify_mode:  smtp_verify
   }
+  unless smtp_auth == "none"
+    smtp_settings[:authentication] = smtp_auth.to_sym
+    smtp_settings[:user_name]      = ENV["SMTP_USERNAME"]
+    smtp_settings[:password]       = ENV["SMTP_PASSWORD"]
+  end
+  config.action_mailer.smtp_settings = smtp_settings
 
   # Enable locale fallbacks for I18n (makes lookups for any locale fall back to
   # the I18n.default_locale when a translation cannot be found).

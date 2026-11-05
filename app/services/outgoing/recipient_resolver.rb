@@ -13,7 +13,7 @@ module Outgoing
     FAKE_ADDRESS_SUFFIX = "@unknown.user"
 
     def self.for(draft)
-      return Recipients.new(to: [ dev_override ], cc: []) unless Rails.env.production?
+      return Recipients.new(to: [ dev_override ], cc: []) if !Rails.env.production? || Hackorum.staging?
 
       list = draft.topic.mailing_lists.first
       raise MissingPostAddressError if list.nil? || list.post_address.blank?

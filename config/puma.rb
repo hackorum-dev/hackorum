@@ -24,6 +24,11 @@
 # Any libraries that use a connection pool or another resource pool should
 # be configured to provide at least as many connections as the number of
 # threads. This includes Active Record's `pool` parameter in `database.yml`.
+if ENV["METRICS_ENABLED"].to_s == "1"
+  require "fileutils"
+  # stale per-worker metric files from a previous run
+  FileUtils.rm_rf(File.expand_path("../tmp/prometheus", __dir__))
+end
 require_relative "environment"
 threads_count = ENV.fetch("RAILS_MAX_THREADS", 3)
 threads threads_count, threads_count
@@ -35,7 +40,12 @@ port ENV.fetch("PORT", 3000)
 plugin :tmp_restart
 
 # Run the Solid Queue supervisor inside of Puma for single-server deployments
-plugin :solid_queue if ENV["SOLID_QUEUE_IN_PUMA"] || Rails.env.development?
+solid_queue_in_puma = %w[1 true yes].include?(ENV["SOLID_QUEUE_IN_PUMA"].to_s.strip.downcase)
+plugin :solid_queue if solid_queue_in_puma || Rails.env.development?
+if ENV["METRICS_ENABLED"].to_s == "1"
+  plugin :yabeda
+  activate_control_app "unix://#{File.expand_path('../tmp/pumactl.sock', __dir__)}", no_token: true
+end
 
 # Specify the PID file. Defaults to tmp/pids/server.pid in development.
 # In other environments, only set the PID file if requested.

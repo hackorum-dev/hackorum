@@ -123,4 +123,23 @@ RSpec.describe Outgoing::RecipientResolver do
       end
     end
   end
+
+  context 'in staging (production env)' do
+    before { allow(Rails.env).to receive(:production?).and_return(true) }
+
+    it 'uses the dev override instead of the real list' do
+      with_env('HACKORUM_ENV' => 'staging', 'HACKORUM_DEV_REPLY_TO' => 'test@example.com') do
+        result = described_class.for(draft)
+        expect(result.to).to eq([ 'test@example.com' ])
+        expect(result.cc).to eq([])
+      end
+    end
+
+    it 'fails closed when the override is missing' do
+      with_env('HACKORUM_ENV' => 'staging', 'HACKORUM_DEV_REPLY_TO' => nil) do
+        expect { described_class.for(draft) }
+          .to raise_error(Outgoing::RecipientResolver::MissingDevOverrideError)
+      end
+    end
+  end
 end
