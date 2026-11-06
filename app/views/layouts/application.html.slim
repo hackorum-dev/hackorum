@@ -69,7 +69,6 @@ html data-theme="light"
                   i class=icon_class aria-hidden="true"
                   span.sr-only Starred
               = link_to "Search", topics_path(anchor: "search"), class: "nav-link"
-              = link_to "Statistics", stats_path, class: "nav-link"
               = link_to "Reports", reports_path, class: "nav-link"
               = link_to "Help", help_index_path, class: "nav-link"
               - if user_signed_in?
@@ -120,7 +119,6 @@ html data-theme="light"
             summary.nav-link.nav-overflow-toggle aria-label="Menu" data-action="click->sidebar#closeMenuOnNavigate"
               i.fa-solid.fa-bars
             .nav-overflow-menu
-              = link_to "Statistics", stats_path, class: "nav-link"
               = link_to "Help", help_index_path, class: "nav-link"
               - if user_signed_in?
                 = link_to "Settings", settings_root_path, class: "nav-link"

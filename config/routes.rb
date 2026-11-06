@@ -152,8 +152,6 @@ Rails.application.routes.draw do
     end
     resources :attachments, only: [ :create, :destroy ], controller: "draft_attachments"
   end
-  get "stats", to: "stats#show", as: :stats
-  get "stats/data", to: "stats#data", as: :stats_data
 
   # Reports
   get "reports", to: "reports#index", as: :reports
