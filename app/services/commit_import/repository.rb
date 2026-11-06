@@ -10,7 +10,9 @@ module CommitImport
     RECORD_SEP = "\x1e".freeze
     FIELD_SEP = "\x1f".freeze
     # Leading record separator plus a trailing field separator after the body:
-    # everything after that last separator is the --name-only file list.
+    # everything after that last separator is the --numstat file list, one
+    # "added<TAB>removed<TAB>path" line per file ("-" for binary files,
+    # renamed paths as "a => b" or "dir/{a => b}/f").
     LOG_FORMAT = RECORD_SEP + %w[%H %an %ae %cn %ce %aI %cI %s %b].join(FIELD_SEP) + FIELD_SEP
     # 9 %-placeholders joined by 8 separators, plus the trailing one: 9 total
     # in a clean chunk. More than 9 means a field's own text contained a
@@ -31,7 +33,8 @@ module CommitImport
     MAX_CONSECUTIVE_SHA_FAILURES = 10
 
     Record = Struct.new(:sha, :author_name, :author_email, :committer_name, :committer_email,
-                        :authored_at, :committed_at, :subject, :body, :files, keyword_init: true)
+                        :authored_at, :committed_at, :subject, :body, :files,
+                        :lines_added, :lines_removed, keyword_init: true)
 
     # upstream_remote: which remote carries the postgres history. "origin" is
     # the mirror layout (/pgrepo, and an ordinary clone); the repo the
@@ -174,7 +177,7 @@ module CommitImport
     def log_for(shas)
       out, err, status = run(
         [ "git", "-C", @path, "-c", "core.quotepath=false",
-          "log", "--no-walk", "--stdin", "--format=#{LOG_FORMAT}", "--name-only" ],
+          "log", "--no-walk", "--stdin", "--format=#{LOG_FORMAT}", "--numstat" ],
         timeout: @git_timeout, stdin_data: shas.join("\n")
       )
       raise Error, "git log failed: #{scrub(err)}" unless status.success?
@@ -197,13 +200,41 @@ module CommitImport
           next
         end
 
+        files, added, removed = parse_numstat(f[9])
         Record.new(
           sha: f[0], author_name: f[1], author_email: f[2],
           committer_name: f[3], committer_email: f[4],
           authored_at: parse_time!(f[5], "commit #{f[0]}"), committed_at: parse_time!(f[6], "commit #{f[0]}"),
           subject: f[7], body: f[8].to_s.strip,
-          files: f[9].to_s.lines.map(&:strip).reject(&:empty?).uniq
+          files: files, lines_added: added, lines_removed: removed
         )
+      end
+    end
+
+    # "-" marks a binary file: listed, not counted
+    def parse_numstat(text)
+      files = []
+      added = 0
+      removed = 0
+      text.to_s.each_line do |line|
+        a, r, path = line.strip.split("\t", 3)
+        next if path.to_s.empty?
+
+        files << rename_target(path)
+        added += a.to_i if a != "-"
+        removed += r.to_i if r != "-"
+      end
+      [ files.uniq, added, removed ]
+    end
+
+    # git prints a rename as "a => b" or "dir/{a => b}/f"; the old path is gone
+    def rename_target(path)
+      return path unless path.include?(" => ")
+
+      if path.include?("{")
+        path.gsub(/\{([^{}]*) => ([^{}]*)\}/) { Regexp.last_match(2) }.squeeze("/").delete_prefix("/")
+      else
+        path.split(" => ", 2).last
       end
     end
 

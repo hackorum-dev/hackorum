@@ -90,6 +90,22 @@ RSpec.describe PersonMergeService do
     end
   end
 
+  describe "affiliations" do
+    it "carries affiliations over and drops a colliding one" do
+      create(:alias, person: source, name: "Old Name", email: "old@example.com")
+      create(:alias, person: target, name: "Kept Name", email: "kept@example.com")
+      moved = PersonAffiliation.create!(person: source, company: "Acme", since: Date.new(2025, 1, 1), source: "manual")
+      PersonAffiliation.create!(person: source, company: "Beta", source: "domain")
+      kept = PersonAffiliation.create!(person: target, company: "Beta", source: "manual")
+
+      expect(merge.success?).to be true
+      expect(moved.reload.person_id).to eq(target.id)
+      expect(PersonAffiliation.where(person: target).order(:company).pluck(:company, :source)).to eq([ [ "Acme", "manual" ], [ "Beta", "manual" ] ])
+      expect(kept.reload.person_id).to eq(target.id)
+      expect(PersonAffiliation.count).to eq(2)
+    end
+  end
+
   describe "topic participants" do
     def participation_for(topic, person, message_count:, first_at:, last_at:)
       row = TopicParticipant.find_or_create_by!(topic_id: topic.id, person_id: person.id)

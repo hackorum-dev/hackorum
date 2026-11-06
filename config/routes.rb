@@ -152,6 +152,15 @@ Rails.application.routes.draw do
     end
     resources :attachments, only: [ :create, :destroy ], controller: "draft_attachments"
   end
+  namespace :stats do
+    root "index#show"
+    get "releases/:major", to: "releases#overview", as: :release, constraints: { major: /\d+/ }
+    get "releases/:major/pulse", to: "releases#pulse", as: :release_pulse, constraints: { major: /\d+/ }
+    get "releases/:major/people", to: "releases#people", as: :release_people, constraints: { major: /\d+/ }
+    get "releases/:major/companies", to: "releases#companies", as: :release_companies, constraints: { major: /\d+/ }
+    get "releases/:major/committers", to: "releases#committers", as: :release_committers, constraints: { major: /\d+/ }
+    get "releases/:major/person/*email", to: "releases#person", as: :release_person, constraints: { major: /\d+/ }, format: false
+  end
 
   # Reports
   get "reports", to: "reports#index", as: :reports

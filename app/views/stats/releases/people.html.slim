@@ -1,0 +1,86 @@
+- content_for :title, "#{@release.label} people"
+- seg = ->(label, active, path) { link_to label, path, class: "stats-seg-item#{' is-active' if active}", aria: { current: ("page" if active) } }
+- top_n = Stats::PeopleParams::TOP
+- shown = @params.all? ? @rows : @rows.first(top_n)
+- credits = @rows.map { |r| @params.value(r, "credits") }.sort.reverse
+- label_min = credits.size >= top_n ? credits[top_n - 1] : 0
+- rank_label = ->(r) { r == "credits" ? "authored + reviewed" : r }
+ruby:
+  top_series = if @params.rank == "credits"
+    [ { label: "authored", values: @top.map { |r| r[:authored] } }, { label: "reviewed", values: @top.map { |r| r[:reviewed] } } ]
+  else
+    [ { label: @params.rank, values: @top.map { |r| r[@params.rank.to_sym] } } ]
+  end
+  points = @rows.map { |r| { x: r[:authored], y: r[:reviewed], name: r[:name], group: r[:committer] ? "committers" : "others" } }
+
+.stats-page
+  h1 = "#{@release.label} statistics"
+  = render "stats/releases/header", release: @release, releases: @releases, tab: :people
+
+  .stats-controls
+    span
+      | Rank by
+      span.stats-seg
+        - Stats::PeopleParams::RANKS.each do |r|
+          = seg.call(rank_label.call(r), @params.rank == r, stats_release_people_path(@release.major, @params.active_params.merge(rank: r).except(:sort, :dir)))
+    span
+      | Committers
+      span.stats-seg
+        - Stats::PeopleParams::COMMITTERS.each do |c|
+          = seg.call(c, @params.committers == c, stats_release_people_path(@release.major, @params.active_params.merge(committers: c)))
+    span.muted = "#{stats_number(@totals[:authors])} authors, #{stats_number(@totals[:reviewers])} reviewers, #{stats_number(@totals[:people])} people in all"
+  .stats-two
+    div.stats-card
+      .t Authored vs reviewed
+      .s one dot per person, top names labelled, hover for the rest
+      = stats_chart("scatter", { x_label: "authored", y_label: "reviewed", label_min: label_min, diagonal: { below: "more authoring", above: "more reviewing" }, groups: [ { key: "committers", label: "committers" }, { key: "others", label: "everyone else" } ], points: points }, label: "authored vs reviewed")
+    div.stats-card
+      .t = "Top #{top_n}"
+      .s = "by #{rank_label.call(@params.rank)}"
+      = stats_chart("ranked", { categories: @top.map { |r| r[:name] }, total_labels: true, series: top_series }, label: "top people")
+  div data-controller="list-filter"
+    .stats-controls
+      input.form-input type="search" placeholder="Search people" aria-label="Search people" data-action="input->list-filter#filter" style="max-width: 16rem"
+    .stats-table-wrap
+      table.stats-table
+        thead
+          tr
+            th #
+            th.txt Person
+            - if @release.companies?
+              th.txt Company
+            = stats_sort_header(:stats_release_people_path, @release.major, @params, "credits", "Authored + reviewed")
+            = stats_sort_header(:stats_release_people_path, @release.major, @params, "authored", "Authored")
+            = stats_sort_header(:stats_release_people_path, @release.major, @params, "reviewed", "Reviewed")
+            = stats_sort_header(:stats_release_people_path, @release.major, @params, "committed", "Committed")
+            = stats_sort_header(:stats_release_people_path, @release.major, @params, "messages", "Messages")
+            = stats_sort_header(:stats_release_people_path, @release.major, @params, "threads", "Threads")
+        tbody
+          - shown.each_with_index do |r, i|
+            tr data-list-filter-target="item" data-name=r[:name].downcase
+              td = i + 1
+              td.txt.person
+                => r[:email] ? link_to(r[:name], stats_release_person_path(@release.major, r[:email])) : r[:name]
+                - if r[:committer]
+                  span.badge = stats_committer_badge(r[:committer_since])
+              - if @release.companies?
+                td.txt.muted = Stats::Affiliations.label(r[:company])
+              td: b = stats_number(r[:authored] + r[:reviewed])
+              td = stats_number(r[:authored])
+              td = stats_number(r[:reviewed])
+              td = r[:committed].zero? ? "-" : stats_number(r[:committed])
+              td = stats_number(r[:messages])
+              td = stats_number(r[:threads])
+  .stats-foot
+    span = "Showing #{stats_number(shown.size)} of #{stats_number(@rows.size)}"
+    - unless @params.all? || shown.size == @rows.size
+      span ·
+      = link_to "show all", stats_release_people_path(@release.major, @params.active_params.merge(all: "1"))
+    - if @params.all?
+      span ·
+      = link_to "top #{top_n}", stats_release_people_path(@release.major, @params.active_params.except(:all))
+    span ·
+    = link_to "export CSV", stats_release_people_path(@release.major, @params.active_params.merge(format: :csv))
+    - if @unlinked.positive?
+      span ·
+      span = "#{stats_number(@unlinked)} credits not linked to a person are not listed"

@@ -1,0 +1,27 @@
+/ v: the figure; k: the caption (html allowed); d: the subline; chart: [kind, data].
+/ kind "chart" puts the plot beside the text; "share" and "hist" put it under the title, above the subline.
+/ na: no data; the figure (or, for share/hist, the subline) says so and the chart is skipped.
+- kind = local_assigns[:kind]
+- na = local_assigns[:na]
+- titled = %w[share hist].include?(kind)
+- value = na && !titled ? "not available" : v
+- subline = na ? (titled ? "not available" : nil) : local_assigns[:d]
+- chart = na ? nil : local_assigns[:chart]
+- label = strip_tags((local_assigns[:k].presence || v).to_s)
+- classes = [ "stats-tile", (kind && !(na && kind == "chart") ? "is-#{kind}" : nil), ("is-na" if na) ].compact.join(" ")
+div class=classes
+  - if kind == "chart" && chart
+    div
+      .v = value
+      .k = k
+      - if subline.present?
+        .d = subline
+    = stats_chart(chart[0], chart[1], label: label)
+  - else
+    .v = value
+    - if local_assigns[:k].present?
+      .k = k
+    - if chart
+      = stats_chart(chart[0], chart[1], label: label)
+    - if subline.present?
+      .d = subline

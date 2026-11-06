@@ -163,6 +163,20 @@
   --ci-chart-ord3: #2563eb;
   --ci-chart-ord4: #1b3fa8;
   --ci-chart-ord5: #152a63;
+
+  /* Release stats charts. Categorical slots validated with the dataviz
+     validate_palette.js script (light surface #ffffff): all checks pass. */
+  --stats-c1: #4f46e5;
+  --stats-c2: #d97706;
+  --stats-c3: #0d9488;
+  --stats-c4: #a21caf;
+  --stats-c5: #4d7c0f;
+  --stats-gray: #9ca3af;
+  --stats-gray2: #cbd5e1;
+  --stats-good: #15803d;
+  --stats-bad: #b45309;
+  --stats-phase: rgba(79, 70, 229, 0.07);
+  --stats-cf: rgba(217, 119, 6, 0.10);
 }
 
 :root[data-theme="dark"] {
@@ -308,6 +322,19 @@
   --ci-chart-ord3: #60a5fa;
   --ci-chart-ord4: #93c5fd;
   --ci-chart-ord5: #bfdbfe;
+
+  /* validated against the dark surface: all checks pass */
+  --stats-c1: #6366f1;
+  --stats-c2: #d97706;
+  --stats-c3: #0d9488;
+  --stats-c4: #c026d3;
+  --stats-c5: #65a30d;
+  --stats-gray: #64748b;
+  --stats-gray2: #475569;
+  --stats-good: #4ade80;
+  --stats-bad: #fbbf24;
+  --stats-phase: rgba(129, 140, 248, 0.10);
+  --stats-cf: rgba(245, 158, 11, 0.12);
 }
 
 /* dark page tones vanish on the lighter modal surface */

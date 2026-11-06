@@ -26,6 +26,7 @@
 @import "components/profile.css";
 @import "components/settings.css";
 @import "components/reports.css";
+@import "components/release-stats.css";
 @import "components/help.css";
 @import "components/pagination.css";
 @import "components/ci.css";

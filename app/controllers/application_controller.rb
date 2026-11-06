@@ -3,7 +3,7 @@ class ApplicationController < ActionController::Base
 
   around_action :track_page_load_time
   rescue_from ActiveRecord::RecordNotFound, with: :render_404
-  helper_method :current_user, :user_signed_in?, :current_admin?
+  helper_method :current_user, :user_signed_in?, :current_admin?, :lineage_visible?
   helper_method :activity_unread_count
   before_action :authorize_mini_profiler
 

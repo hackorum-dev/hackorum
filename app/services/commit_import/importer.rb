@@ -151,6 +151,7 @@ module CommitImport
           authored_at: record.authored_at, committed_at: record.committed_at,
           author_name: record.author_name, author_email: record.author_email,
           committer_name: record.committer_name, committer_email: record.committer_email,
+          lines_added: record.lines_added, lines_removed: record.lines_removed,
           branches: branch_map[record.sha] || [],
           cherry_picked_from_sha: result.cherry_picked_from,
           unresolved_message_ids: unresolved,

@@ -20,7 +20,7 @@ class GitFixtureRepo
     files.each do |rel, content|
       full = File.join(@path, rel)
       FileUtils.mkdir_p(File.dirname(full))
-      File.write(full, content)
+      File.binwrite(full, content)
       git("add", "--", rel)
     end
 
@@ -30,6 +30,12 @@ class GitFixtureRepo
       "GIT_AUTHOR_NAME" => author_name, "GIT_AUTHOR_EMAIL" => author_email
     }
     git_with_env(env, "commit", "--quiet", "--allow-empty", "-m", message)
+    head
+  end
+
+  def rename(from, to, subject: "rename")
+    git("mv", from, to)
+    git("commit", "--quiet", "-m", subject)
     head
   end
 

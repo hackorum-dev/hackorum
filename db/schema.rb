@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_11_05_130000) do
+ActiveRecord::Schema[8.0].define(version: 2026_11_06_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -231,6 +231,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_05_130000) do
     t.string "unresolved_message_ids", default: [], null: false, array: true
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "lines_added"
+    t.integer "lines_removed"
     t.index ["cherry_picked_from_sha"], name: "index_commits_on_cherry_picked_from_sha"
     t.index ["committed_at"], name: "index_commits_on_committed_at"
     t.index ["committed_at"], name: "index_commits_pending_message_ids", where: "(cardinality(unresolved_message_ids) > 0)"
@@ -643,6 +645,19 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_05_130000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["default_alias_id"], name: "index_people_on_default_alias_id"
+  end
+
+  create_table "person_affiliations", force: :cascade do |t|
+    t.bigint "person_id", null: false
+    t.string "company", null: false
+    t.date "since"
+    t.date "until"
+    t.string "source", null: false
+    t.text "note"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["person_id", "company", "since"], name: "index_person_affiliations_on_person_id_and_company_and_since", unique: true, nulls_not_distinct: true
+    t.index ["person_id"], name: "index_person_affiliations_on_person_id"
   end
 
   create_table "person_merges", force: :cascade do |t|
@@ -1131,6 +1146,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_05_130000) do
   add_foreign_key "patchset_pairs", "topics"
   add_foreign_key "patchset_runs", "topics"
   add_foreign_key "people", "aliases", column: "default_alias_id"
+  add_foreign_key "person_affiliations", "people", on_delete: :cascade
   add_foreign_key "person_merges", "users", column: "performed_by_id"
   add_foreign_key "saved_search_preferences", "saved_searches"
   add_foreign_key "saved_search_preferences", "users"

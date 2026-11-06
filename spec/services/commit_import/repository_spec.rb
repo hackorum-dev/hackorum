@@ -117,6 +117,54 @@ RSpec.describe CommitImport::Repository do
                                               "src/include/nodes/execnodes.h")
     end
 
+    it "counts added and removed lines" do
+      fixture_repo.commit(subject: "base", files: { "a.c" => "one\ntwo\nthree\n", "b.c" => "keep\ndrop\n" })
+      sha = fixture_repo.commit(subject: "change",
+                                files: { "a.c" => "one\ntwo\nthree\nfour\nfive\nsix\n", "b.c" => "keep\n" })
+
+      record = described_class.new(path: fixture_repo.path).commits([ sha ]).first
+
+      expect(record.lines_added).to eq(3)
+      expect(record.lines_removed).to eq(1)
+      expect(record.files).to contain_exactly("a.c", "b.c")
+    end
+
+    it "treats binary files as zero lines" do
+      sha = fixture_repo.commit(subject: "binary", files: { "logo.png" => "\x89PNG\r\n\x1a\n\x00\x00".b })
+
+      record = described_class.new(path: fixture_repo.path).commits([ sha ]).first
+
+      expect(record.lines_added).to eq(0)
+      expect(record.lines_removed).to eq(0)
+      expect(record.files).to eq([ "logo.png" ])
+    end
+
+    it "lists a renamed file under its new path with no line churn" do
+      fixture_repo.commit(subject: "base", files: { "a.c" => "one\ntwo\nthree\n" })
+      sha = fixture_repo.rename("a.c", "b.c")
+
+      record = described_class.new(path: fixture_repo.path).commits([ sha ]).first
+
+      expect(record.files).to eq([ "b.c" ])
+      expect(record.lines_added).to eq(0)
+      expect(record.lines_removed).to eq(0)
+    end
+
+    it "resolves rename notation to the new path" do
+      repo = described_class.new(path: fixture_repo.path)
+      {
+        "a.c => b.c" => "b.c",
+        "src/{old => new}/f.c" => "src/new/f.c",
+        "src/{old => }/f.c" => "src/f.c",
+        "src/{ => new}/f.c" => "src/new/f.c",
+        "{old => new}/f.c" => "new/f.c",
+        "{lib => }/f.c" => "f.c",
+        "src/f.c" => "src/f.c"
+      }.each do |raw, expected|
+        expect(repo.send(:rename_target, raw)).to eq(expected), raw
+      end
+    end
+
     it "yields one record per sha for many commits" do
       shas = 3.times.map { |i| fixture_repo.commit(subject: "commit #{i}") }
       records = described_class.new(path: fixture_repo.path).commits(shas).to_a

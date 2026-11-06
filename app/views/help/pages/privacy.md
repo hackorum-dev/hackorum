@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 4 November 2026
+Last updated: 6 November 2026
 
 This policy explains how Hackorum ("we", "us") processes personal data, and what rights you have under the EU General Data Protection Regulation (GDPR).
 
@@ -27,6 +27,8 @@ We collect the following from public sources, not from you:
 - **Committer and contributor lists** published on www.postgresql.org.
 
 From this we derive additional data: which email addresses belong to the same person, per-person and per-thread statistics, CI results for posted patches, and the relationship between patch versions (patch lineage) including suggested reviewers. Some of the derived data is produced with the help of an AI model, see [Recipients](#recipients).
+
+**Affiliations.** For the statistics pages we keep, per person, which company they worked for and when. This comes from public sources: the PostgreSQL contributors page, commit messages and email domains, conference and company pages, and public profiles. It is kept as date ranges and can be wrong or out of date. To correct or remove yours, write to the address above; we remove it without asking why.
 
 ### Account data
 

@@ -45,3 +45,5 @@ CLAUDE.md
 # Local PostgreSQL clone used by the commit-history-parsing tool/specs
 /postgres/
 /postgres-ci/
+
+/public/brainstorm

@@ -39,6 +39,8 @@ RSpec.describe CommitImport::Importer do
       expect(commit.commit_files.pluck(:path)).to contain_exactly(
         "src/backend/executor/execMain.c", "src/include/nodes/execnodes.h"
       )
+      expect(commit.lines_added).to eq(2)
+      expect(commit.lines_removed).to eq(0)
     end
 
     it "records branch membership from every branch containing the commit" do

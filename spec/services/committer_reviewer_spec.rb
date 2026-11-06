@@ -66,6 +66,24 @@ RSpec.describe CommitterReviewer do
     expect(described_class.sync!([ commit.id ])).to eq(0)
   end
 
+  it "lists someone else's patch even when the committer is a trailer reviewer" do
+    committer!
+    author!
+    create(:commit_person, commit: commit, role: "reviewer", person: committer_person, raw_name: "Neil Conway", raw_email: "neil@example.com")
+    cr = described_class.new([ commit.id ])
+    expect(cr.others_commit_ids).to eq([ commit.id ])
+    expect(cr.entries).to be_empty
+  end
+
+  it "does not list own patches or commits without an author" do
+    own = create(:commit)
+    committer!(own)
+    author!(own, person: committer_person)
+    bare = create(:commit)
+    committer!(bare)
+    expect(described_class.new([ own.id, bare.id ]).others_commit_ids).to be_empty
+  end
+
   it "is idempotent and follows authorship changes" do
     committer!
     author = author!
@@ -86,6 +104,12 @@ RSpec.describe CommitterReviewer do
     committer!
     author!(email: "NEIL@example.com")
     expect(described_class.sync!([ commit.id ])).to eq(0)
+  end
+
+  it "does not match two resolved people by name" do
+    committer!
+    author!(name: "Neil Conway", email: "other@example.com")
+    expect(described_class.sync!([ commit.id ])).to eq(1)
   end
 
   it "ignores an llm reviewer row naming the committer" do

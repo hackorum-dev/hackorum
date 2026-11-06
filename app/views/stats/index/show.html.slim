@@ -1,0 +1,11 @@
+- content_for :title, "Statistics"
+
+.stats-page
+  h1 Statistics
+  p.stats-intro Numbers about PostgreSQL development, read from the lists and the git history.
+  .stats-cards
+    - newest = @releases.find { |r| !r.in_development? } || @releases.first
+    - if newest
+      = link_to stats_release_path(newest.major), class: "stats-card" do
+        h2 By release
+        p Who shaped #{newest.label} and how: commits, threads, patch lineage, reviews, companies, people, committers.

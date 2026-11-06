@@ -1,0 +1,76 @@
+- content_for :title, "#{@release.label} committers"
+- d = @data
+- rows = d[:rows]
+- person_path = ->(r) { stats_release_person_path(@release.major, r[:email] || r[:id]) }
+
+.stats-page
+  h1 = "#{@release.label} statistics"
+  = render "stats/releases/header", release: @release, releases: @releases, tab: :committers
+  .stats-two
+    div.stats-card
+      .t Own work vs committing for others
+      .s x: commits they authored, y: others' patches they committed
+      = stats_chart("scatter", { x_label: "own commits", y_label: "commits for others", label_min: 100, diagonal: { below: "more own work", above: "more committing for others" }, groups: [ { key: "c", label: "committers" } ], points: rows.map { |r| { x: r[:own], y: r[:for_others], name: r[:name], group: "c" } } }, label: "own vs for others")
+    div.stats-card
+      .t Lines changed
+      .s added plus removed, own commits vs commits for others
+      = stats_chart("ranked", d[:lines_chart].merge(total_labels: true, number_labels: true), label: "lines per committer")
+  - if d[:llm]
+    .stats-two.is-one
+      div.stats-card
+        .t How much they change others' patches
+        .s every committer with an assessed commit, LLM verdict on the patches of others they committed (share of assessed); from discussion means written from scratch
+        = stats_chart("ranked", d[:change].merge(max: 100, total_labels: false), label: "change level per committer", height: stats_ranked_height(d[:change][:categories].size))
+  .stats-two.is-one
+    div.stats-card
+      .t Reviewing other committers' work
+      .s credited as reviewer on commits they did not commit; own commits never count
+      = stats_chart("ranked", d[:reviews_chart].merge(total_labels: true), label: "reviews for others per committer")
+  .stats-two
+    - { commits: "Commits, by month", authored: "Authored, by month", reviewed: "Reviewed, by month", messages: "Messages, by month" }.each do |key, title|
+      div.stats-card
+        .t = title
+        .s = "top #{Stats::Release::Committers::TOP_CHART} committers by this measure and the rest, one scale; shaded months are outside the main phase"
+        = stats_chart("rows", { buckets: d[:monthly][:buckets], windows: d[:monthly][:windows], series: d[:monthly][key] }, label: title, height: stats_rows_height(d[:monthly][key]))
+  .stats-table-wrap#committers-table
+    table.stats-table.is-wide
+      thead
+        tr
+          th.txt Committer
+          th Commits
+          th = tag.abbr("Own", title: "Commits they authored, including commits with no Author credit")
+          th = tag.abbr("For others", title: "Other people's patches they committed")
+          th = tag.abbr("Authors", title: "Distinct authors whose patches they committed")
+          th Reverts
+          th = tag.abbr("Lines", title: "Lines added plus removed, all their commits")
+          th = tag.abbr("Reviewed for others", title: "Credited as reviewer on commits by other committers; their own commits never count")
+          - if d[:llm]
+            th = tag.abbr("As posted", title: "Of the others' patches they committed that the LLM assessed: share committed unchanged")
+            th = tag.abbr("Sole reviewer", title: "Of the others' patches they committed that the LLM assessed: share with no reviewer credited or found besides themselves")
+          th Messages
+          th Threads
+          th = tag.abbr("People", title: "Distinct people they replied to or who replied to them, in release threads")
+          th Backported
+      tbody
+        - rows.each do |r|
+          tr
+            td.txt
+              = link_to r[:name], person_path.call(r)
+              - if r[:since]
+                span.muted = " since #{r[:since].strftime('%b %Y')}"
+            td: b = r[:commits]
+            td = r[:own]
+            td = r[:for_others]
+            td = r[:authors]
+            td = r[:reverts].zero? ? "-" : r[:reverts]
+            td = stats_number(r[:lines])
+            td = r[:reviewed_for_others].zero? ? "-" : r[:reviewed_for_others]
+            - if d[:llm]
+              td = r[:judged].zero? ? "-" : stats_pct(r[:as_posted], r[:judged])
+              td = r[:judged].zero? ? "-" : stats_pct(r[:alone], r[:judged])
+            td = stats_number(r[:messages])
+            td = r[:threads]
+            td = r[:people]
+            td = stats_pct(r[:backported], r[:commits])
+  .stats-foot
+    = link_to "export CSV", stats_release_committers_path(@release.major, format: :csv)

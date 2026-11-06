@@ -6,6 +6,7 @@ class Person < ApplicationRecord
   has_many :sent_messages, class_name: "Message", foreign_key: "sender_person_id"
   has_many :mentions
   has_many :topic_participants
+  has_many :affiliations, class_name: "PersonAffiliation", dependent: :destroy
 
   belongs_to :default_alias, class_name: "Alias", optional: true
 
@@ -135,6 +136,7 @@ class Person < ApplicationRecord
     moved.each_slice(1000) { |ids| CommitterReviewer.sync!(ids) }
     TopicParticipant.where(person_id: old_person.id).where.not(topic_id: TopicParticipant.where(person_id: id).select(:topic_id)).update_all(person_id: id)
     TopicParticipant.where(person_id: old_person.id).delete_all
+    PersonAffiliation.where(person_id: old_person.id).where("NOT EXISTS (SELECT 1 FROM person_affiliations t WHERE t.person_id = ? AND t.company = person_affiliations.company AND t.since IS NOT DISTINCT FROM person_affiliations.since)", id).update_all(person_id: id)
   end
 
   def merge_contributor_memberships_from(other_person)

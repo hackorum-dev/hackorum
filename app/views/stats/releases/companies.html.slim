@@ -1,0 +1,90 @@
+- content_for :title, "#{@release.label} companies"
+ruby:
+  rows = @data[:rows]
+  tiles = @data[:tiles]
+  known = rows.reject { |r| r[:company] == Stats::Affiliations::UNKNOWN }
+  unknown = rows.find { |r| r[:company] == Stats::Affiliations::UNKNOWN }
+  authored_total = tiles[:authored_total]
+  reviewed_total = rows.sum { |r| r[:reviewed] }
+  top12 = known.first(12)
+  title_cap = 40
+  people_title = lambda do |r|
+    committers, others = r[:people].partition { |person| person[:committer] }
+    lines = committers.map { |person| "#{person[:name]} (committer)" } + others.map { |person| person[:name] }
+    extra = lines.size - title_cap
+    head = "#{r[:people].size} #{'person'.pluralize(r[:people].size)}#{committers.any? ? ", #{committers.size} committer#{'s' unless committers.one?}" : ''}"
+    ([ head ] + lines.first(title_cap) + (extra.positive? ? [ "and #{extra} more" ] : [])).join("\n")
+  end
+  share_rows = lambda do |key, total|
+    head = known.sort_by { |r| [ -r[key], r[:company] ] }.first(8)
+    rest = (known - head).sum { |r| r[key] }
+    { categories: head.map { |r| r[:company] } + [ Stats::Release::Companies::OTHER, Stats::Affiliations::UNKNOWN ],
+      total_labels: true, percent_of: total, gray_tail: 2,
+      series: [ { label: key.to_s, values: head.map { |r| r[key] } + [ rest, unknown ? unknown[key] : 0 ] } ] }
+  end
+
+.stats-page
+  h1 = "#{@release.label} statistics"
+  = render "stats/releases/header", release: @release, releases: @releases, tab: :companies
+  .stats-tiles.is-four
+    = render "stats/releases/tile", v: stats_number(tiles[:companies]), k: "Companies", d: "with at least one credit"
+    = render "stats/releases/tile", v: stats_pct(tiles[:known_credits], tiles[:credits]), k: "Credits with a known affiliation", d: "#{stats_pct(tiles[:credits] - tiles[:known_credits], tiles[:credits])} individual or unknown"
+    = render "stats/releases/tile", v: stats_pct(tiles[:top5_authored], authored_total), k: "Of commits authored by the top 5 companies"
+    = render "stats/releases/tile", v: stats_number(tiles[:with_committer]), k: "Companies with a committer"
+  div.stats-card.is-tall style="margin-bottom: var(--spacing-3)"
+    .t Top companies by credits
+    .s authored, reviewed, and committed without authoring, stacked
+    = stats_chart("ranked", { categories: top12.map { |r| r[:company] }, total_labels: false, series: [ { label: "authored", values: top12.map { |r| r[:authored] } }, { label: "reviewed", values: top12.map { |r| r[:reviewed] } }, { label: "committed, not authored", values: top12.map { |r| r[:committed] } } ] }, label: "top companies by credits")
+  .stats-two
+    div.stats-card.is-mid
+      .t Share of authored commits
+      .s top 8, the other companies and unknown folded
+      = stats_chart("ranked", share_rows.call(:authored, authored_total), label: "share of authored commits")
+    div.stats-card.is-mid
+      .t Share of reviewed commits
+      .s a commit reviewed by two companies counts for both
+      = stats_chart("ranked", share_rows.call(:reviewed, reviewed_total), label: "share of reviewed commits")
+  .stats-two
+    div.stats-card
+      .t Authored, by month
+      .s = "top #{Stats::Release::Companies::TOP_MONTHLY} companies by this measure, the other companies, individuals and unknown, one scale; shaded months are outside the main phase"
+      = stats_chart("rows", { buckets: @data[:monthly][:buckets], windows: @data[:monthly][:windows], series: @data[:monthly][:authored] }, label: "authored by month", height: stats_rows_height(@data[:monthly][:authored]))
+    div.stats-card
+      .t Reviewed, by month
+      .s same split
+      = stats_chart("rows", { buckets: @data[:monthly][:buckets], windows: @data[:monthly][:windows], series: @data[:monthly][:reviewed] }, label: "reviewed by month", height: stats_rows_height(@data[:monthly][:reviewed]))
+  .stats-table-wrap
+    table.stats-table
+      thead
+        tr
+          th #
+          th.txt Company
+          th title="people credited under the company in this cycle; hover the marker for names" People
+          th Authored + reviewed
+          th Authored
+          th Reviewed
+          th Committed
+          th Lines
+          th Share of authored
+          th Share of reviewed
+      tbody
+        - rows.each_with_index do |r, i|
+          tr
+            td = r.equal?(unknown) ? "-" : i + 1
+            td.txt = r[:company]
+            td
+              = r[:people].size
+              span.info title=people_title.call(r) i
+            td: b = stats_number(r[:authored] + r[:reviewed])
+            td = stats_number(r[:authored])
+            td = stats_number(r[:reviewed])
+            td = r[:committed].zero? ? "-" : stats_number(r[:committed])
+            td = stats_number(r[:lines])
+            td = stats_pct(r[:authored], authored_total)
+            td = stats_pct(r[:reviewed], reviewed_total)
+  .stats-foot
+    = link_to "export CSV", stats_release_companies_path(@release.major, format: :csv)
+  p.stats-disclaimer
+    | Affiliations come from public sources: the PostgreSQL contributors page, commit messages and email domains, conference and company pages, and public profiles. They are kept as date ranges and can be wrong or out of date. To correct or remove yours, see the
+    =< link_to "privacy policy", help_path("privacy")
+    | .
