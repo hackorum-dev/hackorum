@@ -26,6 +26,7 @@ Useful commands:
 * Rails console: `task console`
 * Migrations/seeds: `task db-migrate` (or run arbitrary commands via `task shell`)
 * Tests: `task test` (pass args after `--`, e.g. `task test -- spec/models`)
+* Import the latest public dump from dumps.hackorum.dev in one step: `task db-import-latest` (downloads into `tmp/dumps`, recreates the dev DB, creates testadmin@example.com / password as admin)
 * Import a DB dump: `task db-import SCHEMA=/path/to/schema-YYYY-MM.sql.gz PUBLIC_DATA=/path/to/public-data-YYYY-MM.sql.gz`
 * If you need private data too, add `PRIVATE_DATA=/path/to/private-data-YYYY-MM.sql.gz` to the same command
 * Import postgres commit history: `task commit-import` (expects a checkout in `./postgres`, override with `PG_REPO=/path/to/postgres`; extra importer args after `--`, e.g. `-- --limit 100`)

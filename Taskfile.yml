@@ -140,6 +140,35 @@ tasks:
           {{.COMPOSE}} start web
         fi
 
+  db-import-latest:
+    desc: 'Download the latest public dump from dumps.hackorum.dev and import it (db-import + testadmin). Files are cached in tmp/dumps'
+    vars:
+      DUMPS_URL: https://dumps.hackorum.dev
+      DUMP_DIR: tmp/dumps
+      MONTH:
+        sh: |
+          list=$(curl -fsS -H 'Accept: application/json' https://dumps.hackorum.dev/) || exit 1
+          months() { echo "$list" | grep -o "\"name\":\"$1-[0-9]\{4\}-[0-9]\{2\}\.sql\.gz\"" | grep -o '[0-9]\{4\}-[0-9]\{2\}' | sort -u; }
+          pub=$(months public-data)
+          for m in $(months schema); do echo "$pub" | grep -qx "$m" && echo "$m"; done | tail -n 1
+    preconditions:
+      - sh: '[ -n "{{.MONTH}}" ]'
+        msg: 'no matching schema + public-data dump pair found at https://dumps.hackorum.dev/'
+    cmds:
+      - |
+        mkdir -p "{{.DUMP_DIR}}"
+        for f in schema-{{.MONTH}}.sql.gz public-data-{{.MONTH}}.sql.gz; do
+          if [ -f "{{.DUMP_DIR}}/$f" ]; then echo "Using cached $f"; continue; fi
+          echo "Downloading $f..."
+          curl -fL -C - -o "{{.DUMP_DIR}}/$f.part" "{{.DUMPS_URL}}/$f" || { echo "download of $f failed"; exit 1; }
+          mv "{{.DUMP_DIR}}/$f.part" "{{.DUMP_DIR}}/$f"
+        done
+        find "{{.DUMP_DIR}}" -maxdepth 1 -name '*.sql.gz' ! -name '*-{{.MONTH}}.sql.gz' -delete
+      - task: db-import
+        vars:
+          SCHEMA: '{{.DUMP_DIR}}/schema-{{.MONTH}}.sql.gz'
+          PUBLIC_DATA: '{{.DUMP_DIR}}/public-data-{{.MONTH}}.sql.gz'
+
   mbox-import:
     desc: 'Import mbox files (vars: LIST=id MBOX_DIR=/path MBOX_FILES="*.mbox"; extra args after --, e.g. -- --update-body)'
     requires:
