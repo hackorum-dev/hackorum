@@ -9,12 +9,15 @@ module Lineage
       STOP_KINDS = %w[usage_limit capacity aborted].freeze
       MAX_CONSECUTIVE_FAILURES = 3
       COUNTED_FAILURE_KINDS = %w[processor codex].freeze
+      BUNDLE_POLL_SECONDS = 5
+      BUNDLE_WAIT_SECONDS = 1800
       # kind: :done (server took the result), :refused (server no longer wanted it, not a stop), :empty, :stopped
       Outcome = Struct.new(:kind, :claim, :status, :duration_s, :error, keyword_init: true)
 
       def initialize(client:, runner:, jobs_root:, worker_name:, stop:, phases: nil, repo_path: nil, completer: nil,
                      say: ->(_) { }, capacity_sleeps: CAPACITY_RETRY_SLEEPS, server_sleeps: SERVER_RETRY_SLEEPS,
-                     release_sleeps: RELEASE_RETRY_SLEEPS, max_failures: MAX_CONSECUTIVE_FAILURES)
+                     release_sleeps: RELEASE_RETRY_SLEEPS, max_failures: MAX_CONSECUTIVE_FAILURES,
+                     bundle_poll: BUNDLE_POLL_SECONDS, bundle_wait: BUNDLE_WAIT_SECONDS)
         @client = client
         @runner = runner
         @jobs_root = jobs_root.to_s
@@ -27,7 +30,10 @@ module Lineage
         @server_sleeps = server_sleeps
         @release_sleeps = release_sleeps
         @max_failures = max_failures
+        @bundle_poll = bundle_poll
+        @bundle_wait = bundle_wait
         @failures = 0
+        @bundle_failures = 0
       end
 
       def run_one
@@ -47,8 +53,14 @@ module Lineage
       def process(claim)
         job_dir = File.join(@jobs_root, claim.topic_id.to_s, claim.run_id.to_s)
         FileUtils.mkdir_p(job_dir)
-        tar = with_retries("download of run #{claim.run_id}") do
-          @client.download_bundle(claim.run_id, to: File.join(job_dir, "bundle.tar.gz"))
+        tar = begin
+          fetch_bundle(claim, File.join(job_dir, "bundle.tar.gz"))
+        rescue Client::Conflict => e
+          return bundle_refused(claim, e)
+        end
+        unless tar
+          release(claim)
+          return Outcome.new(kind: :stopped, claim: claim, status: "aborted")
         end
         result, duration = prepare_and_run(job_dir, tar)
         @capacity_sleeps.each do |s|
@@ -64,6 +76,34 @@ module Lineage
           return Outcome.new(kind: :stopped, claim: claim, status: result.failure_kind, error: result.error_message)
         end
         finish(claim, result, duration, job_dir)
+      end
+
+      # -> tarball path, or nil when stopped while the server builds it
+      def fetch_bundle(claim, to)
+        deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + @bundle_wait
+        loop do
+          tar = with_retries("download of run #{claim.run_id}") { @client.download_bundle(claim.run_id, to: to) }
+          if tar
+            @bundle_failures = 0
+            return tar
+          end
+          if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+            raise Client::Error, "bundle of run #{claim.run_id} not ready after #{@bundle_wait}s"
+          end
+          pause(@bundle_poll)
+          return nil if @stop.set?
+        end
+      end
+
+      def bundle_refused(claim, e)
+        @bundle_failures += 1
+        @say.call("bundle of run #{claim.run_id} refused: #{e.message}")
+        if @bundle_failures >= @max_failures
+          @say.call("#{@bundle_failures} bundles refused in a row, stopping")
+          @stop.set!
+          return Outcome.new(kind: :stopped, claim: claim, error: e.message)
+        end
+        Outcome.new(kind: :refused, claim: claim, error: e.message)
       end
 
       def finish(claim, result, duration, job_dir)

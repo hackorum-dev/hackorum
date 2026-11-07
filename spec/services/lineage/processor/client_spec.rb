@@ -23,11 +23,23 @@ RSpec.describe Lineage::Processor::Client, :webmock do
     end
   end
 
+  it "returns nil while the bundle builds" do
+    stub_request(:get, "http://srv:3000/api/lineage/claims/7/bundle").to_return(status: 202)
+    Dir.mktmpdir do |dir|
+      expect(client.download_bundle(7, to: File.join(dir, "b.tar.gz"))).to be_nil
+      expect(Dir.children(dir)).to be_empty
+    end
+  end
+
   it "fails a download cleanly" do
-    stub_request(:get, "http://srv:3000/api/lineage/claims/7/bundle").to_return(status: 409, body: "taken")
     Dir.mktmpdir do |dir|
       to = File.join(dir, "b.tar.gz")
+      stub_request(:get, "http://srv:3000/api/lineage/claims/7/bundle").to_return(status: 409, body: "taken")
       expect { client.download_bundle(7, to: to) }.to raise_error(described_class::Conflict)
+      stub_request(:get, "http://srv:3000/api/lineage/claims/7/bundle").to_return(status: 404)
+      expect { client.download_bundle(7, to: to) }.to raise_error(described_class::Conflict, /404/)
+      stub_request(:get, "http://srv:3000/api/lineage/claims/7/bundle").to_return(status: 504)
+      expect { client.download_bundle(7, to: to) }.to raise_error(described_class::Error, /504/)
       expect(Dir.children(dir)).to be_empty
     end
   end

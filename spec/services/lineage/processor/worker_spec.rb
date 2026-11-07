@@ -44,7 +44,7 @@ RSpec.describe Lineage::Processor::Worker do
   def worker(dir, client:, runner:, **opts)
     described_class.new(client: client, runner: runner, completer: completer, jobs_root: File.join(dir, "jobs"),
                         worker_name: "w", phases: nil, stop: stop, say: ->(l) { lines << l },
-                        capacity_sleeps: [ 0, 0, 0 ], server_sleeps: [ 0, 0 ], release_sleeps: [ 0 ], **opts)
+                        capacity_sleeps: [ 0, 0, 0 ], server_sleeps: [ 0, 0 ], release_sleeps: [ 0 ], bundle_poll: 0, **opts)
   end
 
   it "runs a claim end to end" do
@@ -279,6 +279,59 @@ RSpec.describe Lineage::Processor::Worker do
       expect(c).to have_received(:download_bundle).exactly(3).times
       expect(c).to have_received(:release).with(7).twice
       expect(lines).to include(a_string_including("left for the server sweep"))
+    end
+  end
+
+  it "polls until the bundle is built" do
+    Dir.mktmpdir do |dir|
+      c = client(dir)
+      polls = 0
+      allow(c).to receive(:download_bundle) do |_, to:|
+        polls += 1
+        next nil if polls < 3
+        FileUtils.cp(tarball(dir), to)
+        to
+      end
+      out = worker(dir, client: c, runner: runner(result)).run_one
+      expect(out.kind).to eq(:done)
+      expect(polls).to eq(3)
+    end
+  end
+
+  it "releases the claim when stopped while the bundle builds" do
+    Dir.mktmpdir do |dir|
+      c = client(dir)
+      allow(c).to receive(:download_bundle) { stop.set!; nil }
+      r = runner
+      out = worker(dir, client: c, runner: r).run_one
+      expect(out).to have_attributes(kind: :stopped, status: "aborted")
+      expect(c).to have_received(:release).with(7)
+      expect(r).not_to have_received(:call)
+    end
+  end
+
+  it "gives up a bundle that never gets built" do
+    Dir.mktmpdir do |dir|
+      c = client(dir)
+      allow(c).to receive(:download_bundle).and_return(nil)
+      out = worker(dir, client: c, runner: runner, bundle_wait: 0).run_one
+      expect(out.kind).to eq(:stopped)
+      expect(out.error).to include("not ready after 0s")
+      expect(c).to have_received(:release).with(7)
+    end
+  end
+
+  it "moves past refused bundles, stopping after three in a row" do
+    Dir.mktmpdir do |dir|
+      c = client(dir)
+      allow(c).to receive(:download_bundle).and_raise(Lineage::Processor::Client::Conflict, "409: bundle failed: kaput")
+      w = worker(dir, client: c, runner: runner)
+      2.times { expect(w.run_one).to have_attributes(kind: :refused, error: a_string_including("kaput")) }
+      expect(stop.set?).to be(false)
+      expect(w.run_one.kind).to eq(:stopped)
+      expect(stop.set?).to be(true)
+      expect(c).not_to have_received(:release)
+      expect(lines).to include(a_string_including("3 bundles refused in a row"))
     end
   end
 end

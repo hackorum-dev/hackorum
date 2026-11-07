@@ -6,42 +6,40 @@ module Lineage
     Conflict = Class.new(Error)
 
     LOCK_KEY = "lineage_claim"
-    MAX_BUILD_FAILURES = 5
     RESULT_FIELDS = %i[exit_code failure_kind model effort job_dir input_tokens cached_input_tokens output_tokens].freeze
 
     def self.bundles_root = Pathname.new(ENV["LINEAGE_BUNDLES_ROOT"].presence || Rails.root.join("tmp/lineage_bundles"))
     def self.bundle_dir(id) = bundles_root.join(id.to_s)
     def self.tar_path(id) = bundles_root.join("#{id}.tar.gz")
+    def self.part_path(id) = bundles_root.join("#{id}.tar.gz.part")
 
     def self.claim(worker:, phases: Queue::PHASES)
-      MAX_BUILD_FAILURES.times do
-        run = AdvisoryLock.with_lock(LOCK_KEY, wait: true) do
-          Queue.sweep!
-          prune!
-          topic, phase = Queue.next(phases: phases)
-          topic && PatchsetRun.create!(topic: topic, status: "claimed", mode: phase, worker: worker,
-                                       claimed_at: Time.current, started_at: Time.current,
-                                       prompt_version: JobBundle.prompt_version)
-        end
-        return nil unless run
-        begin
-          build!(run)
-          return run
-        rescue => e
-          cleanup(run.id)
-          run.finish!(status: "failed", failure_kind: "bundle", error: "#{e.class}: #{e.message}")
-        end
+      run = AdvisoryLock.with_lock(LOCK_KEY, wait: true) do
+        Queue.sweep!
+        prune!
+        topic, phase = Queue.next(phases: phases)
+        topic && PatchsetRun.create!(topic: topic, status: "claimed", mode: phase, worker: worker,
+                                     claimed_at: Time.current, started_at: Time.current,
+                                     prompt_version: JobBundle.prompt_version)
       end
-      raise Error, "#{MAX_BUILD_FAILURES} bundle builds failed in a row"
+      LineageBundleJob.perform_later(run.id) if run
+      run
     end
 
+    # -> tarball path, or nil while the build job runs
     def self.bundle_tar(run)
       PatchsetRun.transaction do
         run.lock!
+        raise Conflict, "run #{run.id} bundle failed: #{run.error}" if run.failure_kind == "bundle"
         claimed!(run)
-        run.update!(claimed_at: Time.current)
-        tar = tar_path(run.id)
-        File.exist?(tar) ? tar : build!(run)
+        if File.exist?(tar_path(run.id))
+          run.update!(claimed_at: Time.current)
+          tar_path(run.id)
+        elsif run.bundle_index
+          run.update!(bundle_index: nil)
+          LineageBundleJob.perform_later(run.id)
+          nil
+        end
       end
     end
 
@@ -83,6 +81,7 @@ module Lineage
 
     def self.build!(run)
       dir = bundle_dir(run.id)
+      part = part_path(run.id)
       FileUtils.rm_rf(dir)
       FileUtils.mkdir_p(dir)
       candidates = if run.mode == "trailer"
@@ -91,18 +90,29 @@ module Lineage
         []
       end
       index = BundleWriter.new(run: run, topic: run.topic, candidates: candidates, mode: run.mode).call(dir.to_s)
-      run.update!(bundle_index: index, through_message_id: index["through_message_id"])
-      tar = tar_path(run.id)
-      system("tar", "-czf", tar.to_s, "-C", dir.to_s, ".", exception: true)
-      tar
+      system("tar", "-czf", part.to_s, "-C", dir.to_s, ".", exception: true)
+      PatchsetRun.transaction do
+        run.lock!
+        claimed!(run)
+        run.update!(bundle_index: index, through_message_id: index["through_message_id"])
+        File.rename(part, tar_path(run.id))
+      end
+    rescue Conflict, ActiveRecord::RecordNotFound
+      cleanup(run.id)
+    rescue => e
+      cleanup(run.id)
+      PatchsetRun.transaction do
+        run.lock!
+        run.finish!(status: "failed", failure_kind: "bundle", error: "#{e.class}: #{e.message}") if run.status == "claimed"
+      end
     end
 
     def self.prune!
       return unless bundles_root.directory?
       live = PatchsetRun.claimed.pluck(:id).to_set
       bundles_root.each_child do |path|
-        id = path.basename(".tar.gz").to_s
-        next unless id.match?(/\A\d+\z/) && !live.include?(id.to_i)
+        id = path.basename.to_s[/\A(\d+)(\.tar\.gz(\.part)?)?\z/, 1]
+        next unless id && !live.include?(id.to_i)
         FileUtils.rm_rf(path)
       end
     end
@@ -110,11 +120,12 @@ module Lineage
     def self.cleanup(id)
       FileUtils.rm_rf(bundle_dir(id))
       FileUtils.rm_f(tar_path(id))
+      FileUtils.rm_f(part_path(id))
     end
 
     def self.claimed!(run)
       raise Conflict, "run #{run.id} is #{run.status}" unless run.status == "claimed"
     end
-    private_class_method :bundle_dir, :tar_path, :build!, :prune!, :cleanup, :claimed!
+    private_class_method :bundle_dir, :tar_path, :part_path, :prune!, :cleanup, :claimed!
   end
 end

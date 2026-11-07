@@ -15,7 +15,11 @@ module LineageApi
 
     def bundle
       path = ::Lineage::Claims.bundle_tar(run)
-      send_file path, type: "application/gzip", filename: "#{run.id}.tar.gz"
+      if path
+        send_file path, type: "application/gzip", filename: "#{run.id}.tar.gz"
+      else
+        head :accepted
+      end
     end
 
     def result

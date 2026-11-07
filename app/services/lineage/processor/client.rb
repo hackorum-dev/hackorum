@@ -35,17 +35,25 @@ module Lineage
         Claim.new(run_id: data["run_id"], topic_id: data["topic_id"], mode: data["mode"], prompt_version: data["prompt_version"])
       end
 
+      # -> path, or nil while the server still builds the bundle
       def download_bundle(run_id, to:)
         part = "#{to}.part"
+        pending = false
         guard do
           File.open(part, "wb") do |f|
             http.request(authed(Net::HTTP::Get.new(path("/claims/#{run_id}/bundle")))) do |res|
-              check!(res, "200")
+              pending = res.code == "202"
+              next if pending
+              check!(res, "200", conflict: %w[404 409])
               res.read_body { |chunk| f.write(chunk) }
             end
           end
-          File.rename(part, to)
         end
+        if pending
+          File.unlink(part)
+          return nil
+        end
+        File.rename(part, to)
         to
       rescue
         File.unlink(part) if File.exist?(part)

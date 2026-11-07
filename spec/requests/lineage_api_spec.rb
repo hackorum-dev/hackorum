@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe "Lineage API", type: :request do
+  include ActiveJob::TestHelper
+
   let(:patch) { "diff --git a/src/backend/x.c b/src/backend/x.c\n--- a/src/backend/x.c\n+++ b/src/backend/x.c\n@@ -1,1 +1,2 @@\n a\n+b\n" }
 
   def thread(first_at, linked: false)
@@ -43,6 +45,11 @@ RSpec.describe "Lineage API", type: :request do
     expect(claim).to include("topic_id" => topic.id, "mode" => "lineage")
     run = PatchsetRun.find(claim["run_id"])
     expect(run.worker).to eq("box")
+
+    get bundle_api_lineage_claim_path(run), headers: headers
+    expect(response).to have_http_status(:accepted)
+    perform_enqueued_jobs
+    run.reload
 
     get bundle_api_lineage_claim_path(run), headers: headers
     expect(response).to have_http_status(:ok)
@@ -110,6 +117,18 @@ RSpec.describe "Lineage API", type: :request do
     expect(response).to have_http_status(:ok)
     expect(JSON.parse(response.body)).to include("status" => "failed")
     expect(run.reload.failure_kind).to eq("upload")
+  end
+
+  it "refuses the bundle of a failed build" do
+    thread(Time.zone.parse("2020-01-01"))
+    allow(Lineage::BundleWriter).to receive(:new).and_raise("kaput")
+    post api_lineage_claims_path, params: { worker: "box" }.to_json, headers: json_headers
+    run = PatchsetRun.find(JSON.parse(response.body)["run_id"])
+    perform_enqueued_jobs
+
+    get bundle_api_lineage_claim_path(run), headers: headers
+    expect(response).to have_http_status(:conflict)
+    expect(JSON.parse(response.body)["error"]).to include("kaput")
   end
 
   it "validates claim params" do
