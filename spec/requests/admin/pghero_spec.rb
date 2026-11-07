@@ -35,6 +35,8 @@ RSpec.describe "PgHero mount", type: :request do
   end
 
   it "is routable for admins" do
+    # CI postgres lacks pg_stat_statements preload; probe error aborts the test txn
+    allow_any_instance_of(PgHero::Database).to receive(:query_stats_readable?).and_return(false)
     sign_in(email: "admin@example.com")
     get "/admin/pghero"
     expect(response).not_to have_http_status(:not_found)

@@ -42,11 +42,11 @@ RSpec.describe Lineage::DiffParser do
     r = described_class.parse(UNIFIED)
     plan = r.files.find { |f| f.path == "src/backend/optimizer/plan.c" }
     expect(plan.area).to eq(:code)
-    expect(plan.removed).to eq(Set[ "int b;" ])
-    expect(plan.added).to eq(Set[ "int c;", "--- not a header" ])
+    expect(plan.removed).to eq(Set["int b;"])
+    expect(plan.added).to eq(Set["int c;", "--- not a header"])
     gone = r.files.find { |f| f.path == "src/test/regress/sql/old.sql" }
     expect(gone.area).to eq(:test)
-    expect(gone.removed).to eq(Set[ "select 1;" ])
+    expect(gone.removed).to eq(Set["select 1;"])
     expect(r.subjects).to eq([ "Teach the planner a trick" ])
   end
 
@@ -55,8 +55,8 @@ RSpec.describe Lineage::DiffParser do
     expect(r.files.size).to eq(1)
     f = r.files.first
     expect(f.path).to eq("src/backend/x.c")
-    expect(f.removed).to eq(Set[ "old line", "gone" ])
-    expect(f.added).to eq(Set[ "new line", "added" ])
+    expect(f.removed).to eq(Set["old line", "gone"])
+    expect(f.added).to eq(Set["new line", "added"])
   end
 
   it "gives each file of a multi-file context diff its own entry" do
@@ -82,8 +82,8 @@ RSpec.describe Lineage::DiffParser do
     DIFF
     r = described_class.parse(text)
     expect(r.files.map(&:path)).to eq([ "src/a.c", "src/b.c" ])
-    expect(r.files.map(&:added)).to eq([ Set[ "new a" ], Set[ "new b" ] ])
-    expect(r.files.map(&:removed)).to eq([ Set[ "old a" ], Set[ "old b" ] ])
+    expect(r.files.map(&:added)).to eq([ Set["new a"], Set["new b"] ])
+    expect(r.files.map(&:removed)).to eq([ Set["old a"], Set["old b"] ])
   end
 
   it "parses plain diff -u output without diff --git lines" do
@@ -105,8 +105,8 @@ RSpec.describe Lineage::DiffParser do
     DIFF
     r = described_class.parse(text)
     expect(r.files.map(&:path)).to eq([ "src/a.c", "src/b.c" ])
-    expect(r.files[0].removed).to eq(Set[ "b" ])
-    expect(r.files[1].added).to eq(Set[ "w" ])
+    expect(r.files[0].removed).to eq(Set["b"])
+    expect(r.files[1].added).to eq(Set["w"])
   end
 
   it "does not let a deletion-only context hunk swallow the next file" do
@@ -132,9 +132,9 @@ RSpec.describe Lineage::DiffParser do
     DIFF
     r = described_class.parse(text)
     expect(r.files.map(&:path)).to eq([ "src/a.c", "src/b.c" ])
-    expect(r.files[0].removed).to eq(Set[ "b" ])
+    expect(r.files[0].removed).to eq(Set["b"])
     expect(r.files[0].added).to be_empty
-    expect(r.files[1].added).to eq(Set[ "w" ])
+    expect(r.files[1].added).to eq(Set["w"])
     expect(r.files[1].removed).to be_empty
   end
 
@@ -159,7 +159,7 @@ RSpec.describe Lineage::DiffParser do
     DIFF
     r = described_class.parse(text)
     expect(r.files.map(&:path)).to eq([ "src/a.c", "src/b.c" ])
-    expect(r.files[1].added).to eq(Set[ "w" ])
+    expect(r.files[1].added).to eq(Set["w"])
   end
 
   it "uses the Index: path when the context header has a bare basename" do
@@ -186,8 +186,8 @@ RSpec.describe Lineage::DiffParser do
     r = described_class.parse(text)
     expect(r.files.map(&:path)).to eq([ "src/test/regress/sql/foo.sql", "src/backend/Makefile" ])
     expect(r.files[0].area).to eq(:test)
-    expect(r.files[0].added).to eq(Set[ "select 1;" ])
-    expect(r.files[1].added).to eq(Set[ "CFLAGS=1" ])
+    expect(r.files[0].added).to eq(Set["select 1;"])
+    expect(r.files[1].added).to eq(Set["CFLAGS=1"])
   end
 
   it "uses the Index: path when a unified header has a bare basename" do
@@ -215,8 +215,8 @@ RSpec.describe Lineage::DiffParser do
     r = described_class.parse(text)
     expect(r.files.map(&:path)).to eq([ "src/test/regress/sql/foo.sql", "src/backend/gone.c" ])
     expect(r.files[0].area).to eq(:test)
-    expect(r.files[0].added).to eq(Set[ "select 1;" ])
-    expect(r.files[1].removed).to eq(Set[ "int x;" ])
+    expect(r.files[0].added).to eq(Set["select 1;"])
+    expect(r.files[1].removed).to eq(Set["int x;"])
   end
 
   it "parses non-utf8 bytes without breaking json" do
@@ -291,8 +291,8 @@ RSpec.describe Lineage::DiffParser do
     DIFF
     r = described_class.parse(text)
     expect(r.files.map(&:path)).to eq([ "src/new.c", "src/old.c" ])
-    expect(r.files[0].added).to eq(Set[ "one", "two" ])
-    expect(r.files[1].removed).to eq(Set[ "three", "four" ])
+    expect(r.files[0].added).to eq(Set["one", "two"])
+    expect(r.files[1].removed).to eq(Set["three", "four"])
   end
 
   it "memoizes line sets per area" do
@@ -301,7 +301,7 @@ RSpec.describe Lineage::DiffParser do
     expect(added).to include("int c;")
     expect(removed).to include("select 1;")
     expect(r.lines).to equal(r.lines)
-    expect(r.lines(:test)[1]).to eq(Set[ "select 1;" ])
+    expect(r.lines(:test)[1]).to eq(Set["select 1;"])
   end
 
   it "merges several files and keeps subject order" do

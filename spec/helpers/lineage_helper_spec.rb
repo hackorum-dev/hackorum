@@ -60,8 +60,8 @@ RSpec.describe LineageHelper, type: :helper do
   describe "#story_dot_class" do
     it "classifies by commit ref" do
       revert = "b" * 40
-      expect(helper.story_dot_class("x [commit:#{sha}]", Set[ revert ])).to eq("is-commit")
-      expect(helper.story_dot_class("x [commit:#{revert}]", Set[ revert ])).to eq("is-revert")
+      expect(helper.story_dot_class("x [commit:#{sha}]", Set[revert])).to eq("is-commit")
+      expect(helper.story_dot_class("x [commit:#{revert}]", Set[revert])).to eq("is-revert")
       expect(helper.story_dot_class("x", Set.new)).to eq("is-talk")
     end
   end

@@ -64,7 +64,7 @@ RSpec.describe Topics::CommitSummary do
       backport = create(:commit, subject: "Revert support for MERGE", committed_at: t0 + 101.days, cherry_picked_from_sha: revert.sha)
       s = summary([ feature, revert, backport ])
 
-      expect(s.revert_shas).to eq(Set[ revert.sha, backport.sha ])
+      expect(s.revert_shas).to eq(Set[revert.sha, backport.sha])
     end
 
     it "claims nothing when the body names no thread commit" do
