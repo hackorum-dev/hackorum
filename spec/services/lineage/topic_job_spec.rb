@@ -13,8 +13,8 @@ RSpec.describe Lineage::TopicJob do
   let!(:m1) { patch_message(topic, 2.days.ago) }
   let!(:m2) { patch_message(topic, 1.day.ago) }
 
-  def job(dir, runner:, candidates: [], **opts)
-    described_class.new(topic: topic, candidates: candidates, repo_path: dir, jobs_root: File.join(dir, "jobs"),
+  def job(dir, runner:, candidates: [], repo_path: dir, **opts)
+    described_class.new(topic: topic, candidates: candidates, repo_path: repo_path, jobs_root: File.join(dir, "jobs"),
                         worktrees_dir: File.join(dir, "wt"), apply: false, runner: runner, **opts)
   end
 
@@ -74,8 +74,9 @@ RSpec.describe Lineage::TopicJob do
 
   it "folds backports into their canonical candidate" do
     Dir.mktmpdir do |dir|
-      canonical = create(:commit)
-      backport = create(:commit, cherry_picked_from_sha: canonical.sha, branches: [ "REL_17_STABLE" ])
+      git = GitFixtureRepo.new(File.join(dir, "repo"))
+      canonical = create(:commit, sha: git.commit(subject: "canonical"))
+      backport = create(:commit, sha: git.commit(subject: "backport"), cherry_picked_from_sha: canonical.sha, branches: [ "REL_17_STABLE" ])
       create(:commit_person, commit: canonical, role: "reviewer", raw_name: "Alice")
       create(:commit_person, commit: backport, role: "reviewer", raw_name: "Alice")
       person = create(:person)
@@ -140,8 +141,9 @@ RSpec.describe Lineage::TopicJob do
 
   it "hands the ingestor the candidate index with origin, backports and reviewers" do
     Dir.mktmpdir do |dir|
-      canonical = create(:commit)
-      backport = create(:commit, cherry_picked_from_sha: canonical.sha, branches: [ "REL_17_STABLE" ])
+      git = GitFixtureRepo.new(File.join(dir, "repo"))
+      canonical = create(:commit, sha: git.commit(subject: "canonical"))
+      backport = create(:commit, sha: git.commit(subject: "backport"), cherry_picked_from_sha: canonical.sha, branches: [ "REL_17_STABLE" ])
       create(:commit_person, commit: canonical, role: "reviewer", raw_name: "Alice")
       create(:commit_person, commit: canonical, role: "reviewer", raw_name: "Guessed", source: "llm", confidence: 0.9)
       seen = nil
@@ -153,8 +155,8 @@ RSpec.describe Lineage::TopicJob do
         File.write(File.join(job_dir, "result.json"), JSON.dump("lineage" => [], "verdicts" => [], "story" => "s"))
         good_result
       end
-      job(dir, runner: runner, candidates: [ { commit: canonical, origin: "trailer", overlap: nil },
-                                             { commit: backport, origin: "previous", overlap: nil } ]).call
+      job(dir, runner: runner, repo_path: git.path, candidates: [ { commit: canonical, origin: "trailer", overlap: nil },
+                                                                  { commit: backport, origin: "previous", overlap: nil } ]).call
       expect(seen["patchsets"]).to eq([ { "message_id" => m1.id }, { "message_id" => m2.id } ])
       expect(seen["candidates"]).to eq([ { "sha" => canonical.sha, "origin" => "trailer",
                                            "backports" => [ backport.sha ], "reviewers" => [ "Alice" ],

@@ -104,6 +104,21 @@ RSpec.describe Lineage::Processor::Worker do
     end
   end
 
+  it "stops and releases when the checkout lacks a candidate" do
+    Dir.mktmpdir do |dir|
+      c = client(dir)
+      allow(completer).to receive(:call).and_raise(Lineage::BundleCompleter::MissingCommits, "abc not in repo after fetch")
+      r = runner
+      out = worker(dir, client: c, runner: r).run_one
+      expect(out.kind).to eq(:stopped)
+      expect(out.status).to eq("stale_repo")
+      expect(stop.set?).to be(true)
+      expect(c).to have_received(:release).with(7)
+      expect(c).not_to have_received(:submit_result)
+      expect(r).not_to have_received(:call)
+    end
+  end
+
   it "stops without running codex when the stop flag is set while completing the bundle" do
     Dir.mktmpdir do |dir|
       c = client(dir)

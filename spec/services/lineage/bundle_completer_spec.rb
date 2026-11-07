@@ -21,24 +21,22 @@ RSpec.describe Lineage::BundleCompleter do
       repo = File.join(root, "repo")
       sha = GitFixtureRepo.new(repo).commit(subject: "Add x", files: { "src/backend/x.c" => "a\nint x;\n" })
       dir = File.join(root, "job")
-      write_bundle(dir, candidates: [ { "sha" => sha, "origin" => "trailer" }, { "sha" => "0" * 40, "origin" => "manual" } ])
+      write_bundle(dir, candidates: [ { "sha" => sha, "origin" => "trailer" } ])
 
       described_class.new(repo_path: repo).call(dir)
 
       index = JSON.parse(File.read(File.join(dir, "index.json")))
       expect(index["repo_path"]).to eq(repo)
-      expect(index["candidates"].map { |c| c["diff_available"] }).to eq([ true, false ])
+      expect(index["candidates"].map { |c| c["diff_available"] }).to eq([ true ])
       expect(File.read(File.join(dir, "commits", sha, "message.txt"))).to start_with("Add x")
       expect(File.read(File.join(dir, "commits", sha, "diff.patch"))).to include("+int x;")
-      expect(File.exist?(File.join(dir, "commits", "0" * 40))).to be(false)
 
       scores = JSON.parse(File.read(File.join(dir, "commit_scores.json")))
-      expect(scores.size).to eq(4)
+      expect(scores.size).to eq(2)
       good = scores.find { |s| s["sha"] == sha && s["message_id"] == 20 }
       expect(good["ordinal"]).to eq(2)
       expect(good["metrics"]["file_jaccard"]).to eq(1.0)
       expect(scores.find { |s| s["sha"] == sha && s["message_id"] == 30 }["metrics"]).to eq("unparsed" => true)
-      expect(scores.find { |s| s["sha"] == "0" * 40 && s["message_id"] == 20 }["metrics"]).to eq("unparsed" => true)
       expect(File.read(File.join(dir, "README.md"))).to eq("checkout at `#{repo}`\n")
     end
   end
@@ -55,6 +53,37 @@ RSpec.describe Lineage::BundleCompleter do
       expect(JSON.parse(File.read(File.join(dir, "commit_scores.json")))).to eq([])
       expect(Dir.exist?(File.join(dir, "commits"))).to be(false)
       expect(File.read(File.join(dir, "README.md"))).to include(repo)
+    end
+  end
+
+  it "fetches a candidate missing from the checkout" do
+    Dir.mktmpdir do |root|
+      upstream = GitFixtureRepo.new(File.join(root, "upstream"))
+      upstream.commit(subject: "base")
+      repo = upstream.clone_to(File.join(root, "repo"))
+      sha = upstream.commit(subject: "Add x", files: { "src/backend/x.c" => "a\nint x;\n" })
+      dir = File.join(root, "job")
+      write_bundle(dir, candidates: [ { "sha" => sha, "origin" => "trailer" } ])
+
+      described_class.new(repo_path: repo).call(dir)
+
+      index = JSON.parse(File.read(File.join(dir, "index.json")))
+      expect(index["candidates"].first["diff_available"]).to be(true)
+      expect(File.read(File.join(dir, "commits", sha, "diff.patch"))).to include("+int x;")
+    end
+  end
+
+  it "raises when a candidate is still missing after the fetch" do
+    Dir.mktmpdir do |root|
+      upstream = GitFixtureRepo.new(File.join(root, "upstream"))
+      upstream.commit(subject: "base")
+      repo = upstream.clone_to(File.join(root, "repo"))
+      dir = File.join(root, "job")
+      write_bundle(dir, candidates: [ { "sha" => "0" * 40, "origin" => "trailer" } ])
+
+      expect { described_class.new(repo_path: repo).call(dir) }
+        .to raise_error(described_class::MissingCommits, /#{"0" * 40}/)
+      expect(File.exist?(File.join(dir, "commit_scores.json"))).to be(false)
     end
   end
 end

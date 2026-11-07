@@ -6,7 +6,7 @@ module Lineage
       CAPACITY_RETRY_SLEEPS = [ 60, 180, 300 ].freeze
       SERVER_RETRY_SLEEPS = [ 10, 30, 60, 120, 300 ].freeze
       RELEASE_RETRY_SLEEPS = [ 5, 15, 45 ].freeze
-      STOP_KINDS = %w[usage_limit capacity aborted].freeze
+      STOP_KINDS = %w[usage_limit capacity aborted stale_repo].freeze
       MAX_CONSECUTIVE_FAILURES = 3
       COUNTED_FAILURE_KINDS = %w[processor codex].freeze
       BUNDLE_POLL_SECONDS = 5
@@ -134,6 +134,8 @@ module Lineage
         run_codex(job_dir)
       rescue Client::Error
         raise
+      rescue BundleCompleter::MissingCommits => e
+        [ processor_failure(e, kind: "stale_repo"), nil ]
       rescue => e
         [ processor_failure(e), nil ]
       end
@@ -146,8 +148,8 @@ module Lineage
         [ processor_failure(e), nil ]
       end
 
-      def processor_failure(e)
-        CodexRunner::Result.new(exit_code: -1, timed_out: false, aborted: false, command: [], failure_kind: "processor",
+      def processor_failure(e, kind: "processor")
+        CodexRunner::Result.new(exit_code: -1, timed_out: false, aborted: false, command: [], failure_kind: kind,
                                 error_message: "#{e.class}: #{e.message}", usage: {})
       end
 

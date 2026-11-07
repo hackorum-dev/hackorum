@@ -1,29 +1,40 @@
 module Lineage
   # database half of a bundle; returns the index the ingestor needs
   class BundleWriter
-    def initialize(run:, topic:, candidates:, mode:, branches: nil)
+    def initialize(run:, topic:, candidates:, mode:, branches: nil, base_run: nil)
       @run = run
       @topic = topic
       @candidates = candidates
       @mode = mode
       @branches = branches || method(:existing_branches)
+      @base_run = base_run
     end
 
     def call(dir)
+      # read first: mail listed here was in the database when the bundle was built
+      patch_mail_ids = @topic.messages.where(is_patch_submission: true).order(:id).pluck(:id)
       patchsets = PatchsetEnumerator.new(@topic).call(File.join(dir, "patchsets"))
       branches = @branches.call(patchsets)
+      fresh = @base_run && Updates.new_patchset_ids(@base_run, patchsets.map(&:message))
       pairs = TriangleBuilder.new(@topic, patchsets).call
+      pairs = pairs.select { |p| fresh.include?(p[:later_message_id]) || fresh.include?(p[:earlier_message_id]) } if fresh
       entries = with_reviewers(fold_backports(all_candidates))
-      previous = PatchsetRun.current_for(@topic.id)&.raw_result
+      previous = (@base_run || PatchsetRun.current_for(@topic.id))&.raw_result&.except("update")
       last_id = JobBundle.new(run: @run, topic: @topic, patchsets: patchsets, candidates: entries, pairs: pairs,
-                              branches: branches, previous: previous, mode: @mode).write(dir)
-      { "mode" => @mode, "through_message_id" => last_id,
-        "patchsets" => patchsets.map { |p| { "message_id" => p.message.id } },
-        "candidates" => entries.map { |c|
-          { "sha" => c[:commit].sha, "origin" => c[:origin],
-            "backports" => c[:backports].map(&:sha), "reviewers" => c[:reviewers],
-            "committer_reviewers" => c[:committer_reviewers] }
-        } }
+                              branches: branches, previous: previous, mode: @mode, base_run: @base_run,
+                              new_patchset_ids: fresh).write(dir)
+      index = { "mode" => @mode, "through_message_id" => last_id,
+                "patchsets" => patchsets.map { |p|
+                  { "message_id" => p.message.id }.merge(fresh ? { "new" => fresh.include?(p.message.id) } : {})
+                },
+                "candidates" => entries.map { |c|
+                  { "sha" => c[:commit].sha, "origin" => c[:origin],
+                    "backports" => c[:backports].map(&:sha), "reviewers" => c[:reviewers],
+                    "committer_reviewers" => c[:committer_reviewers] }
+                },
+                "patch_mail_ids" => patch_mail_ids }
+      index.merge!("base_run_id" => @base_run.id, "since_message_id" => @base_run.through_message_id) if @base_run
+      index
     end
 
     private
@@ -34,9 +45,9 @@ module Lineage
     end
 
     # the ingestor drops llm links for commits this run did not judge, so every
-    # currently linked commit must be judged again
+    # currently linked commit must be judged again; an update keeps them as they are
     def all_candidates
-      return @candidates if @mode == "lineage"
+      return @candidates if %w[lineage update].include?(@mode)
 
       known = @candidates.map { |c| c[:commit].id }.to_set
       previous = Commit.where(id: CommitTopic.llm.where(topic_id: @topic.id).select(:commit_id))

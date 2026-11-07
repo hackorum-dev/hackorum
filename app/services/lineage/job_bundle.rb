@@ -15,7 +15,8 @@ module Lineage
 
     def self.prompt_version = Digest::SHA256.hexdigest(File.read(PROMPT_PATH))[0, 12]
 
-    def initialize(run:, topic:, patchsets:, candidates:, pairs:, branches:, previous:, mode:)
+    def initialize(run:, topic:, patchsets:, candidates:, pairs:, branches:, previous:, mode:,
+                   base_run: nil, new_patchset_ids: nil)
       @run = run
       @topic = topic
       @patchsets = patchsets
@@ -24,6 +25,8 @@ module Lineage
       @branches = branches
       @previous = previous
       @mode = mode
+      @base_run = base_run
+      @new_patchset_ids = new_patchset_ids
     end
 
     def write(dir)
@@ -48,7 +51,15 @@ module Lineage
         "patchsets" => @patchsets.map { |p| patchset_entry(p, by_id) },
         "candidates" => @candidates.map { |c| candidate_entry(c) },
         "previous" => @previous
-      }
+      }.merge(update_keys(messages))
+    end
+
+    # update runs: what is new since the base run
+    def update_keys(messages)
+      return {} unless @base_run
+
+      { "since_message_id" => @base_run.through_message_id,
+        "new_message_ordinals" => messages.each_with_index.filter_map { |m, i| i + 1 if Updates.new_message?(@base_run, m) } }
     end
 
     def patchset_entry(p, by_id)
@@ -65,6 +76,7 @@ module Lineage
           File.basename(a.file_name).sub(PatchBranches::PatchsetExtractor::WRAPPER_SUFFIX, "")
         }
       }
+      entry["new"] = @new_patchset_ids.include?(p.message.id) if @base_run
       branch = @branches[p.message.id]
       entry["branch"] = branch.transform_keys(&:to_s) if branch
       entry

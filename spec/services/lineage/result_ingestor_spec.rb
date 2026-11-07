@@ -731,4 +731,201 @@ RSpec.describe Lineage::ResultIngestor do
       expect(run.reload.verdicts.first.reviews).to eq([])
     end
   end
+
+  describe "update mode" do
+    let(:old_commit) { create(:commit) }
+    let(:old_extra) { create(:commit) }
+    let(:base) do
+      create(:patchset_run, topic: topic, status: "done", mode: "trailer", through_message: m1,
+                            raw_result: { "lineage" => [ { "message_id" => m1.id } ], "verdicts" => [ { "sha" => old_commit.sha } ],
+                                          "extra_commits" => [ { "sha" => old_extra.sha } ], "story" => [ "old" ] }).tap do |r|
+        create(:patchset_lineage, patchset_run: r, message: m1)
+        create(:commit_verdict, patchset_run: r, commit: old_commit)
+        create(:commit_verdict, patchset_run: r, commit: old_extra, extra: true, origin: "extra")
+      end
+    end
+    let(:index) do
+      { "patchsets" => [ { "message_id" => m1.id, "new" => false }, { "message_id" => m2.id, "new" => true } ],
+        "candidates" => [ { "sha" => commit.sha, "origin" => "trailer" } ], "base_run_id" => base.id }
+    end
+    let(:new_lineage) { [ { "message_id" => m2.id, "parent_message_id" => m1.id, "step_kind" => "rebase", "confidence" => 0.8, "reason" => "r" } ] }
+
+    def update_answer(**opts) = answer(lineage: new_lineage, **opts).merge("extra_commits" => [])
+
+    it "carries the base rows forward and merges raw_result" do
+      ingest(update_answer, mode: "update")
+      expect(run.reload.status).to eq("done")
+      expect(run.lineages.pluck(:message_id)).to contain_exactly(m1.id, m2.id)
+      expect(run.verdicts.pluck(:commit_id)).to contain_exactly(old_commit.id, old_extra.id, commit.id)
+      expect(run.raw_result["lineage"].map { |l| l["message_id"] }).to eq([ m1.id, m2.id ])
+      expect(run.raw_result["verdicts"].map { |v| v["sha"] }).to eq([ old_commit.sha, commit.sha ])
+      expect(run.raw_result["extra_commits"].map { |v| v["sha"] }).to eq([ old_extra.sha ])
+      expect(run.raw_result["story"]).to eq([ "v1 then v2", "then commit" ])
+      expect(run.raw_result["update"]["lineage"]).to eq(new_lineage)
+    end
+
+    it "leaves old llm links and credits alone" do
+      create(:commit_topic, topic: topic, commit: old_extra, source: "llm", confidence: 0.9)
+      create(:commit_person, commit: old_extra, role: "author", raw_name: "Old", source: "llm", confidence: 0.9)
+      ingest(update_answer, mode: "update")
+      expect(CommitTopic.llm.where(topic_id: topic.id).pluck(:commit_id)).to include(old_extra.id)
+      expect(CommitPerson.llm.where(commit_id: old_extra.id).count).to eq(1)
+    end
+
+    it "drops lineage for an old patchset with a note, still rejects unknown ids" do
+      bad = new_lineage + [ { "message_id" => m1.id, "parent_message_id" => nil, "step_kind" => "new_series", "confidence" => 1, "reason" => "r" } ]
+      ingest(answer(lineage: bad).merge("extra_commits" => []), mode: "update")
+      expect(run.reload.status).to eq("done")
+      expect(run.error).to include("lineage for old patchset #{m1.id} dropped")
+      expect(run.lineages.pluck(:message_id)).to contain_exactly(m1.id, m2.id)
+      expect(run.raw_result["lineage"].map { |l| l["message_id"] }).to eq([ m1.id, m2.id ])
+
+      stranger = new_lineage + [ new_lineage[0].merge("message_id" => create(:message, topic: topic).id) ]
+      expect { ingest(answer(lineage: stranger).merge("extra_commits" => []), mode: "update") }
+        .to raise_error(described_class::Error, /unknown message id/)
+    end
+
+    it "still rejects missing lineage for a new patchset" do
+      expect { ingest(answer(lineage: []).merge("extra_commits" => []), mode: "update") }
+        .to raise_error(described_class::Error, /lineage missing for message #{m2.id}/)
+    end
+
+    it "drops a verdict on a commit the base run judged, still rejects unknown shas" do
+      data = update_answer
+      data["verdicts"] << data["verdicts"][0].merge("sha" => old_commit.sha)
+      ingest(data, mode: "update")
+      expect(run.reload.error).to include("verdict for #{old_commit.sha} dropped: judged by the base run")
+      expect(run.verdicts.pluck(:commit_id)).to contain_exactly(old_commit.id, old_extra.id, commit.id)
+      expect(run.raw_result["verdicts"].map { |v| v["sha"] }).to eq([ old_commit.sha, commit.sha ])
+
+      data = update_answer
+      data["verdicts"] << data["verdicts"][0].merge("sha" => create(:commit).sha)
+      expect { ingest(data, mode: "update") }.to raise_error(described_class::Error, /unknown sha/)
+    end
+
+    it "keeps base rows over new ones for the same patchset or commit" do
+      create(:patchset_lineage, patchset_run: base, message: m2, parent_message_id: nil, step_kind: "new_series")
+      create(:commit_verdict, patchset_run: base, commit: commit, verdict: "undecided")
+      ingest(update_answer, mode: "update")
+      expect(run.reload.status).to eq("done")
+      expect(run.error).to include("lineage for #{m2.id} dropped: carried", "verdict for #{commit.sha} dropped: carried")
+      expect(run.lineages.find_by(message_id: m2.id).step_kind).to eq("new_series")
+      expect(run.verdicts.find_by(commit_id: commit.id).verdict).to eq("undecided")
+    end
+
+    it "builds an update on top of an update" do
+      ingest(update_answer, mode: "update")
+      m3 = create(:message, topic: topic, is_patch_submission: true, created_at: 1.hour.ago)
+      commit2 = create(:commit)
+      run2 = create(:patchset_run, topic: topic, status: "running", mode: "update", started_at: 1.minute.ago, finished_at: nil)
+      index2 = { "patchsets" => [ { "message_id" => m1.id, "new" => false }, { "message_id" => m2.id, "new" => false },
+                                  { "message_id" => m3.id, "new" => true } ],
+                 "candidates" => [ { "sha" => commit2.sha, "origin" => "trailer" } ], "base_run_id" => run.id }
+      data = { "lineage" => [ { "message_id" => m3.id, "parent_message_id" => m2.id, "step_kind" => "rebase", "confidence" => 0.8, "reason" => "r" } ],
+               "verdicts" => [ { "sha" => commit2.sha, "verdict" => "as_is", "source_message_id" => m3.id, "confidence" => 0.9, "evidence" => "e" } ],
+               "extra_commits" => [], "story" => [ "v3" ] }
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "result.json")
+        File.write(path, JSON.dump(data))
+        described_class.new(run: run2, index: index2, mode: "update").call(path)
+      end
+
+      run2.reload
+      expect(run2.status).to eq("done")
+      expect(run2.lineages.pluck(:message_id)).to contain_exactly(m1.id, m2.id, m3.id)
+      expect(run2.verdicts.pluck(:commit_id)).to contain_exactly(old_commit.id, old_extra.id, commit.id, commit2.id)
+      expect(run2.verdicts.find_by(commit_id: old_extra.id)).to have_attributes(extra: true, origin: "extra")
+      expect(run2.raw_result["lineage"].map { |l| l["message_id"] }).to eq([ m1.id, m2.id, m3.id ])
+      expect(run2.raw_result["verdicts"].map { |v| v["sha"] }).to eq([ old_commit.sha, commit.sha, commit2.sha ])
+      expect(run2.raw_result["extra_commits"].map { |v| v["sha"] }).to eq([ old_extra.sha ])
+      expect(run2.raw_result["update"]).to eq(data)
+      expect(run.reload.verdicts.count).to eq(3)
+    end
+
+    it "rejects a missing candidate verdict" do
+      data = update_answer.merge("verdicts" => [])
+      expect { ingest(data, mode: "update") }.to raise_error(described_class::Error, /verdict missing for #{commit.sha}/)
+    end
+
+    it "rejects extra commits" do
+      data = update_answer.merge("extra_commits" => [ { "sha" => create(:commit).sha, "verdict" => "as_is", "confidence" => 1 } ])
+      expect { ingest(data, mode: "update") }.to raise_error(described_class::Error, /no extra_commits/)
+    end
+
+    it "raises BaseGone without failing the run when the base run is gone" do
+      index
+      base.destroy!
+      expect { ingest(update_answer, mode: "update") }.to raise_error(described_class::BaseGone)
+      expect(run.reload.status).to eq("running")
+    end
+  end
+
+  describe "discussion mode" do
+    let(:report) { create(:message, topic: topic, created_at: 3.days.ago) }
+    let(:fix) { create(:message, topic: topic, created_at: 2.days.ago) }
+
+    def discussion_answer(**verdict)
+      { "lineage" => [], "extra_commits" => [], "story" => [ "fixed inline" ],
+        "verdicts" => [ { "sha" => commit.sha, "verdict" => "from_discussion", "source_message_id" => nil,
+                          "author_name" => nil, "author_message_id" => nil, "confidence" => 0.9, "evidence" => "inline" }.merge(verdict) ] }
+    end
+
+    before { index.replace("patchsets" => [], "candidates" => [ { "sha" => commit.sha, "origin" => "trailer", "reviewers" => [ "Rev" ] } ]) }
+
+    it "moves a message source to the author and clears it" do
+      ingest(discussion_answer("source_message_id" => fix.id), mode: "discussion")
+      v = run.reload.verdicts.sole
+      expect(v).to have_attributes(source_message_id: nil, author_message_id: fix.id)
+      expect(run.error).to include("source_message_id #{fix.id} is not a patchset")
+      expect(CommitPerson.llm.where(commit_id: commit.id, role: "author").sole.person_id).to eq(fix.sender_person_id)
+    end
+
+    it "keeps a named author when clearing the source" do
+      ingest(discussion_answer("source_message_id" => fix.id, "author_message_id" => report.id), mode: "discussion")
+      expect(run.reload.verdicts.sole).to have_attributes(source_message_id: nil, author_message_id: report.id)
+    end
+
+    it "still rejects a source outside the topic, and a message source in other modes" do
+      stranger = create(:message)
+      expect { ingest(discussion_answer("source_message_id" => stranger.id), mode: "discussion") }
+        .to raise_error(described_class::Error, /unknown source_message_id/)
+      expect { ingest(discussion_answer("source_message_id" => fix.id), mode: "trailer") }
+        .to raise_error(described_class::Error, /unknown source_message_id/)
+    end
+
+    it "drops reviewed ids that are not patchsets" do
+      data = discussion_answer("reviews" => [ { "reviewer" => "Rev", "reviewed_message_ids" => [ fix.id ], "coverage" => "final", "note" => "n" } ])
+      ingest(data, mode: "discussion")
+      expect(run.reload.verdicts.sole.reviews.first).to include("reviewer" => "Rev", "reviewed_message_ids" => [], "coverage" => "final")
+      expect(run.error).to include("reviewed message #{fix.id} is not a patchset")
+      expect { ingest(data, mode: "trailer") }.to raise_error(described_class::Error, /unknown reviewed message/)
+    end
+
+    it "drops reviewed ids of suggested reviewers that are not patchsets" do
+      index["candidates"][0]["reviewers"] = []
+      data = discussion_answer("suggested_reviews" => [ { "reviewer" => "Sug", "reviewer_message_id" => fix.id, "reviewed_message_ids" => [ report.id ],
+                                                          "coverage" => "final", "note" => "n", "confidence" => 0.9 } ])
+      ingest(data, mode: "discussion")
+      expect(run.reload.verdicts.sole.reviews.first).to include("reviewer" => "Sug", "reviewed_message_ids" => [])
+    end
+
+    it "validates lineage normally when the bundle has patchsets" do
+      index["patchsets"] = [ { "message_id" => m1.id } ]
+      expect { ingest(discussion_answer, mode: "discussion") }.to raise_error(described_class::Error, /lineage missing for message #{m1.id}/)
+      data = discussion_answer.merge("lineage" => [ { "message_id" => m1.id, "parent_message_id" => nil, "step_kind" => "new_series",
+                                                      "confidence" => 0.7, "reason" => "nocfbot" } ])
+      ingest(data, mode: "discussion")
+      expect(run.reload.lineages.pluck(:message_id)).to eq([ m1.id ])
+    end
+  end
+
+  it "ingests a discussion run with no patchsets" do
+    index.replace("patchsets" => [], "candidates" => [ { "sha" => commit.sha, "origin" => "trailer" } ])
+    data = { "lineage" => [], "extra_commits" => [], "story" => [ "fixed inline" ],
+             "verdicts" => [ { "sha" => commit.sha, "verdict" => "from_discussion", "source_message_id" => nil,
+                               "author_name" => nil, "author_message_id" => nil, "confidence" => 0.9, "evidence" => "inline" } ] }
+    ingest(data, mode: "discussion")
+    expect(run.reload.status).to eq("done")
+    expect(run.verdicts.first.verdict).to eq("from_discussion")
+  end
 end

@@ -3,6 +3,8 @@ require "json"
 module Lineage
   class ResultIngestor
     Error = Class.new(StandardError)
+    # the run an update builds on was deleted under it; not the run's fault
+    BaseGone = Class.new(StandardError)
 
     LEVELLED = %w[modified partial].freeze
     SUGGESTED_COVERAGES = %w[final earlier].freeze
@@ -19,26 +21,31 @@ module Lineage
 
     def call(result_path)
       data = parse(result_path)
-      validate!(data)
+      base_run if update?
       @notes = []
       @suggestions = {}
+      validate!(data)
       extras = dedupe_extras(data)
       found = Commit.where(sha: extras.map { |v| v["sha"] }).index_by(&:sha)
       extras, missing = extras.partition { |v| found.key?(v["sha"]) }
       known = candidate_commits.merge(found)
       missing.each { |v| @notes << "extra commit not in commits table: #{v['sha']}" }
+      old_lineages, old_verdicts = carried_rows(data, known)
       @ref_shas = reference_shas(data, known)
       PatchsetRun.transaction do
         @run.lineages.delete_all
         @run.verdicts.delete_all
-        PatchsetLineage.insert_all(lineage_rows(data))
-        CommitVerdict.insert_all(verdict_rows(data["verdicts"], known, extra: false) +
-                                 verdict_rows(extras, known, extra: true))
-        @run.finish!(status: "done", story: normalize(story_text(data)), raw_result: data,
+        PatchsetLineage.insert_all(old_lineages) if old_lineages.any?
+        CommitVerdict.insert_all(old_verdicts) if old_verdicts.any?
+        rows = lineage_rows(data)
+        PatchsetLineage.insert_all(rows) if rows.any?
+        rows = verdict_rows(data["verdicts"], known, extra: false) + verdict_rows(extras, known, extra: true)
+        CommitVerdict.insert_all(rows) if rows.any?
+        @run.finish!(status: "done", story: normalize(story_text(data)), raw_result: update? ? merged(data) : data,
                      error: @notes.join("\n").presence)
         judged = data["verdicts"] + extras
         if @link && judged.any?
-          previously_linked = CommitTopic.llm.where(topic_id: @run.topic_id).pluck(:commit_id)
+          previously_linked = update? ? [] : CommitTopic.llm.where(topic_id: @run.topic_id).pluck(:commit_id)
           link!(judged, known)
           CommitPerson.llm.where(commit_id: judged.map { |v| known[v["sha"]].id } | previously_linked).delete_all
           authors = attribute_authors!(judged, known)
@@ -71,6 +78,50 @@ module Lineage
     def suggested(v) = v.fetch("suggested_reviews", nil) || []
     def message_ids = @message_ids ||= @run.topic.chronological_message_ids
     def topic_message_ids = @topic_message_ids ||= message_ids.to_set
+    def update? = @mode == "update"
+    def discussion? = @mode == "discussion"
+    def new_patchset_ids = @new_patchset_ids ||= @index["patchsets"].select { |p| p["new"] }.map { |p| p["message_id"] }.to_set
+
+    def base_run
+      return nil unless update?
+
+      @base_run ||= PatchsetRun.find_by(id: @index["base_run_id"]) or
+        raise BaseGone, "base run #{@index['base_run_id']} is gone"
+    end
+
+    def base_verdict_shas
+      @base_verdict_shas ||= Commit.where(id: base_run.verdicts.select(:commit_id)).pluck(:sha).to_set
+    end
+
+    # base rows win; new answers for the same patchset or commit are dropped
+    def carried_rows(data, known)
+      return [ [], [] ] unless update?
+
+      lineages = base_run.lineages.to_a
+      verdicts = base_run.verdicts.to_a
+      taken = lineages.map(&:message_id).to_set
+      data["lineage"] = data["lineage"].reject do |l|
+        taken.include?(l["message_id"]).tap { |hit| @notes << "lineage for #{l['message_id']} dropped: carried from base run" if hit }
+      end
+      taken = verdicts.map(&:commit_id).to_set
+      data["verdicts"] = data["verdicts"].reject do |v|
+        taken.include?(known[v["sha"]].id).tap { |hit| @notes << "verdict for #{v['sha']} dropped: carried from base run" if hit }
+      end
+      [ carried(lineages), carried(verdicts) ]
+    end
+
+    def carried(rows)
+      rows.map { |row| row.attributes.except("id").merge("patchset_run_id" => @run.id) }
+    end
+
+    # the next update reads this as previous, so it must be the whole picture
+    def merged(data)
+      prev = base_run.raw_result || {}
+      data.merge("lineage" => Array(prev["lineage"]) + data["lineage"],
+                 "verdicts" => Array(prev["verdicts"]) + data["verdicts"],
+                 "extra_commits" => Array(prev["extra_commits"]),
+                 "update" => data.except("update"))
+    end
 
     def validate!(data)
       raise Error, "top level must be an object with lineage, verdicts, story" unless data.is_a?(Hash) &&
@@ -79,29 +130,44 @@ module Lineage
       if @mode == "lineage" && (data["verdicts"].any? || extras(data).any?)
         raise Error, "lineage mode allows no verdicts or extra_commits"
       end
+      raise Error, "update mode allows no extra_commits" if update? && extras(data).any?
 
+      judged_ids = update? ? new_patchset_ids : patchset_ids
       seen = Set.new
-      data["lineage"].each do |l|
+      data["lineage"] = data["lineage"].select do |l|
         raise Error, "lineage entry must be an object" unless l.is_a?(Hash)
         id = l["message_id"]
-        raise Error, "unknown message id #{id}" unless patchset_ids.include?(id)
+        if update? && patchset_ids.include?(id) && !judged_ids.include?(id)
+          @notes << "lineage for old patchset #{id} dropped"
+          next false
+        end
+        raise Error, "unknown message id #{id}" unless judged_ids.include?(id)
         raise Error, "duplicate lineage for #{id}" unless seen.add?(id)
         parent = l["parent_message_id"]
         raise Error, "unknown parent #{parent} for #{id}" unless parent.nil? || patchset_ids.include?(parent)
         raise Error, "message #{id} cannot be its own parent" if parent == id
         raise Error, "bad step_kind #{l['step_kind']}" unless PatchsetLineage::STEP_KINDS.include?(l["step_kind"])
         check_confidence!(l["confidence"], "lineage #{id}")
+        true
       end
-      missing = patchset_ids - seen
+      missing = judged_ids - seen
       raise Error, "lineage missing for message #{missing.first}" if missing.any?
 
       shas = Set.new
-      data["verdicts"].each do |v|
+      data["verdicts"] = data["verdicts"].select do |v|
         raise Error, "verdict entry must be an object" unless v.is_a?(Hash)
+        if update? && !candidates.key?(v["sha"]) && base_verdict_shas.include?(v["sha"])
+          @notes << "verdict for #{v['sha']} dropped: judged by the base run"
+          next false
+        end
         raise Error, "unknown sha #{v['sha']}" unless candidate_commits.key?(v["sha"])
         raise Error, "duplicate verdict for #{v['sha']}" unless shas.add?(v["sha"])
         raise Error, "bad verdict #{v['verdict']}" unless CommitVerdict::VERDICTS.include?(v["verdict"])
         check_verdict!(v, "verdict #{v['sha']}")
+        true
+      end
+      if update? && (missing_sha = (candidates.keys - shas.to_a).first)
+        raise Error, "verdict missing for #{missing_sha}"
       end
 
       extras(data).each do |v|
@@ -114,6 +180,12 @@ module Lineage
 
     def check_verdict!(v, what)
       src = v["source_message_id"]
+      if discussion? && src && !patchset_ids.include?(src) && topic_message_ids.include?(src)
+        v["source_message_id"] = nil
+        v["author_message_id"] ||= src
+        @notes << "source_message_id #{src} is not a patchset, cleared for #{what}"
+        src = nil
+      end
       raise Error, "unknown source_message_id #{src}" unless src.nil? || patchset_ids.include?(src)
       author = v["author_message_id"]
       raise Error, "unknown author_message_id #{author} for #{what}" unless author.nil? || topic_message_ids.include?(author)
@@ -144,7 +216,7 @@ module Lineage
         raise Error, "review entry must be an object for #{what}" unless r.is_a?(Hash)
         raise Error, "bad reviewer #{r['reviewer'].inspect} for #{what}" unless r["reviewer"].is_a?(String) && r["reviewer"].present?
         raise Error, "bad coverage #{r['coverage']} for #{what}" unless CommitVerdict::COVERAGES.include?(r["coverage"])
-        check_reviewed_ids!(r["reviewed_message_ids"], what)
+        r["reviewed_message_ids"] = check_reviewed_ids!(r["reviewed_message_ids"], what)
       end
     end
 
@@ -156,14 +228,20 @@ module Lineage
         mid = r["reviewer_message_id"]
         raise Error, "unknown reviewer_message_id #{mid} for #{what}" unless mid.nil? || topic_message_ids.include?(mid)
         raise Error, "bad coverage #{r['coverage']} for suggested reviewer in #{what}" unless SUGGESTED_COVERAGES.include?(r["coverage"])
-        check_reviewed_ids!(r["reviewed_message_ids"], what)
+        r["reviewed_message_ids"] = check_reviewed_ids!(r["reviewed_message_ids"], what)
         check_confidence!(r["confidence"], "suggested reviewer #{r['reviewer']} in #{what}")
       end
     end
 
     def check_reviewed_ids!(ids, what)
       raise Error, "reviewed_message_ids must be an array for #{what}" unless ids.is_a?(Array)
-      ids.each { |id| raise Error, "unknown reviewed message #{id} for #{what}" unless patchset_ids.include?(id) }
+      ids.select do |id|
+        next true if patchset_ids.include?(id)
+        raise Error, "unknown reviewed message #{id} for #{what}" unless discussion?
+
+        @notes << "reviewed message #{id} is not a patchset, dropped for #{what}"
+        false
+      end
     end
 
     def dedupe_extras(data)
@@ -272,7 +350,7 @@ module Lineage
         end
       end
       ids = judged.map { |v| known[v["sha"]].id } + backports.values.flatten
-      CommitTopic.llm.where(topic_id: @run.topic_id).where.not(commit_id: ids).delete_all
+      CommitTopic.llm.where(topic_id: @run.topic_id).where.not(commit_id: ids).delete_all unless update?
     end
 
     # The author the model named wins, then the sender of the source patchset

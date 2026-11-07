@@ -22,7 +22,7 @@ OptionParser.new do |o|
   o.on("--repo PATH", "postgres checkout (default ./postgres)") { |v| options[:repo] = v }
   o.on("--jobs-root PATH", "job dirs (default tmp/lineage_jobs)") { |v| options[:jobs_root] = v }
   o.on("--concurrency N", Integer, "parallel codex processes (default 2)") { |v| options[:concurrency] = v }
-  o.on("--phase NAME", %w[trailer full lineage], "only claim from this phase, repeatable") { |v| options[:phases] << v }
+  o.on("--phase NAME", %w[trailer update discussion full lineage], "only claim from this phase, repeatable") { |v| options[:phases] << v }
   o.on("--limit N", Integer, "stop after N jobs") { |v| options[:limit] = v }
   o.on("--model NAME", "codex model") { |v| options[:model] = v }
   o.on("--effort LEVEL", "codex reasoning effort") { |v| options[:effort] = v }

@@ -4,13 +4,21 @@ require "json"
 module Lineage
   # git half of a bundle: candidate diffs, commit-vs-patchset metrics, repo path
   class BundleCompleter
+    # candidates are upstream commits: one still missing after a fetch means a
+    # broken checkout, not a commit the LLM should judge blind
+    MissingCommits = Class.new(StandardError)
+
+    FETCH_LOCK = Mutex.new
+
     def initialize(repo_path:)
       @repo_path = repo_path.to_s
     end
 
     def call(dir)
       index = JSON.parse(File.read(File.join(dir, "index.json")))
-      diffs = CommitDiff.new(PatchBranches::GitRepo.new(@repo_path))
+      repo = PatchBranches::GitRepo.new(@repo_path)
+      ensure_commits!(repo, index["candidates"].map { |c| c["sha"] })
+      diffs = CommitDiff.new(repo)
       parsed = index["patchsets"].to_h { |p| [ p["message_id"], parse(dir, p) ] }
       scores = []
       index["candidates"].each do |c|
@@ -32,6 +40,17 @@ module Lineage
     end
 
     private
+
+    def ensure_commits!(repo, shas)
+      missing = shas.reject { |sha| repo.rev_parse(sha) }
+      return if missing.empty?
+
+      fetch = FETCH_LOCK.synchronize { repo.run("fetch", "--quiet") }
+      missing = missing.reject { |sha| repo.rev_parse(sha) }
+      return if missing.empty?
+
+      raise MissingCommits, "#{missing.join(', ')} not in #{@repo_path} after fetch#{": #{fetch.output}" unless fetch.success?}"
+    end
 
     def parse(dir, p)
       return nil if p["parse_error"] || p["files"].empty?

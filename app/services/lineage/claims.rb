@@ -44,6 +44,7 @@ module Lineage
     end
 
     def self.result!(run, fields, result_path: nil)
+      gone = false
       PatchsetRun.transaction do
         run.lock!
         claimed!(run)
@@ -59,14 +60,24 @@ module Lineage
           run.finish!(status: "failed", failure_kind: "upload", error: "result file missing", duration_s: duration)
         else
           begin
-            ResultIngestor.new(run: run, index: run.bundle_index, mode: run.mode).call(result_path.to_s)
-          rescue ResultIngestor::Error
-            run.update!(failure_kind: "schema")
+            PatchsetRun.transaction(requires_new: true) do
+              ResultIngestor.new(run: run, index: run.bundle_index, mode: run.mode).call(result_path.to_s)
+            rescue ResultIngestor::Error
+              run.update!(failure_kind: "schema")
+            end
+          rescue ResultIngestor::BaseGone
+            run.destroy!
+            gone = true
+          rescue => e
+            # the savepoint is gone, so is anything the ingestor saved
+            run.reload.assign_attributes(fields.slice(*RESULT_FIELDS))
+            run.finish!(status: "failed", failure_kind: "ingest", error: "#{e.class}: #{e.message}")
           end
-          run.update!(duration_s: duration) if duration
+          run.update!(duration_s: duration) if duration && !gone
         end
         cleanup(run.id)
       end
+      raise Conflict, "run #{run.id}: base run is gone, topic requeued" if gone
       run
     end
 
@@ -84,12 +95,15 @@ module Lineage
       part = part_path(run.id)
       FileUtils.rm_rf(dir)
       FileUtils.mkdir_p(dir)
-      candidates = if run.mode == "trailer"
-        CandidateFinder.trailer_commits(run.topic).map { |c| { commit: c, origin: "trailer", overlap: nil } }
-      else
-        []
-      end
-      index = BundleWriter.new(run: run, topic: run.topic, candidates: candidates, mode: run.mode).call(dir.to_s)
+      base = PatchsetRun.current_for(run.topic_id) if run.mode == "update"
+      return drop!(run) if run.mode == "update" && base.nil?
+
+      candidates = case run.mode
+      when "trailer", "discussion" then CandidateFinder.trailer_commits(run.topic)
+      when "update" then Updates.new_commits(run.topic, base)
+      else []
+      end.map { |c| { commit: c, origin: "trailer", overlap: nil } }
+      index = BundleWriter.new(run: run, topic: run.topic, candidates: candidates, mode: run.mode, base_run: base).call(dir.to_s)
       system("tar", "-czf", part.to_s, "-C", dir.to_s, ".", exception: true)
       PatchsetRun.transaction do
         run.lock!
@@ -105,6 +119,17 @@ module Lineage
         run.lock!
         run.finish!(status: "failed", failure_kind: "bundle", error: "#{e.class}: #{e.message}") if run.status == "claimed"
       end
+    end
+
+    # an update whose base vanished before the build: let the queue pick again
+    def self.drop!(run)
+      PatchsetRun.transaction do
+        run.lock!
+        claimed!(run)
+        run.destroy!
+      end
+      cleanup(run.id)
+      nil
     end
 
     def self.prune!
@@ -126,6 +151,6 @@ module Lineage
     def self.claimed!(run)
       raise Conflict, "run #{run.id} is #{run.status}" unless run.status == "claimed"
     end
-    private_class_method :bundle_dir, :tar_path, :part_path, :prune!, :cleanup, :claimed!
+    private_class_method :bundle_dir, :tar_path, :part_path, :drop!, :prune!, :cleanup, :claimed!
   end
 end

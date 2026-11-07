@@ -32,6 +32,7 @@ RSpec.describe Lineage::BundleWriter do
       expect(index["mode"]).to eq("trailer")
       expect(index["through_message_id"]).to eq(m2.id)
       expect(index["patchsets"]).to eq([ { "message_id" => m1.id }, { "message_id" => m2.id } ])
+      expect(index["patch_mail_ids"]).to eq([ m1.id, m2.id ])
       expect(index["candidates"]).to eq([
         { "sha" => commit.sha, "origin" => "trailer", "backports" => [ backport.sha ], "reviewers" => [ "Rev One", "The Boss" ],
           "committer_reviewers" => [ "The Boss" ] },
@@ -60,6 +61,85 @@ RSpec.describe Lineage::BundleWriter do
       expect(index["candidates"]).to eq([])
       disk = JSON.parse(File.read(File.join(dir, "index.json")))
       expect(disk["patchsets"].map { |p| p["branch"] }).to eq([ { "status" => "failed" }, { "status" => "failed" } ])
+    end
+  end
+
+  describe "update mode" do
+    let(:base) do
+      create(:patchset_run, topic: topic, status: "done", mode: "trailer", through_message: m1,
+                            raw_result: { "lineage" => [], "verdicts" => [], "story" => [ "old" ] })
+    end
+    let(:update_run) { create(:patchset_run, topic: topic, status: "claimed", mode: "update") }
+
+    it "marks new patchsets and messages and keeps only new pairs" do
+      create(:commit_topic, topic: topic, commit: create(:commit), source: "llm", confidence: 0.9)
+      fresh = create(:commit)
+      Dir.mktmpdir do |dir|
+        cands = [ { commit: fresh, origin: "trailer", overlap: nil } ]
+        index = described_class.new(run: update_run, topic: topic, candidates: cands, mode: "update", base_run: base).call(dir)
+
+        expect(index["base_run_id"]).to eq(base.id)
+        expect(index["since_message_id"]).to eq(m1.id)
+        expect(index["patchsets"]).to eq([ { "message_id" => m1.id, "new" => false }, { "message_id" => m2.id, "new" => true } ])
+        expect(index["candidates"].map { |c| c["sha"] }).to eq([ fresh.sha ])
+
+        disk = JSON.parse(File.read(File.join(dir, "index.json")))
+        expect(disk["since_message_id"]).to eq(m1.id)
+        expect(disk["new_message_ordinals"]).to eq([ 2 ])
+        expect(disk["patchsets"].map { |p| p["new"] }).to eq([ false, true ])
+        expect(disk["previous"]).to eq(base.raw_result)
+        expect(JSON.parse(File.read(File.join(dir, "pairs.json"))).map { |p| p["later_message_id"] }).to eq([ m2.id ])
+      end
+    end
+
+    it "lists patch mail with no patchset and hides the base's own update answer" do
+      bare = create(:message, topic: topic, created_at: 12.hours.ago, is_patch_submission: true)
+      base.update!(raw_result: base.raw_result.merge("update" => { "story" => [ "inner" ] }))
+      Dir.mktmpdir do |dir|
+        index = described_class.new(run: update_run, topic: topic, candidates: [], mode: "update", base_run: base).call(dir)
+
+        expect(index["patch_mail_ids"]).to eq([ m1.id, m2.id, bare.id ])
+        expect(index["patchsets"].map { |p| p["message_id"] }).to eq([ m1.id, m2.id ])
+        disk = JSON.parse(File.read(File.join(dir, "index.json")))
+        expect(disk["previous"]).to eq("lineage" => [], "verdicts" => [], "story" => [ "old" ])
+      end
+    end
+
+    it "flags late patch mail the base run did not see, whatever its date" do
+      base.update!(through_message: m2, bundle_index: { "patchsets" => [ { "message_id" => m1.id }, { "message_id" => m2.id } ] })
+      late = patch_message(topic, 3.days.ago)
+      Dir.mktmpdir do |dir|
+        index = described_class.new(run: update_run, topic: topic, candidates: [], mode: "update", base_run: base).call(dir)
+
+        expect(index["patchsets"]).to eq([ { "message_id" => late.id, "new" => true },
+                                           { "message_id" => m1.id, "new" => false }, { "message_id" => m2.id, "new" => false } ])
+        disk = JSON.parse(File.read(File.join(dir, "index.json")))
+        expect(disk["new_message_ordinals"]).to eq([ 1 ])
+        expect(File.read(File.join(dir, "messages", "001.txt"))).to start_with("Message: #1 (id #{late.id})")
+        expect(JSON.parse(File.read(File.join(dir, "pairs.json"))).map { |p| p["earlier_message_id"] }).to eq([ late.id, late.id ])
+      end
+    end
+
+    it "writes update keys when the base has no through message" do
+      base.update!(through_message: nil)
+      Dir.mktmpdir do |dir|
+        index = described_class.new(run: update_run, topic: topic, candidates: [], mode: "update", base_run: base).call(dir)
+
+        expect(index).to include("base_run_id" => base.id, "since_message_id" => nil)
+        disk = JSON.parse(File.read(File.join(dir, "index.json")))
+        expect(disk).to include("since_message_id" => nil, "new_message_ordinals" => [ 1, 2 ])
+        expect(disk["patchsets"].map { |p| p["new"] }).to eq([ true, true ])
+      end
+    end
+  end
+
+  it "adds no update keys in other modes" do
+    Dir.mktmpdir do |dir|
+      index = described_class.new(run: run, topic: topic, candidates: [], mode: "trailer").call(dir)
+      disk = JSON.parse(File.read(File.join(dir, "index.json")))
+      expect(index).not_to include("base_run_id", "since_message_id")
+      expect(disk).not_to include("since_message_id", "new_message_ordinals")
+      expect(disk["patchsets"].first).not_to have_key("new")
     end
   end
 end

@@ -1,6 +1,6 @@
 class PatchsetRun < ApplicationRecord
   STATUSES = %w[queued claimed running done failed timeout].freeze
-  MODES = %w[trailer full lineage].freeze
+  MODES = %w[trailer update discussion full lineage].freeze
   CLAIM_TTL = 1.hour
 
   belongs_to :topic
