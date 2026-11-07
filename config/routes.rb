@@ -154,12 +154,17 @@ Rails.application.routes.draw do
   end
   namespace :stats do
     root "index#show"
-    get "releases/:major", to: "releases#overview", as: :release, constraints: { major: /\d+/ }
-    get "releases/:major/pulse", to: "releases#pulse", as: :release_pulse, constraints: { major: /\d+/ }
-    get "releases/:major/people", to: "releases#people", as: :release_people, constraints: { major: /\d+/ }
-    get "releases/:major/companies", to: "releases#companies", as: :release_companies, constraints: { major: /\d+/ }
-    get "releases/:major/committers", to: "releases#committers", as: :release_committers, constraints: { major: /\d+/ }
-    get "releases/:major/person/*email", to: "releases#person", as: :release_person, constraints: { major: /\d+/ }, format: false
+    # one controller per period kind; the kind is a route default, the key
+    # is the major, the year, or the cycle's start year
+    { "releases" => [ "release", /\d+/ ], "years" => [ "year", /\d{4}/ ], "cycles" => [ "cycle", /\d{4}/ ] }.each do |segment, (kind, pattern)|
+      opts = { defaults: { kind: kind }, constraints: { key: pattern } }
+      get "#{segment}/:key", to: "periods#overview", as: kind, **opts
+      get "#{segment}/:key/pulse", to: "periods#pulse", as: "#{kind}_pulse", **opts
+      get "#{segment}/:key/people", to: "periods#people", as: "#{kind}_people", **opts
+      get "#{segment}/:key/companies", to: "periods#companies", as: "#{kind}_companies", **opts
+      get "#{segment}/:key/committers", to: "periods#committers", as: "#{kind}_committers", **opts
+      get "#{segment}/:key/person/*email", to: "periods#person", as: "#{kind}_person", format: false, **opts
+    end
   end
 
   # Reports

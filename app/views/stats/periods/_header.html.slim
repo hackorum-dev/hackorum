@@ -1,0 +1,18 @@
+- same_tab = ->(p) { tab unless %i[overview person].include?(tab) || (tab == :companies && !p.companies?) }
+.stats-chips
+  - periods.each do |p|
+    - classes = [ "stats-chip", ("is-active" if p.key == period.key), ("is-dim" if p.in_progress?) ].compact.join(" ")
+    = link_to stats_period_path(p, same_tab.call(p)), class: classes do
+      = p.label
+      - if p.in_progress?
+        |  (#{p.in_progress_label})
+  span.stats-range = period.range_text
+nav.stats-tabs
+  = link_to "Overview", stats_period_path(period), class: "stats-tab#{' is-active' if tab == :overview}"
+  = link_to "Pulse", stats_period_path(period, :pulse), class: "stats-tab#{' is-active' if tab == :pulse}"
+  - if period.companies?
+    = link_to "Companies", stats_period_path(period, :companies), class: "stats-tab#{' is-active' if tab == :companies}"
+  = link_to "People", stats_period_path(period, :people), class: "stats-tab#{' is-active' if tab == :people}"
+  = link_to "Committers", stats_period_path(period, :committers), class: "stats-tab#{' is-active' if tab == :committers}"
+  - if local_assigns[:person]
+    span.stats-tab.is-active = person[:name]

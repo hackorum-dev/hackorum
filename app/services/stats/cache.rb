@@ -1,26 +1,26 @@
 module Stats
-  # A closed release never changes, so its entries never expire. The open
-  # one moves with every import and LLM run; an hour of staleness is fine.
+  # A closed period never changes, so its entries never expire. An open one
+  # moves with every import and LLM run; an hour of staleness is fine.
   module Cache
     # bump when a stats definition changes
-    VERSION = 3
+    VERSION = 4
     OPEN_TTL = 1.hour
 
     def self.enabled? = !Rails.env.development?
 
-    def self.fetch(release, tab, **extra, &block)
+    def self.fetch(period, tab, **extra, &block)
       return yield unless enabled?
 
-      options = release.closed? ? { expires_in: nil } : { expires_in: OPEN_TTL, race_condition_ttl: 1.minute }
-      Rails.cache.fetch(key(release, tab, extra), **options, &block)
+      options = period.closed? ? { expires_in: nil } : { expires_in: OPEN_TTL, race_condition_ttl: 1.minute }
+      Rails.cache.fetch(key(period, tab, extra), **options, &block)
     end
 
-    def self.delete(release, tab, **extra)
-      Rails.cache.delete(key(release, tab, extra))
+    def self.delete(period, tab, **extra)
+      Rails.cache.delete(key(period, tab, extra))
     end
 
-    def self.key(release, tab, extra)
-      [ "release-stats", VERSION, release.major, tab.to_s, extra.sort ]
+    def self.key(period, tab, extra)
+      [ "stats", VERSION, period.kind.to_s, period.key, tab.to_s, extra.sort ]
     end
     private_class_method :key
   end

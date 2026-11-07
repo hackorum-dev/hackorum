@@ -4,8 +4,13 @@
   h1 Statistics
   p.stats-intro Numbers about PostgreSQL development, read from the lists and the git history.
   .stats-cards
-    - newest = @releases.find { |r| !r.in_development? } || @releases.first
-    - if newest
-      = link_to stats_release_path(newest.major), class: "stats-card" do
-        h2 By release
-        p Who shaped #{newest.label} and how: commits, threads, patch lineage, reviews, companies, people, committers.
+    - release = @releases.find { |r| !r.in_development? } || @releases.first
+    - if release
+      = render "stats/index/card", period: release, image: "stats/release.png", title: "By release",
+        text: "What went into one major, as its users see it: the changes that ship in it and not in the release before, counted from the previous GA to its own GA. Commits, threads, patch lineage, reviews, people, companies and committers."
+    - if @years.first
+      = render "stats/index/card", period: @years.first, image: "stats/year.png", title: "By year",
+        text: "The same numbers for a calendar year, January to December, across every branch."
+    - if @cycles.first
+      = render "stats/index/card", period: @cycles.first, image: "stats/cycle.png", title: "By development cycle",
+        text: "The same numbers for one run of master: from the day the previous major branched off to the day the next one did."

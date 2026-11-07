@@ -33,6 +33,13 @@
 #   bob    Beta Corp  nil..2025-11-30         domain
 #   bob    Gamma      2025-12-01..nil         manual
 #   dave   none
+# Only the time windows see these (release numbers do not move):
+#   c6  2026-03-01 REL_18_STABLE only, dave, +2/-2, file f.c: a back-branch-only fix
+#   c7  2024-12-01 master (in 17, 18, 19 too), alice, +3/-1, file g.c
+#   c7b 2026-01-10 REL_16_STABLE cherry-pick of c7: an old change backported in 2026
+#   c4 is linked to t4 like c4b, as the importer links every commit with the trailer
+# Year 2026: c2 c3 c4 c6, backported c3 c4. Year 2025: c1 c5.
+# Cycle 2025 (18 beta1 to 19 beta1): c1 c2 c3 c6, backported c3. Cycle 2026: c4.
 module StatsReleaseFixture
   Built = Struct.new(:people, :commits, :topics, :messages, :cf_patch, :affiliations, keyword_init: true)
 
@@ -91,8 +98,17 @@ module StatsReleaseFixture
     c[:c5] = create(:commit, sha: "5" * 40, subject: "Old thing", committed_at: Time.zone.parse("2025-04-01 12:00"),
                              branches: %w[REL_18_STABLE REL_19_STABLE master], committer_name: "Alice", committer_email: "alice@example.com",
                              lines_added: 1, lines_removed: 1)
+    c[:c6] = create(:commit, sha: "6" * 40, subject: "Back-branch only fix", committed_at: Time.zone.parse("2026-03-01 12:00"),
+                             branches: %w[REL_18_STABLE], committer_name: "Dave", committer_email: "dave@example.com",
+                             lines_added: 2, lines_removed: 2)
+    c[:c7] = create(:commit, sha: "7" * 40, subject: "Old master thing", committed_at: Time.zone.parse("2024-12-01 12:00"),
+                             branches: %w[REL_17_STABLE REL_18_STABLE REL_19_STABLE master], committer_name: "Alice", committer_email: "alice@example.com",
+                             lines_added: 3, lines_removed: 1)
+    c[:c7b] = create(:commit, sha: "f" * 40, subject: "Old master thing", committed_at: Time.zone.parse("2026-01-10 12:00"),
+                              branches: %w[REL_16_STABLE], cherry_picked_from_sha: c[:c7].sha, committer_name: "Alice", committer_email: "alice@example.com",
+                              lines_added: 3, lines_removed: 1)
 
-    { c1: %w[a.c b.c], c2: %w[a.c], c3: %w[c.c], c3b: %w[c.c], c4: %w[d.c], c4b: %w[d.c], c4c: %w[d.c], c4d: %w[d.c], c5: %w[e.c] }.each do |key, paths|
+    { c1: %w[a.c b.c], c2: %w[a.c], c3: %w[c.c], c3b: %w[c.c], c4: %w[d.c], c4b: %w[d.c], c4c: %w[d.c], c4d: %w[d.c], c5: %w[e.c], c6: %w[f.c], c7: %w[g.c], c7b: %w[g.c] }.each do |key, paths|
       paths.each { |path| CommitFile.create!(commit: c[key], path: path) }
     end
 
@@ -103,11 +119,13 @@ module StatsReleaseFixture
     credit.call(c[:c3], people["dave"], committer); credit.call(c[:c3b], people["dave"], committer)
     %i[c4 c4b c4c c4d].each { |key| credit.call(c[key], people["alice"], committer); credit.call(c[key], people["dave"], "author") }
     credit.call(c[:c5], people["alice"], committer)
+    credit.call(c[:c6], people["dave"], committer); credit.call(c[:c7], people["alice"], committer); credit.call(c[:c7b], people["alice"], committer)
     CommitterReviewer.sync!(c.values.map(&:id))
 
     create(:commit_topic, commit: c[:c1], topic: t1)
     create(:commit_topic, commit: c[:c2], topic: t2)
     create(:commit_topic, commit: c[:c4b], topic: t4)
+    create(:commit_topic, commit: c[:c4], topic: t4)
 
     # an older run on t1 whose verdict would win the tie on id if it counted
     old1 = create(:patchset_run, topic: t1, created_at: 1.day.ago)

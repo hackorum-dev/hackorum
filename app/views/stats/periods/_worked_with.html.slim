@@ -1,0 +1,17 @@
+/ data: { top: [{name, email, count}], rest: { people, count, share } }
+.stats-card
+  .t = title
+  .s = sub
+  .stats-list
+    - max = data[:top].first&.dig(:count).to_i
+    - data[:top].each do |e|
+      .row
+        span = e[:email] ? link_to(e[:name], stats_period_path(period, :person, e[:email])) : e[:name]
+        span = e[:count]
+      .bar style="width: #{max.zero? ? 0 : (e[:count] * 100 / max)}%"
+    - if data[:rest][:people].positive?
+      .row.rest
+        span = "#{data[:rest][:people]} #{data[:rest][:people] == 1 ? 'other' : 'others'}"
+        span = "#{data[:rest][:count]} (#{data[:rest][:share]}%)"
+    - if data[:top].empty?
+      .row.rest: span none

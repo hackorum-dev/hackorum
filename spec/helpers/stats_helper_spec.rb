@@ -40,4 +40,15 @@ RSpec.describe StatsHelper, type: :helper do
       expect(helper.stats_number(2867)).to eq("2,867")
     end
   end
+
+  describe "#stats_period_path" do
+    let(:period) { instance_double(Stats::Period::Release, kind: :release, key: "19") }
+
+    it "builds the kind's route for a tab, with extra segments and params" do
+      expect(helper.stats_period_path(period)).to eq("/stats/releases/19")
+      expect(helper.stats_period_path(period, :pulse, gran: "month")).to eq("/stats/releases/19/pulse?gran=month")
+      expect(helper.stats_period_path(period, :person, "a@example.com")).to eq("/stats/releases/19/person/a@example.com")
+      expect(helper.stats_period_path(period, :people, format: :csv)).to eq("/stats/releases/19/people.csv")
+    end
+  end
 end

@@ -28,6 +28,6 @@ production:
   database_maintenance:
     class: DatabaseMaintenanceJob
     schedule: every day at 5am
-  release_stats_warm:
-    command: "system('ruby', Rails.root.join('script', 'warm_release_stats.rb').to_s)"
+  stats_warm:
+    command: "system('ruby', Rails.root.join('script', 'warm_stats.rb').to_s)"
     schedule: every day at 6am

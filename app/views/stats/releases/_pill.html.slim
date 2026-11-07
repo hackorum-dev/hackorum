@@ -1,7 +1,0 @@
-/ value and release are numbers in the same unit; better: "up", "down" or nil
-- unless release.nil? || value.nil?
-  - dir = value == release ? nil : (value > release ? "up" : "down")
-  - cls = better && dir ? (dir == better ? "is-good" : "is-bad") : nil
-  span.stats-pill class=cls
-    = dir == "up" ? "▲" : (dir == "down" ? "▼" : "=")
-    = " release #{release}#{local_assigns[:unit]}"

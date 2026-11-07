@@ -41,14 +41,20 @@ module StatsHelper
     name.to_s.split.filter_map { |w| w[/\p{L}/] }.first(2).join.upcase
   end
 
+  # the kind's route helper for a tab; extra segments (the person email)
+  # and query params pass through: stats_period_path(period, :people, sort: "x")
+  def stats_period_path(period, tab = nil, *args)
+    send([ "stats", period.kind, tab, "path" ].compact.join("_"), period.key, *args)
+  end
+
   # sort link for a table column; the current column flips direction
-  def stats_sort_header(path_helper, major, params_object, key, label)
+  def stats_sort_header(period, params_object, key, label)
     active = params_object.sort == key
     dir = active && params_object.dir == "desc" ? "asc" : "desc"
     arrow = active ? (params_object.dir == "desc" ? " \u25BE" : " \u25B4") : ""
     sort = { "desc" => "descending", "asc" => "ascending" }[params_object.dir] if active
     tag.th(class: [ "sortable", ("is-active" if active) ].compact.join(" "), aria: { sort: sort }.compact) do
-      link_to "#{label}#{arrow}", send(path_helper, major, params_object.active_params.merge(sort: key, dir: dir))
+      link_to "#{label}#{arrow}", stats_period_path(period, :people, params_object.active_params.merge(sort: key, dir: dir))
     end
   end
 end

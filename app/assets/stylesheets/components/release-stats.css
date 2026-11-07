@@ -2,7 +2,8 @@
 .stats-page h1 { margin-bottom: var(--spacing-1); }
 .stats-intro { color: var(--color-text-muted); margin-bottom: var(--spacing-4); }
 
-.stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: var(--spacing-3); }
+.stats-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--spacing-3); }
+.stats-card-art { display: block; width: 100%; height: 140px; object-fit: contain; margin-bottom: var(--spacing-3); }
 .stats-card { display: block; background: var(--color-bg-card); border: var(--border-width) solid var(--color-border); border-radius: var(--border-radius-lg); padding: var(--spacing-4); color: inherit; text-decoration: none; }
 .stats-cards .stats-card h2 { margin: 0 0 var(--spacing-1); font-size: var(--font-size-lg); }
 .stats-cards .stats-card p { margin: 0; color: var(--color-text-muted); font-size: var(--font-size-sm); }
@@ -122,4 +123,5 @@ div.stats-card { padding: var(--spacing-3); min-width: 0; }
   .stats-podiums { grid-template-columns: 1fr; }
   .stats-two { grid-template-columns: 1fr; }
   .stats-three { grid-template-columns: 1fr; }
+  .stats-cards { grid-template-columns: 1fr; }
 }

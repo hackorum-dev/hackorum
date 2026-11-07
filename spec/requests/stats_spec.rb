@@ -32,6 +32,10 @@ RSpec.describe "Release statistics", type: :request do
     expect(response).to have_http_status(:not_found)
     get "/stats/releases/19/person/alice@example.com"
     expect(response).to have_http_status(:not_found)
+    get "/stats/years/2026"
+    expect(response).to have_http_status(:not_found)
+    get "/stats/cycles/2025"
+    expect(response).to have_http_status(:not_found)
     get topics_path
     expect(response.body).not_to include('href="/stats"')
   end
@@ -45,8 +49,15 @@ RSpec.describe "Release statistics", type: :request do
     it "lists the statistics and links the nav" do
       get "/stats"
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("By release")
-      expect(response.body).to include("/stats/releases/19")
+      doc = Nokogiri::HTML(response.body)
+      cards = doc.css("a.stats-card")
+      expect(cards.map { |c| c.at_css("h2").text }).to eq([ "By release", "By year", "By development cycle" ])
+      expect(cards.map { |c| c["href"] }).to eq([ "/stats/releases/19", "/stats/years/2026", "/stats/cycles/2026" ])
+      expect(cards.map { |c| c.at_css("img.stats-card-art")["src"] }).to all(match(%r{/assets/stats/(release|year|cycle)-\w+\.png}))
+      expect(response.body).not_to include("PG19 and how")
+      expect(response.body).to include("counted from the previous GA to its own GA")
+      expect(response.body).to include("January to December")
+      expect(response.body).to include("from the day the previous major branched off")
       get topics_path
       expect(response.body).to include('href="/stats"')
     end
@@ -284,6 +295,7 @@ RSpec.describe "Release statistics", type: :request do
     it "renders the committers tab" do
       get "/stats/releases/19/committers"
       expect(response).to have_http_status(:ok)
+      expect(response.body).to include("one scale; shaded months are outside the main phase")
       doc = Nokogiri::HTML(response.body)
       expect(doc.at_css(".stats-tab.is-active").text).to eq("Committers")
       expect(doc.css(".stats-chips a.stats-chip[href*='/person/']")).to be_empty
@@ -369,6 +381,107 @@ RSpec.describe "Release statistics", type: :request do
       get "/stats/releases/7/committers"
       expect(response).to have_http_status(:not_found)
       get "/stats/releases/7/person/alice@example.com"
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "keeps the release-only tiles and legend" do
+      get "/stats/releases/19/pulse"
+      expect(response.body).to include("early / stabilization: only threads that landed in PG19")
+      get "/stats/releases/19/person/alice@example.com"
+      expect(response.body).to include("Started after the 19 branch point")
+      get "/stats/releases/19"
+      expect(response.body).to include("commits in the 19 branch that are not in 18")
+      expect(response.body).to include("to an earlier branch too")
+    end
+
+    it "renders a year on every tab" do
+      get "/stats/years/2026"
+      expect(response).to have_http_status(:ok)
+      doc = Nokogiri::HTML(response.body)
+      expect(doc.at_css("h1").text).to eq("2026 statistics")
+      expect(doc.css(".stats-chip").map(&:text).map(&:squish)).to eq([ "2026 (in progress)", "2025", "2024", "2023", "2022", "2021", "2020", "2019", "2018", "2017" ])
+      expect(doc.at_css(".stats-chip.is-active.is-dim").text).to include("2026")
+      expect(doc.at_css(".stats-range").text).to eq("Year: 2026-01-01 to today")
+      expect(response.body).to include("committed between 2026-01-01 and today, one per change, backports collapsed")
+      expect(response.body).to include("cherry-picked to another branch too")
+      expect(response.body).to include("Who shaped 2026")
+      expect(doc.css(".stats-tab").map(&:text)).to eq([ "Overview", "Pulse", "Companies", "People", "Committers" ])
+      expect(doc.css(".stats-chip").map { |a| a["href"] }).to include("/stats/years/2025")
+
+      get "/stats/years/2026/pulse"
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("early / stabilization")
+      data = JSON.parse(Nokogiri::HTML(response.body).at_css("[data-release-chart-kind-value='strips']")["data-release-chart-data-value"])
+      expect(data["windows"].map { |w| w["phase"] }).to eq([ "middle" ])
+      expect(data["events"].map { |e| e["label"] }).to eq([ "19 branched (beta1)" ])
+
+      get "/stats/years/2026/people"
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("/stats/years/2026/person/alice@example.com")
+      expect(response.body).to include("/stats/years/2026/people?")
+      get "/stats/years/2026/people.csv"
+      expect(response.headers["Content-Disposition"]).to include("2026-people.csv")
+
+      get "/stats/years/2026/companies"
+      expect(response).to have_http_status(:ok)
+      get "/stats/years/2026/companies.csv"
+      expect(response.headers["Content-Disposition"]).to include("2026-companies.csv")
+
+      get "/stats/years/2026/committers"
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("shaded months")
+      get "/stats/years/2026/committers.csv"
+      expect(response.headers["Content-Disposition"]).to include("2026-committers.csv")
+
+      get "/stats/years/2026/person/alice@example.com"
+      expect(response).to have_http_status(:ok)
+      body = response.body
+      expect(body).to include("Alice in 2026")
+      expect(body).not_to include("branch point")
+      expect(body).to include("in the year")
+      expect(body).to include("year 75%")
+      expect(body).to include("year 25%")
+      expect(body).not_to include("release 75%")
+      expect(Nokogiri::HTML(body).css(".stats-head a").map { |a| a["href"] }).to include("/stats/years/2025/person/alice@example.com")
+    end
+
+    it "keeps companies out of years before the curated data" do
+      get "/stats/years/2025"
+      expect(Nokogiri::HTML(response.body).css(".stats-tab").map(&:text)).not_to include("Companies")
+      get "/stats/years/2025/companies"
+      expect(response).to have_http_status(:not_found)
+      get "/stats/years/2026/companies"
+      expect(Nokogiri::HTML(response.body).css(".stats-chip").find { |a| a.text.include?("2025") }["href"]).to eq("/stats/years/2025")
+    end
+
+    it "renders a development cycle" do
+      get "/stats/cycles/2025"
+      expect(response).to have_http_status(:ok)
+      doc = Nokogiri::HTML(response.body)
+      expect(doc.at_css("h1").text).to eq("2025/26 cycle statistics")
+      expect(doc.css(".stats-chip").map(&:text).map(&:squish)).to eq([ "2026/27 (in progress)", "2025/26" ])
+      expect(doc.at_css(".stats-range").text).to eq("Master: 2025-05-05 (18 branched) to 2026-06-01 (19 branched)")
+      expect(response.body).to include("Who shaped the 2025/26 cycle")
+      expect(doc.css(".stats-tab").map(&:text)).to include("Companies")
+      get "/stats/cycles/2025/pulse"
+      expect(response).to have_http_status(:ok)
+      get "/stats/cycles/2025/people.csv"
+      expect(response.headers["Content-Disposition"]).to include("2025-26-people.csv")
+      get "/stats/cycles/2026/person/alice@example.com"
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Alice in the 2026/27 cycle")
+    end
+
+    it "404s for unknown years and cycles" do
+      get "/stats/years/1990"
+      expect(response).to have_http_status(:not_found)
+      get "/stats/years/abc"
+      expect(response).to have_http_status(:not_found)
+      get "/stats/years/2016/pulse"
+      expect(response).to have_http_status(:not_found)
+      get "/stats/cycles/2024" # no 17 beta1 in the fixture
+      expect(response).to have_http_status(:not_found)
+      get "/stats/cycles/2025/person/nobody@example.com"
       expect(response).to have_http_status(:not_found)
     end
   end

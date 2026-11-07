@@ -1,0 +1,23 @@
+/ entries: top 6 person hashes with :name, :email and the metric keys; line: ->(entry) { "417 commits" }
+- name_of = ->(entry) { entry[:email] ? link_to(entry[:name], local_assigns[:period] ? stats_period_path(period, :person, entry[:email]) : person_path(entry[:email])) : entry[:name] }
+.stats-podium-card
+  .t
+    span = title
+    - if local_assigns[:link]
+      = link_to "#{link_label} →", link
+  .stats-podium
+    - [ [ 1, "two" ], [ 0, "one" ], [ 2, "three" ] ].each do |index, step|
+      - entry = entries[index]
+      .stats-step class=step
+        .who
+          - if entry
+            - if step == "one"
+              .crown &#9813;
+            .avatar = stats_initials(entry[:name])
+            span.n = name_of.call(entry)
+            .s = line.call(entry)
+        .block = index + 1
+  - rest = entries.drop(3)
+  - if rest.any?
+    .stats-podium-next
+      = safe_join(rest.each_with_index.map { |entry, i| safe_join([ "#{i + 4}. ", name_of.call(entry), " #{line.call(entry)}" ]) }, " · ")

@@ -1,0 +1,37 @@
+- content_for :title, "#{@period.title} pulse"
+- seg = ->(label, active, path) { link_to label, path, class: "stats-seg-item#{' is-active' if active}", aria: { current: ("page" if active) } }
+
+.stats-page
+  h1 = "#{@period.title} statistics"
+  = render "stats/periods/header", period: @period, periods: @periods, tab: :pulse
+
+  .stats-controls
+    span
+      | Granularity
+      span.stats-seg
+        - Stats::PulseParams::GRANS.each do |g|
+          = seg.call(g.capitalize, @pulse_params.gran == g, stats_period_path(@period, :pulse, gran: g, group: @pulse_params.group))
+    span
+      | Series
+      span.stats-seg
+        - Stats::PulseParams::GROUPS.keys.each do |g|
+          = seg.call(g.capitalize, @pulse_params.group == g, stats_period_path(@period, :pulse, gran: @pulse_params.gran, group: g))
+  .stats-legend
+    span
+      i.swatch.c1
+      | committers
+    span
+      i.swatch.c2
+      | everyone else
+    - if @period.windows.size > 1
+      span
+        i.swatch.phase
+        | early / stabilization: only threads that landed in #{@period.long_label}
+    span
+      i.swatch.cf
+      | commitfest
+    span
+      i.swatch.event
+      | release event
+  .stats-strips-card style="--stats-strips-height: #{60 + @data[:strips].size * 125}px"
+    = stats_chart("strips", @data, css_class: "stats-chart stats-strips", label: "#{@period.label} pulse, #{@pulse_params.gran}ly")

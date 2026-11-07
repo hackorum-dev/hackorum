@@ -1,0 +1,110 @@
+- content_for :title, "#{@period.title} statistics"
+- code = @data[:code]
+- disc = @data[:discussion]
+- lin = @data[:lineage]
+- rev = @data[:reviews]
+- total = code[:commits]
+- llm = @data[:llm]
+- months = code[:commits_by_month]
+ruby:
+  verdict_segments = stats_share_segments([
+    [ "as posted", lin[:verdicts][:as_is], "The commit is the posted patch, byte for byte or near enough." ],
+    [ "split from a series", lin[:verdicts][:partial], "The posted patchset was committed as several commits; this is one of them, with little or no change." ],
+    [ "modified", lin[:verdicts][:modified], "The committer changed the posted patch before committing." ],
+    [ "from discussion", lin[:verdicts][:from_discussion], "No posted patch matches: the change was written from scratch after the discussion (a one-liner, a revert, an inline suggestion).", true ] ])
+  change_segments = stats_share_segments([
+    [ "light", lin[:change_levels][:light], "Formatting, naming, comments, tests." ],
+    [ "moderate", lin[:change_levels][:moderate], "Local logic changed." ],
+    [ "significant", lin[:change_levels][:significant], "The approach changed." ] ])
+  coverage_segments = stats_share_segments([
+    [ "final version", rev[:coverage][:final], "Their last mail is about the version that was committed." ],
+    [ "earlier version only", rev[:coverage][:earlier], "They wrote about an earlier version, not the one committed." ],
+    [ "not found in the thread", rev[:coverage][:none], "Credited in the commit message but no mail from them in the thread: off-list review, or an unmatched name.", true ] ])
+- no_lines = total.positive? && (code[:lines_added].to_i + code[:lines_removed].to_i).zero?
+- alone = rev[:alone]
+- with_other = alone[:of] - alone[:count]
+
+.stats-page
+  h1 = "#{@period.title} statistics"
+  = render "stats/periods/header", period: @period, periods: @periods, tab: :overview
+
+  h2.stats-band
+    | Code
+    span.pop = @period.scope_description
+  .stats-tiles
+    = render "stats/periods/tile", kind: "chart", v: stats_number(total), k: "Commits",
+      d: safe_join([ "one per change, backports collapsed", *(code[:peak] ? [ tag.br, "peak #{code[:peak].first}: #{stats_number(code[:peak].last)}" ] : []) ]),
+      chart: [ "spark", { categories: months.map(&:first), values: months.map(&:last), unit: "commits" } ]
+    = render "stats/periods/tile", v: stats_number(code[:backported]), k: "Also backported", d: @period.backported_description
+    = render "stats/periods/tile", v: stats_number(code[:reverts]), k: "Reverts", d: "#{stats_pct(code[:reverts], total)} of commits"
+    = render "stats/periods/tile", v: stats_number(code[:authors]), k: "Authors"
+    = render "stats/periods/tile", v: stats_number(code[:reviewers]), k: "Reviewers"
+    = render "stats/periods/tile", kind: "chart", v: stats_number(code[:committers][:count]), k: "Committers",
+      d: "top 5 made #{code[:committers][:top5_share]}% of commits",
+      chart: [ "spark", { categories: code[:committers][:strip].map(&:first), values: code[:committers][:strip].map(&:last), unit: "commits" } ]
+    = render "stats/periods/tile", kind: "chart", v: stats_number(code[:committer_steps]["10+"]), k: "Committers with 10+ commits",
+      d: "#{stats_number(code[:committer_steps]['50+'])} with 50+, #{stats_number(code[:committer_steps]['100+'])} with 100+",
+      chart: [ "spark", { categories: code[:committer_steps].keys, values: code[:committer_steps].values, unit: "committers" } ]
+    = render "stats/periods/tile", kind: "chart", v: "+#{stats_number(code[:lines_added])} / -#{stats_number(code[:lines_removed])}", k: "Lines", d: "by month", na: no_lines,
+      chart: [ "histogram", { categories: code[:lines_by_month].map(&:first), labels: false, series: [ { label: "added", values: code[:lines_by_month].map { |_, (a, _)| a } }, { label: "removed", values: code[:lines_by_month].map { |_, (_, r)| r }, gray: true } ] } ]
+    = render "stats/periods/tile", v: stats_number(code[:files]), k: "Files touched"
+
+  h2.stats-band
+    | Discussion
+    span.pop threads linked to those commits
+  .stats-tiles
+    = render "stats/periods/tile", v: stats_number(disc[:threads]), k: "Threads", d: "landed in #{@period.long_label}"
+    = render "stats/periods/tile", v: stats_number(disc[:messages]), k: "Messages", d: "in those threads"
+    = render "stats/periods/tile", v: stats_number(disc[:people]), k: "People", d: "wrote in them"
+    = render "stats/periods/tile", v: stats_number(disc[:patch_mails]), k: "Patch mails", d: "#{disc[:patch_mails_per_thread]} per thread"
+    = render "stats/periods/tile", v: stats_pct(disc[:with_thread], total), k: "Commits with a thread", d: "#{stats_pct(total - disc[:with_thread], total)} reference no discussion"
+    = render "stats/periods/tile", v: "#{stats_number(disc[:age_median_days])} d", k: "Thread age at commit", d: "median, first mail to commit", na: disc[:age_median_days].nil?
+    = render "stats/periods/tile", kind: "chart", v: stats_pct(disc[:within_2w], disc[:with_thread]), k: "Committed within 2 weeks",
+      d: "#{stats_pct(disc[:over_year], disc[:with_thread])} took over a year",
+      chart: [ "spark", { categories: disc[:age_buckets].map(&:first), values: disc[:age_buckets].map(&:last), unit: "commits" } ]
+
+  h2.stats-band
+    | Patch lineage
+    span.pop = llm ? "LLM-read, #{stats_pct(lin[:covered], total)} of commits covered" : (lin[:covered].positive? ? "not shown: the LLM covers only #{stats_pct(lin[:covered], total)} of commits" : "not available: no LLM runs for this #{@period.noun}")
+  .stats-tiles
+    = render "stats/periods/tile", kind: "share", v: "How the posted patch became the commit", na: !llm,
+      chart: [ "share", { segments: verdict_segments } ]
+    = render "stats/periods/tile", kind: "share", v: "How much the committer changed it", na: !llm,
+      chart: [ "share", { segments: change_segments } ]
+    = render "stats/periods/tile", kind: "chart", v: lin[:versions][:mean], k: "Versions per patch", na: !llm,
+      d: "median #{lin[:versions][:median]}, max #{stats_number(lin[:versions][:max])}",
+      chart: [ "spark", { categories: lin[:versions][:buckets].map(&:first), values: lin[:versions][:buckets].map(&:last), unit: "patches" } ]
+    = render "stats/periods/tile", v: stats_pct(lin[:cf_commits], total), k: "Commits with a Commitfest entry", d: "#{stats_number(lin[:cf_entries])} entries landed"
+    = render "stats/periods/tile", v: lin[:commits_per_entry][:mean], k: "Commits per Commitfest entry", d: "median #{lin[:commits_per_entry][:median]}"
+    = render "stats/periods/tile", v: lin[:batches_per_entry],
+      k: safe_join([ tag.abbr("Batches", title: "A batch is a group of commits from one entry pushed within the same hour. Three commits pushed together is one batch; three commits a week apart is three."), " per Commitfest entry" ]),
+      d: "#{stats_pct(lin[:one_batch_entries], lin[:cf_entries])} landed in one go"
+
+  h2.stats-band
+    | Reviews
+    span.pop = llm ? "commit-message credits, checked by the LLM against the thread" : "commit-message credits"
+  .stats-tiles
+    = render "stats/periods/tile", v: stats_pct(rev[:crediting], total), k: "Commits crediting a reviewer",
+      d: "#{stats_number(rev[:crediting])} name a Reviewed-by, #{stats_pct(total - rev[:crediting], total)} credit nobody"
+    = render "stats/periods/tile", v: rev[:per_commit][:mean], k: "Reviewers per reviewed commit", d: "credited ones, median #{rev[:per_commit][:median]}"
+    = render "stats/periods/tile", kind: "share", v: "What the credited reviewers saw in the thread", na: !llm,
+      d: safe_join([ tag.abbr("not found in the thread", title: "The commit message credits them but the thread has no mail from them: an off-list review, or a name we could not match."),
+                     " is #{stats_pct(rev[:coverage][:none], rev[:coverage].values.sum)}, #{stats_number(rev[:coverage][:none])} credits" ]),
+      chart: [ "share", { segments: coverage_segments } ]
+    = render "stats/periods/tile", v: stats_pct(rev[:uncredited_reviewed][:count], rev[:uncredited_reviewed][:of]), na: !llm,
+      k: tag.abbr("Uncredited commits that were reviewed anyway", title: "Of the #{stats_number(rev[:uncredited_reviewed][:of])} commits that credit no reviewer: the LLM looked for people who, before the commit, reported a problem, tested it, approved it or proposed a change the author took. The same bar committers use for Reviewed-by. Pings, rebase requests and cfbot notes do not count."),
+      d: "#{stats_number(rev[:uncredited_reviewed][:count])} of #{stats_number(rev[:uncredited_reviewed][:of])}, #{stats_number(rev[:uncredited_reviewed][:credits])} credits"
+    = render "stats/periods/tile", v: stats_pct(rev[:by_others][:count], total),
+      k: tag.abbr("Of all commits, written by someone other than the committer", title: "The commit message credits an author other than the committer. The rest the committer wrote themselves."),
+      d: "#{stats_number(rev[:by_others][:count])} of #{stats_number(total)}: #{stats_number(rev[:by_others][:committers])} by other committers, #{stats_number(rev[:by_others][:non_committers])} by non-committers"
+    = render "stats/periods/tile", v: stats_pct(alone[:count], alone[:of]), na: !llm,
+      k: tag.abbr("Of those, reviewed by the committer alone", title: "Of the #{stats_number(alone[:of])} written by someone else that the LLM assessed: the committer is the only reviewer, nobody else is credited and the LLM found nobody else."),
+      d: "#{stats_number(alone[:count])} of #{stats_number(alone[:of])}"
+    = render "stats/periods/tile", kind: "hist", na: !llm || no_lines,
+      v: safe_join([ "Size of patches by others that only the committer reviewed ", tag.abbr("vs. the ones with another reviewer", title: "Lines changed in the commit. Blue: the #{stats_number(alone[:count])} commits reviewed by the committer alone. Grey: the #{stats_number(with_other)} by others that had another reviewer.") ]),
+      chart: [ "histogram", { categories: rev[:size][:categories], series: [ { label: "committer alone (#{stats_number(alone[:count])})", values: rev[:size][:alone] }, { label: "another reviewer too (#{stats_number(with_other)})", values: rev[:size][:with_other], gray: true } ] } ]
+
+  h2.stats-band = "Who shaped #{@period.long_label}"
+  .stats-podiums
+    = render "stats/periods/podium", period: @period, title: "Committers, by commits", entries: @data[:podiums][:committers], link: stats_period_path(@period, :committers), link_label: "All committers", line: ->(e) { "#{stats_number(e[:commits])} commits" }
+    = render "stats/periods/podium", period: @period, title: "Non-committers, by patches authored and reviews", entries: @data[:podiums][:contributors], link: stats_period_path(@period, :people), link_label: "All people", line: ->(e) { "#{stats_number(e[:authored])} authored, #{stats_number(e[:reviewed])} reviewed" }
