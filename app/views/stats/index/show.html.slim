@@ -6,11 +6,20 @@
   .stats-cards
     - release = @releases.find { |r| !r.in_development? } || @releases.first
     - if release
-      = render "stats/index/card", period: release, image: "stats/release.png", title: "By release",
+      = render "stats/index/card", href: stats_period_path(release), image: "stats/release.png", title: "By release",
         text: "What went into one major, as its users see it: the changes that ship in it and not in the release before, counted from the previous GA to its own GA. Commits, threads, patch lineage, reviews, people, companies and committers."
     - if @years.first
-      = render "stats/index/card", period: @years.first, image: "stats/year.png", title: "By year",
+      = render "stats/index/card", href: stats_period_path(@years.first), image: "stats/year.png", title: "By year",
         text: "The same numbers for a calendar year, January to December, across every branch."
     - if @cycles.first
-      = render "stats/index/card", period: @cycles.first, image: "stats/cycle.png", title: "By development cycle",
+      = render "stats/index/card", href: stats_period_path(@cycles.first), image: "stats/cycle.png", title: "By development cycle",
         text: "The same numbers for one run of master: from the day the previous major branched off to the day the next one did."
+
+  h2.stats-row-title Over time
+  .stats-cards
+    = render "stats/index/card", href: stats_trend_path("releases"), image: "stats/release-trend.png", title: "Release over release",
+      text: "How the releases compare: who writes the code, who commits it, how much of it is discussed and reviewed, PG11 to now."
+    = render "stats/index/card", href: stats_trend_path("years"), image: "stats/year-trend.png", title: "Year over year",
+      text: "The same comparison year by year, from 2017."
+    = render "stats/index/card", href: stats_trend_path("cycles"), image: "stats/cycle-trend.png", title: "Cycle over cycle",
+      text: "The same comparison for each run of master, from the 2017/18 cycle."

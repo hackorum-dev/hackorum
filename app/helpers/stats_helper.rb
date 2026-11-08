@@ -57,4 +57,19 @@ module StatsHelper
       link_to "#{label}#{arrow}", stats_period_path(period, :people, params_object.active_params.merge(sort: key, dir: dir))
     end
   end
+
+  def stats_trend_value(value, unit)
+    case unit
+    when "%" then "#{value.round}%"
+    when "days" then "#{value.round} days"
+    else number_with_delimiter(value.round)
+    end
+  end
+
+  # one chart's data: the period labels, the lines and where each point leads
+  def stats_trend_chart(series, data, periods)
+    { categories: data[:periods].map { |p| p[:label] }, lines: series[:lines], unit: series[:unit],
+      open: data[:periods].map { |p| p[:open] }, partial: series[:partial],
+      paths: data[:periods].map { |p| (period = periods[p[:key]]) ? stats_period_path(period) : nil } }
+  end
 end

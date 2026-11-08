@@ -32,6 +32,8 @@ RSpec.describe "Release statistics", type: :request do
     expect(response).to have_http_status(:not_found)
     get "/stats/releases/19/person/alice@example.com"
     expect(response).to have_http_status(:not_found)
+    get "/stats/trends/years"
+    expect(response).to have_http_status(:not_found)
     get "/stats/years/2026"
     expect(response).to have_http_status(:not_found)
     get "/stats/cycles/2025"
@@ -51,9 +53,11 @@ RSpec.describe "Release statistics", type: :request do
       expect(response).to have_http_status(:ok)
       doc = Nokogiri::HTML(response.body)
       cards = doc.css("a.stats-card")
-      expect(cards.map { |c| c.at_css("h2").text }).to eq([ "By release", "By year", "By development cycle" ])
-      expect(cards.map { |c| c["href"] }).to eq([ "/stats/releases/19", "/stats/years/2026", "/stats/cycles/2026" ])
-      expect(cards.map { |c| c.at_css("img.stats-card-art")["src"] }).to all(match(%r{/assets/stats/(release|year|cycle)-\w+\.png}))
+      expect(cards.map { |c| c.at_css("h2").text }).to eq([ "By release", "By year", "By development cycle",
+                                                             "Release over release", "Year over year", "Cycle over cycle" ])
+      expect(cards.map { |c| c["href"] }).to eq([ "/stats/releases/19", "/stats/years/2026", "/stats/cycles/2026",
+                                                  "/stats/trends/releases", "/stats/trends/years", "/stats/trends/cycles" ])
+      expect(cards.map { |c| c.at_css("img.stats-card-art")["src"] }).to all(match(%r{/assets/stats/(release|year|cycle)(-trend)?-\w+\.png}))
       expect(response.body).not_to include("PG19 and how")
       expect(response.body).to include("counted from the previous GA to its own GA")
       expect(response.body).to include("January to December")
@@ -470,6 +474,41 @@ RSpec.describe "Release statistics", type: :request do
       get "/stats/cycles/2026/person/alice@example.com"
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Alice in the 2026/27 cycle")
+    end
+
+    it "renders the three trend pages" do
+      { "releases" => "Release over release", "years" => "Year over year", "cycles" => "Cycle over cycle" }.each do |segment, title|
+        get "/stats/trends/#{segment}"
+        expect(response).to have_http_status(:ok)
+        doc = Nokogiri::HTML(response.body)
+        expect(doc.at_css("h1").text).to eq(title)
+        expect(doc.at_css(".stats-chip.is-active").text).to eq(title)
+        expect(doc.css(".stats-band").map(&:text).join).to include("Headline shifts", "Volume", "From the LLM")
+        charts = doc.css("[data-release-chart-kind-value='trend']")
+        expect(charts.size).to eq(22)
+        charts.each do |chart|
+          data = JSON.parse(chart["data-release-chart-data-value"])
+          expect(data.keys).to include("categories", "lines", "unit", "paths")
+          expect(data["paths"].size).to eq(data["categories"].size)
+        end
+      end
+    end
+
+    it "shows the year trend with headline and period links" do
+      get "/stats/trends/years"
+      doc = Nokogiri::HTML(response.body)
+      commits = doc.css(".stats-trend").find { |c| c.at_css(".t").text == "Commits" }
+      data = JSON.parse(commits.at_css("[data-release-chart-data-value]")["data-release-chart-data-value"])
+      expect(data["categories"].first).to eq("2017")
+      expect(data["categories"].last).to eq("2026")
+      expect(data["open"].last).to be(true)
+      expect(data["paths"].last).to eq("/stats/years/2026")
+      expect(commits.at_css(".stats-trend-head").text).to include("2017", "2025")
+    end
+
+    it "404s on an unknown trend" do
+      get "/stats/trends/weeks"
+      expect(response).to have_http_status(:not_found)
     end
 
     it "404s for unknown years and cycles" do

@@ -19,6 +19,20 @@ module Stats
       Rails.cache.delete(key(period, tab, extra))
     end
 
+    # a trend always ends in an open period
+    def self.fetch_trend(kind, &block)
+      return yield unless enabled?
+
+      Rails.cache.fetch(trend_key(kind), expires_in: OPEN_TTL, race_condition_ttl: 1.minute, &block)
+    end
+
+    def self.delete_trend(kind)
+      Rails.cache.delete(trend_key(kind))
+    end
+
+    def self.trend_key(kind) = [ "stats", VERSION, "trend", kind.to_s ]
+    private_class_method :trend_key
+
     def self.key(period, tab, extra)
       [ "stats", VERSION, period.kind.to_s, period.key, tab.to_s, extra.sort ]
     end

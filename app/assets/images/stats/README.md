@@ -77,3 +77,36 @@ height of the frame, with a few dots scattered over them.
 
 A dark master line with commit nodes along the bottom and a lighter line
 rising steeply off it to run parallel along the top.
+
+## Trend cards
+
+Generated 2026-11-08 (codex-cli 0.164.0, same method, run with stdin from
+/dev/null or codex waits for input). One run, one prompt, then the
+post-processing rule above. Originals were 1774x887.
+
+Prompt:
+
+Use your built-in image generation tool (image_gen) for this, do not draw
+with a script. Generate three illustrations for a statistics index page and
+save them in this directory as release-trend.png, year-trend.png and
+cycle-trend.png. Style: flat vector illustration, mostly indigo (#4f46e5)
+and light indigo (#a5b4fc) with at most one accent tone, soft shapes, no
+text, no gradients, no outlines, fully transparent background (PNG with
+alpha), 2:1 landscape. The drawing must be about 2:1 and fill the frame,
+about 90 percent of the height and 85 percent of the width. The subjects:
+release-trend.png shows a row of version tags of rising height connected by
+a line, like a chart made of labels. year-trend.png shows a row of small
+calendar pages with a rising line drawn across their tops. cycle-trend.png
+shows several parallel branch lines forking off one master line one after
+another, each fork a little higher than the last. Copy the generated files
+into this directory under those names, unmodified, and report the paths
+when done.
+
+release-trend.png: five tags in alternating indigo tones, rising in height,
+strung on a rising line.
+
+year-trend.png: five calendar pages of growing size with a rising line of
+dots above them.
+
+cycle-trend.png: a master line along the bottom with four branches forking
+up one after another, each ending in a lighter bar, each higher than the last.

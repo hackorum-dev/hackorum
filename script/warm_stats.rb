@@ -14,7 +14,8 @@ Stats::Period.all.each do |period|
     [ :pulse, { gran: "month" } ] => proc { Stats::Period::Pulse.new(period, gran: "month").to_h },
     [ :people, {} ] => proc { Stats::Period::People.new(period).to_h },
     [ :companies, {} ] => proc { Stats::Period::Companies.new(period).to_h },
-    [ :committers, {} ] => proc { Stats::Period::Committers.new(period).to_h } }.each do |(tab, extra), build|
+    [ :committers, {} ] => proc { Stats::Period::Committers.new(period).to_h },
+    [ :first_timers, {} ] => proc { Stats::Period::FirstTimers.new(period).count } }.each do |(tab, extra), build|
     next if tab == :companies && !period.companies?
 
     Stats::Cache.delete(period, tab, **extra)
@@ -22,4 +23,11 @@ Stats::Period.all.each do |period|
     Stats::Cache.fetch(period, tab, **extra, &build)
     puts format("%s %s %s %s %.1fs", period.kind, period.label, tab, extra.values.join, Time.current - started)
   end
+end
+
+Stats::Trend::TITLES.each_key do |kind|
+  Stats::Cache.delete_trend(kind)
+  started = Time.current
+  Stats::Cache.fetch_trend(kind) { Stats::Trend.new(kind).to_h }
+  puts format("trend %s %.1fs", kind, Time.current - started)
 end

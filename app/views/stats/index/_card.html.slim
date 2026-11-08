@@ -1,5 +1,5 @@
-/ period: where the card leads; image: asset path; title, text
-= link_to stats_period_path(period), class: "stats-card" do
+/ href: where the card leads; image: asset path; title, text
+= link_to href, class: "stats-card" do
   = image_tag image, class: "stats-card-art", alt: ""
   h2 = title
   p = text

@@ -38,4 +38,11 @@ RSpec.describe Stats::Cache do
     expect(second).to eq(first)
     expect(calls).to eq(1)
   end
+
+  it "keeps a trend for an hour" do
+    expect(Rails.cache).to receive(:fetch)
+      .with([ "stats", version, "trend", "year" ], expires_in: 1.hour, race_condition_ttl: 1.minute)
+      .and_return(:x)
+    expect(described_class.fetch_trend("year") { :y }).to eq(:x)
+  end
 end

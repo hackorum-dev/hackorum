@@ -1,0 +1,32 @@
+- content_for :title, "#{@title} statistics"
+- newest = @periods.values.first
+
+.stats-page
+  h1 = @title
+  .stats-chips
+    - Stats::Trend::SEGMENTS.each do |segment, kind|
+      = link_to Stats::Trend::TITLES[kind], stats_trend_path(segment), class: [ "stats-chip", ("is-active" if kind == @kind) ].compact.join(" ")
+    - if newest
+      span.stats-range
+        = link_to "#{newest.title} statistics", stats_period_path(newest)
+
+  h2.stats-band
+    | Headline shifts
+    span.pop how the work is shared, discussed and reviewed
+  .stats-trends
+    - @data[:shifts].each do |series|
+      = render "stats/trends/card", series: series, data: @data, periods: @periods
+
+  h2.stats-band
+    | Volume
+    span.pop hollow points are periods in progress
+  .stats-trends.is-small
+    - @data[:volume].each do |series|
+      = render "stats/trends/card", series: series, data: @data, periods: @periods
+
+  h2.stats-band
+    | From the LLM
+    span.pop = @data[:llm_from] ? "patch lineage read by the LLM, covered from #{@data[:llm_from]} on" : "the LLM backfill does not cover any of these periods yet"
+  .stats-trends
+    - @data[:llm].each do |series|
+      = render "stats/trends/card", series: series, data: @data, periods: @periods

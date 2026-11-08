@@ -1,0 +1,15 @@
+/ series: one Trend series; data: the trend hash; periods: key -> period
+- head = series[:headline]
+- empty = series[:lines].all? { |l| l[:values].compact.empty? }
+.stats-card.stats-trend
+  .t = series[:label]
+  - if series[:hint]
+    .s = series[:hint]
+  - if head
+    .stats-trend-head
+      span.v = "#{stats_trend_value(head[:from], series[:unit])} \u2192 #{stats_trend_value(head[:to], series[:unit])}"
+      span.d = "#{head[:from_label]} to #{head[:to_label]}"
+  - if empty
+    .s not available
+  - else
+    = stats_chart("trend", stats_trend_chart(series, data, periods), label: series[:label])

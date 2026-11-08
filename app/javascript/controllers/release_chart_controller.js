@@ -49,6 +49,8 @@ export default class extends Controller {
     this.chart = echarts.init(this.element, null, { renderer: "svg" })
     try {
       this.chart.setOption(builder(this.dataValue, palette(), this.element))
+      const paths = this.dataValue.paths
+      if (paths) this.chart.on("click", (e) => { const url = paths[e.dataIndex]; if (url) window.Turbo ? window.Turbo.visit(url) : window.location.assign(url) })
     } catch (e) {
       this.fail()
     }
@@ -351,4 +353,46 @@ function rows(data, p, el) {
   return o
 }
 
-const BUILDERS = { spark: bars, bars, share, histogram, strips, scatter, ranked, rows }
+// one point per period, null is a gap; open periods are hollow points at
+// the end of a dashed segment, closed ones are filled
+// data: { categories: [], lines: [{ label, values }], unit, open: [bool], partial, paths }
+function trend(data, p) {
+  const o = base(p)
+  const open = (j) => !!data.open?.[j]
+  const colors = data.lines.map((_, i) => p.slots[i % p.slots.length])
+  const fmt = (v) => v == null ? "n/a" : data.unit === "%" ? `${v}%` : `${Number(v).toLocaleString()}${data.unit ? " " + data.unit : ""}`
+  o.tooltip.trigger = "axis"
+  o.tooltip.formatter = (ps) => {
+    const shown = ps.filter((x) => !x.seriesId.endsWith(":open"))
+    const j = ps[0].dataIndex
+    const note = open(j) ? ` <span style="color:${p.muted}">in progress${data.partial ? ", partial" : ""}</span>` : ""
+    return `<b>${esc(ps[0].name)}</b>${note}` +
+      shown.map((x) => `<br>${data.lines.length > 1 ? esc(x.seriesName) + ": " : ""}${esc(fmt(data.lines[x.seriesIndex / 2].values[j]))}`).join("")
+  }
+  if (data.lines.length > 1) {
+    o.legend = { data: data.lines.map((l) => l.label), bottom: 0, left: 0, itemWidth: 10, itemHeight: 10,
+                 textStyle: { color: p.muted, fontSize: 11 } }
+  }
+  o.grid = { left: 4, right: 16, top: 8, bottom: data.lines.length > 1 ? 24 : 4, containLabel: true }
+  o.xAxis = { type: "category", data: data.categories, boundaryGap: false, axisTick: { show: false },
+              axisLine: { lineStyle: { color: p.border } }, axisLabel: { fontSize: 10, color: p.muted, hideOverlap: true } }
+  o.yAxis = { type: "value", min: 0, splitLine: { lineStyle: { color: p.border } }, axisLabel: { fontSize: 10, color: p.muted } }
+  const cursor = data.paths ? "pointer" : "default"
+  o.series = data.lines.flatMap((l, i) => {
+    const closed = l.values.map((v, j) => open(j) ? null : v)
+    // the open tail: from the last closed point on, nulls elsewhere
+    const firstOpen = l.values.findIndex((_, j) => open(j))
+    const tail = l.values.map((v, j) => firstOpen >= 0 && j >= firstOpen - 1 ? v : null)
+    return [
+      { id: `${i}:closed`, name: l.label, type: "line", connectNulls: false, symbol: "circle", symbolSize: 6, cursor,
+        lineStyle: { color: colors[i], width: 2 }, itemStyle: { color: colors[i] }, data: closed, z: 3 },
+      { id: `${i}:open`, name: l.label, type: "line", connectNulls: false, symbol: "emptyCircle", symbolSize: 7, cursor,
+        lineStyle: { color: colors[i], width: 2, type: "dashed", opacity: 0.6 },
+        itemStyle: { color: colors[i], opacity: 0.6 },
+        data: tail.map((v, j) => open(j) ? v : { value: v, symbol: "none" }), z: 2 },
+    ]
+  })
+  return o
+}
+
+const BUILDERS = { spark: bars, bars, share, histogram, strips, scatter, ranked, rows, trend }
