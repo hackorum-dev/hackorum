@@ -45,11 +45,16 @@ module PatchCi
     # Queries github directly for each in-flight status instead of paging
     # through history and filtering client-side. These result sets are
     # bounded by how many jobs can run at once, so they never truncate.
-    def in_flight_count
-      IN_FLIGHT.sum { |state| runs(status: state).size }
+    def in_flight_count(now: Time.current)
+      cutoff = now - Config::GHOST_RUN_HOURS.hours
+      IN_FLIGHT.sum { |state| runs(status: state).count { |run| !ghost?(run, cutoff) } }
     end
 
     private
+
+    def ghost?(run, cutoff)
+      run.queued_at.present? && Time.zone.parse(run.queued_at) < cutoff
+    end
 
     def fetch_page(page, status: nil)
       uri = URI("https://api.github.com/repos/#{@repo}/actions/runs")

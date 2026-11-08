@@ -55,7 +55,8 @@ module PatchCi
       StuckRunMarker.new.call if refs_ok && !@dry_run
       pruned = (refs_ok && !@dry_run) ? @pruner.prune! : 0
 
-      in_flight = @client.in_flight_count
+      unseen = unseen_pushes
+      in_flight = @client.in_flight_count + unseen
       free = [ [ @budget - in_flight, 0 ].max, remaining_pushes ].min
 
       pushed = 0
@@ -74,7 +75,7 @@ module PatchCi
 
       DashboardBroadcast.refresh! unless @dry_run
 
-      { in_flight: in_flight, free_slots: free, pushed: pushed, slugs_synced: slugs_synced, failed: @failed,
+      { in_flight: in_flight, unseen: unseen, free_slots: free, pushed: pushed, slugs_synced: slugs_synced, failed: @failed,
         pruned: pruned, era_skips_cleared: @era_skips_cleared, ingested: ingested,
         refs_stale: !refs_ok, fetch_failed: @fetch_failed, mirror_error: @mirror_error,
         error: nil }
@@ -137,6 +138,14 @@ module PatchCi
       PatchCiRepoState.refresh!(master_sha: result.sha,
                                 master_committed_at: @repo.commit_time(result.sha),
                                 master_commit_height: @repo.commit_height(result.sha))
+    end
+
+    # pushed, but no run seen for it yet. github's own count cannot see these,
+    # so on a silent event drop it stays low while pushes vanish
+    def unseen_pushes
+      PatchBranch.where(ci_status: "pushed_awaiting_ci")
+                 .where(pushed_at: Config::UNSEEN_PUSH_HOURS.hours.ago..)
+                 .count
     end
 
     def remaining_pushes

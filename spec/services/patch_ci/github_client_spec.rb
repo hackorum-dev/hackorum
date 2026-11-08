@@ -4,11 +4,11 @@ RSpec.describe PatchCi::GithubClient, :webmock do
   let(:client) { described_class.new(repo: "hackorum-dev/postgres", token: "tok") }
   let(:url) { "https://api.github.com/repos/hackorum-dev/postgres/actions/runs" }
 
-  def run_json(id:, branch:, status:, conclusion: nil)
+  def run_json(id:, branch:, status:, conclusion: nil, created_at: 1.hour.ago.iso8601)
     {
       id: id, head_branch: branch, run_attempt: 1, status: status,
       conclusion: conclusion, head_sha: "a" * 40,
-      created_at: "2026-07-26T10:00:00Z",
+      created_at: created_at,
       run_started_at: "2026-07-26T10:01:00Z",
       updated_at: "2026-07-26T10:15:00Z"
     }
@@ -90,6 +90,14 @@ RSpec.describe PatchCi::GithubClient, :webmock do
     expect(a_request(:get, url).with(query: hash_including("status" => "queued"))).to have_been_made.once
     expect(a_request(:get, url).with(query: hash_including("status" => "in_progress"))).to have_been_made.once
     expect(a_request(:get, url).with(query: { "per_page" => "100", "page" => "1" })).not_to have_been_made
+  end
+
+  it "does not count ghost runs github never cleared as in flight" do
+    PatchCi::GithubClient::IN_FLIGHT.each { |state| stub_status(state, []) }
+    stub_status("queued", [ run_json(id: 1, branch: "a", status: "queued"),
+                            run_json(id: 2, branch: "b", status: "queued", created_at: 60.days.ago.iso8601) ])
+
+    expect(client.in_flight_count).to eq(1)
   end
 
   it "raises on a non-2xx response" do

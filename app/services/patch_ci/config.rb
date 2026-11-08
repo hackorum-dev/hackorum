@@ -16,6 +16,13 @@ module PatchCi
     # do with whether anyone is still discussing it.
     ACTIVE_THREAD_DAYS = 30     # thread with newer messages counts as active
     STUCK_RUN_HOURS = 48        # pushed but no verdict -> infra_error
+    # github drops a job queued this long, so an older in-flight run is a ghost
+    # the API keeps listing - it must not hold a budget slot forever
+    GHOST_RUN_HOURS = 24
+    # a push github has not turned into a run yet still holds a slot this long.
+    # Without it a silent event drop (actions disabled, incident) reads as an
+    # empty budget and the whole queue gets pushed into nothing.
+    UNSEEN_PUSH_HOURS = 2
     PUSH_RETRY_MINUTES = 30     # backoff before retrying a push_failed row
     # how often a row is re-probed against master. The probe is cheap, the push
     # it triggers is not, so this is the cadence of the whole rebase tier.

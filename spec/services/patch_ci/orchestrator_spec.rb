@@ -178,6 +178,16 @@ RSpec.describe PatchCi::Orchestrator do
     expect(orchestrator.cycle[:free_slots]).to eq(0)
   end
 
+  it "counts pushes github has not turned into runs yet against the budget" do
+    create_list(:patch_branch, 3, ci_status: "pushed_awaiting_ci", pushed_at: 5.minutes.ago)
+    create(:patch_branch, ci_status: "pushed_awaiting_ci", pushed_at: 1.day.ago)
+    expect(planner).to receive(:plan).with(limit: 6).and_return([])
+
+    result = orchestrator(budget: 5).cycle
+
+    expect(result).to include(in_flight: 3, unseen: 3, free_slots: 2)
+  end
+
   it "never reports negative free slots" do
     allow(client).to receive(:in_flight_count).and_return(PatchCi::Config::BUDGET + 7)
 
