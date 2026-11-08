@@ -76,7 +76,7 @@ class StatsAggregator
              messages.created_at,
              messages.topic_id,
              aliases.person_id
-      FROM messages
+      FROM visible_messages AS messages
       INNER JOIN aliases ON aliases.id = messages.sender_id
     SQL
     @conn.execute("CREATE INDEX tmp_messages_created_at_idx ON tmp_messages (created_at)")
@@ -140,7 +140,7 @@ class StatsAggregator
       CREATE TEMP TABLE tmp_topics_with_attachments AS
       SELECT DISTINCT messages.topic_id
       FROM attachments
-      INNER JOIN messages ON messages.id = attachments.message_id
+      INNER JOIN visible_messages AS messages ON messages.id = attachments.message_id
     SQL
     @conn.execute("CREATE INDEX tmp_topics_with_attachments_topic_id_idx ON tmp_topics_with_attachments (topic_id)")
 
@@ -261,6 +261,7 @@ class StatsAggregator
              #{@interval_expr.gsub("created_at", "topics.created_at")} AS interval_start
       FROM topics
       WHERE created_at BETWEEN '#{start_stamp}' AND '#{end_stamp}'
+        AND NOT hidden_by_default
     SQL
     @conn.execute("CREATE INDEX tmp_interval_topics_id_idx ON tmp_interval_topics (id)")
     @conn.execute("CREATE INDEX tmp_interval_topics_interval_start_idx ON tmp_interval_topics (interval_start)")
@@ -667,7 +668,7 @@ class RetentionAggregator
         rows = @conn.select_all(<<~SQL.squish)
           WITH firsts AS (
             SELECT aliases.person_id, date_trunc('month', MIN(messages.created_at))::date AS cohort_start
-            FROM messages
+            FROM visible_messages AS messages
             INNER JOIN aliases ON aliases.id = messages.sender_id
             GROUP BY aliases.person_id
           ),
@@ -685,7 +686,7 @@ class RetentionAggregator
             SELECT DISTINCT ON (messages.topic_id)
               messages.topic_id,
               aliases.person_id AS starter_person_id
-            FROM messages
+            FROM visible_messages AS messages
             INNER JOIN aliases ON aliases.id = messages.sender_id
             ORDER BY messages.topic_id, messages.created_at ASC, messages.id ASC
           ),
@@ -694,7 +695,7 @@ class RetentionAggregator
             FROM cohort_bucketed cb
             #{segment[:reply_filter] ? <<~SQL.squish : ""}
               INNER JOIN aliases a ON a.person_id = cb.person_id
-              INNER JOIN messages m ON m.sender_id = a.id
+              INNER JOIN visible_messages m ON m.sender_id = a.id
               INNER JOIN topic_starters ts ON ts.topic_id = m.topic_id
               WHERE m.created_at >= cb.cohort_start_bucket
                 AND m.created_at < (cb.cohort_start_bucket + interval '#{period} months')
@@ -711,7 +712,7 @@ class RetentionAggregator
             SELECT eu.person_id,
                    eu.cohort_start_bucket,
                    date_trunc('month', m.created_at)::date AS msg_month
-            FROM messages m
+            FROM visible_messages m
             INNER JOIN aliases a ON a.id = m.sender_id
             INNER JOIN eligible_users eu ON eu.person_id = a.person_id
           ),
@@ -784,7 +785,7 @@ class RetentionAggregator
           ),
           firsts AS (
             SELECT aliases.person_id, date_trunc('month', MIN(messages.created_at))::date AS cohort_start
-            FROM messages
+            FROM visible_messages AS messages
             INNER JOIN aliases ON aliases.id = messages.sender_id
             GROUP BY aliases.person_id
           ),
@@ -802,7 +803,7 @@ class RetentionAggregator
             SELECT DISTINCT ON (messages.topic_id)
               messages.topic_id,
               aliases.person_id AS starter_person_id
-            FROM messages
+            FROM visible_messages AS messages
             INNER JOIN aliases ON aliases.id = messages.sender_id
             ORDER BY messages.topic_id, messages.created_at ASC, messages.id ASC
           ),
@@ -811,7 +812,7 @@ class RetentionAggregator
             FROM cohort_bucketed cb
             #{segment[:reply_filter] ? <<~SQL.squish : ""}
               INNER JOIN aliases a ON a.person_id = cb.person_id
-              INNER JOIN messages m ON m.sender_id = a.id
+              INNER JOIN visible_messages m ON m.sender_id = a.id
               INNER JOIN topic_starters ts ON ts.topic_id = m.topic_id
               WHERE m.created_at >= cb.cohort_start_bucket
                 AND m.created_at < (cb.cohort_start_bucket + interval '#{period} months')
@@ -828,7 +829,7 @@ class RetentionAggregator
             SELECT eu.person_id,
                    eu.cohort_start_bucket,
                    date_trunc('month', m.created_at)::date AS msg_month
-            FROM messages m
+            FROM visible_messages m
             INNER JOIN aliases a ON a.id = m.sender_id
             INNER JOIN eligible_users eu ON eu.person_id = a.person_id
           ),
@@ -904,6 +905,14 @@ when :daily, :weekly, :monthly then [ granularity ]
 else
                   raise "Usage: ruby script/build_stats.rb [daily|weekly|monthly|all]"
 end
+
+# hidden-list threads (commit notices) are not activity
+ActiveRecord::Base.connection.execute(<<~SQL.squish)
+  CREATE OR REPLACE TEMP VIEW visible_messages AS
+  SELECT messages.* FROM messages
+  INNER JOIN topics ON topics.id = messages.topic_id
+  WHERE NOT topics.hidden_by_default
+SQL
 
 granularities.each do |gran|
   puts "Computing #{gran} stats from #{range_start} to #{range_end}..."

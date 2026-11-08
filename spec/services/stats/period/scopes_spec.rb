@@ -57,7 +57,7 @@ RSpec.describe Stats::Period::Scopes do
   end
 
   it "leaves commit notification threads out of the middle phase" do
-    list = create(:mailing_list, identifier: Stats::Period::Scopes::NOTICE_LIST, display_name: "comitters")
+    list = create(:mailing_list, identifier: "pgsql-committers", display_name: "committers", hidden_by_default: true)
     notice = create(:topic, title: "pgsql: Fix thing", creator_alias: fx.people["alice"].default_alias, created_at: Time.zone.parse("2026-02-10 10:00"))
     create(:topic_mailing_list, topic: notice, mailing_list: list)
     create(:message, topic: notice, sender_alias: fx.people["alice"].default_alias, created_at: Time.zone.parse("2026-02-10 10:00"))

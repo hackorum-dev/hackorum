@@ -7,6 +7,8 @@ class MailingList < ApplicationRecord
   validates :identifier, presence: true, uniqueness: true
   validates :display_name, presence: true
 
+  after_update :refresh_topic_visibility, if: :saved_change_to_hidden_by_default?
+
   def all_emails
     [ email, *alternate_emails ].compact.reject(&:blank?).map(&:downcase)
   end
@@ -17,5 +19,11 @@ class MailingList < ApplicationRecord
       ml.all_emails.each { |e| index[e] = ml }
     end
     index
+  end
+
+  private
+
+  def refresh_topic_visibility
+    Topic.refresh_hidden_by_default!(topic_mailing_lists.select(:topic_id))
   end
 end

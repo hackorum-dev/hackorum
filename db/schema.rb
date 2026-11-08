@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_11_06_150000) do
+ActiveRecord::Schema[8.0].define(version: 2026_11_08_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -327,6 +327,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_06_150000) do
     t.datetime "updated_at", null: false
     t.string "alternate_emails", default: [], array: true
     t.string "post_address"
+    t.boolean "hidden_by_default", default: false, null: false
     t.index ["email"], name: "index_mailing_lists_on_email", unique: true, where: "(email IS NOT NULL)"
     t.index ["identifier"], name: "index_mailing_lists_on_identifier", unique: true
   end
@@ -1020,6 +1021,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_06_150000) do
     t.integer "commit_count", default: 0, null: false
     t.datetime "last_commit_at"
     t.string "slug"
+    t.boolean "hidden_by_default", default: false, null: false
     t.index ["created_at"], name: "index_topics_on_created_at"
     t.index ["creator_id"], name: "index_topics_on_creator_id"
     t.index ["creator_person_id"], name: "index_topics_on_creator_person_id"
@@ -1079,7 +1081,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_06_150000) do
   add_foreign_key "admin_email_changes", "users", column: "performed_by_id"
   add_foreign_key "admin_email_changes", "users", column: "target_user_id"
   add_foreign_key "aliases", "people"
-  add_foreign_key "aliases", "users", validate: false
+  add_foreign_key "aliases", "users"
   add_foreign_key "attachments", "messages"
   add_foreign_key "commit_files", "commits"
   add_foreign_key "commit_people", "commits"
@@ -1113,7 +1115,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_06_150000) do
   add_foreign_key "message_read_ranges", "topics"
   add_foreign_key "message_read_ranges", "users"
   add_foreign_key "messages", "aliases", column: "sender_id"
-  add_foreign_key "messages", "identities", column: "sent_via_identity_id", validate: false
+  add_foreign_key "messages", "identities", column: "sent_via_identity_id"
   add_foreign_key "messages", "messages", column: "reply_to_id"
   add_foreign_key "messages", "people", column: "sender_person_id"
   add_foreign_key "messages", "topics"
@@ -1173,7 +1175,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_06_150000) do
   add_foreign_key "topics", "people", column: "creator_person_id"
   add_foreign_key "topics", "people", column: "last_sender_person_id"
   add_foreign_key "topics", "topics", column: "merged_into_topic_id"
-  add_foreign_key "user_features", "users", validate: false
+  add_foreign_key "user_features", "users"
   add_foreign_key "user_tokens", "users"
   add_foreign_key "users", "people"
 end

@@ -24,6 +24,34 @@ RSpec.describe TopicMergeService do
       expect(target_topic.reload.mailing_lists).to include(list)
     end
 
+    describe "hidden_by_default" do
+      def post_to(topic, list)
+        MessageMailingList.create!(message: topic.messages.first, mailing_list: list)
+      end
+
+      let(:hidden_list) { create(:mailing_list, hidden_by_default: true) }
+      let(:shown_list) { create(:mailing_list) }
+
+      it "keeps a shown target shown when the source is hidden" do
+        post_to(source_topic, hidden_list)
+        post_to(target_topic, shown_list)
+
+        service.call
+
+        expect(target_topic.reload.hidden_by_default).to be(false)
+      end
+
+      it "shows a hidden target when the source is shown" do
+        post_to(source_topic, shown_list)
+        post_to(target_topic, hidden_list)
+        expect(target_topic.reload.hidden_by_default).to be(true)
+
+        service.call
+
+        expect(target_topic.reload.hidden_by_default).to be(false)
+      end
+    end
+
     it "moves the source slug to a target without one" do
       source_topic.update!(slug: "my-feature")
 

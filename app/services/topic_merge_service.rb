@@ -149,6 +149,7 @@ class TopicMergeService
       list_ids.map { |id| { topic_id: target_topic.id, mailing_list_id: id, created_at: now, updated_at: now } },
       unique_by: :idx_topic_mailing_lists_unique, on_duplicate: :skip
     )
+    Topic.refresh_hidden_by_default!(target_topic.id)
   end
 
   # the slug follows the thread unless the target has its own. Cleared on the

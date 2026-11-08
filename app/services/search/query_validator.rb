@@ -28,9 +28,11 @@ module Search
 
     ALL_SELECTORS = (DATE_SELECTORS + COUNT_SELECTORS + AUTHOR_SELECTORS +
                      STATE_SELECTORS + CONTENT_SELECTORS + TAG_SELECTORS +
-                     COMMITFEST_SELECTORS + LIST_SELECTORS + [ :has ]).freeze
+                     COMMITFEST_SELECTORS + LIST_SELECTORS + [ :has, :hidden ]).freeze
 
     HAS_VALUES = %w[attachment patch contributor committer core_team commitfest].freeze
+
+    HIDDEN_VALUES = %w[true false].freeze
 
     # Valid sub-conditions for each parent selector
     VALID_SUB_CONDITIONS = {
@@ -119,6 +121,8 @@ module Search
                     validate_list_selector(node)
       when :has
                     validate_has_selector(node)
+      when :hidden
+                    validate_hidden_selector(node)
       else
                     @warnings << "Unknown selector '#{key}:' was ignored"
                     nil
@@ -280,6 +284,17 @@ module Search
 
       unless HAS_VALUES.include?(value)
         @warnings << "Unknown has: value '#{value}' - valid values are: #{HAS_VALUES.join(', ')}"
+        return nil
+      end
+
+      node
+    end
+
+    def validate_hidden_selector(node)
+      value = node[:value].to_s.downcase
+
+      unless HIDDEN_VALUES.include?(value)
+        @warnings << "Unknown hidden: value '#{value}' - valid values are: #{HIDDEN_VALUES.join(', ')}"
         return nil
       end
 

@@ -20,6 +20,7 @@ class Message < ApplicationRecord
 
   scope :pending, -> { where(state: STATE_PENDING) }
   scope :sent,    -> { where(state: STATE_SENT) }
+  scope :in_shown_topics, -> { joins(:topic).merge(Topic.shown_by_default) }
 
   def pending? = state == STATE_PENDING
   def sent?    = state == STATE_SENT

@@ -3,7 +3,7 @@ module Stats
   # moves with every import and LLM run; an hour of staleness is fine.
   module Cache
     # bump when a stats definition changes
-    VERSION = 4
+    VERSION = 5
     OPEN_TTL = 1.hour
 
     def self.enabled? = !Rails.env.development?

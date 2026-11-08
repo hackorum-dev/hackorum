@@ -13,6 +13,8 @@ RSpec.describe ProfileStats do
         expect(stats.last_message_at).to be_nil
         expect(stats.years_active).to eq(0)
         expect(stats.threads_joined).to eq(0)
+        expect(stats.messages_sent_hidden).to eq(0)
+        expect(stats.threads_joined_hidden).to eq(0)
         expect(stats.patches_sent).to eq(0)
         expect(stats.patch_threads).to eq(0)
         expect(stats.landed_patch_threads).to eq(0)
@@ -32,6 +34,28 @@ RSpec.describe ProfileStats do
 
       expect(stats.messages_sent).to eq(0)
       expect(stats.threads_joined).to eq(0)
+    end
+  end
+
+  describe "hidden lists" do
+    let(:hidden_list) { create(:mailing_list, hidden_by_default: true) }
+
+    before do
+      shown = create(:topic, creator_alias: person_alias)
+      create(:message, topic: shown, sender: person_alias)
+      create(:message, topic: shown, sender: person_alias)
+
+      hidden = create(:topic, creator_alias: person_alias)
+      msg = create(:message, topic: hidden, sender: person_alias)
+      MessageMailingList.create!(message: msg, mailing_list: hidden_list)
+    end
+
+    it "splits counts" do
+      stats = described_class.new(person.id)
+
+      expect([ stats.messages_sent, stats.messages_sent_hidden ]).to eq([ 2, 1 ])
+      expect([ stats.threads_joined, stats.threads_joined_hidden ]).to eq([ 1, 1 ])
+      expect([ stats.threads_started, stats.threads_started_hidden ]).to eq([ 1, 1 ])
     end
   end
 

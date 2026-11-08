@@ -44,7 +44,7 @@ module Search
           str("contributors") | str("participants") | str("messages") |
           str("unread") | str("reading") | str("read") | str("new") |
           str("starred") | str("ignored") | str("notes") | str("tag") |
-          str("has") | str("commitfest") | str("list")
+          str("has") | str("hidden") | str("commitfest") | str("list")
         ).as(:selector_key)
       end
 

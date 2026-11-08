@@ -15,7 +15,7 @@ class TopicsController < ApplicationController
     end
 
     @search_query = nil
-    base_query = Topic.includes(*TOPIC_LIST_PRELOADS)
+    base_query = Topic.includes(*TOPIC_LIST_PRELOADS).shown_by_default
     base_query = apply_default_ignore_filter(base_query) if user_signed_in?
 
     apply_cursor_pagination(base_query)
@@ -890,7 +890,7 @@ class TopicsController < ApplicationController
   end
 
   def topics_base_query(search_query: nil)
-    return Topic.includes(*TOPIC_LIST_PRELOADS) if search_query.nil?
+    return Topic.includes(*TOPIC_LIST_PRELOADS).shown_by_default if search_query.nil?
 
     cleaned_query = search_query.to_s.strip
     return Topic.none if cleaned_query.blank?

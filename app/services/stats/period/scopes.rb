@@ -3,8 +3,6 @@ module Stats
     # The relations every tab reads from. All of them are ActiveRecord
     # relations or plain ids, so a tab composes its own aggregates on top.
     class Scopes
-      NOTICE_LIST = "pgsql-committers".freeze
-
       def initialize(period)
         @period = period
       end
@@ -30,7 +28,7 @@ module Stats
 
       # commit notifications are not discussion
       def notice_topics
-        Topic.where(id: TopicMailingList.where(mailing_list_id: MailingList.where(identifier: NOTICE_LIST).select(:id)).select(:topic_id))
+        Topic.hidden_by_default
       end
 
       def thread_messages

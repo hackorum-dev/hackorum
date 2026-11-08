@@ -37,12 +37,28 @@ class Topic < ApplicationRecord
 
   scope :active, -> { where(merged_into_topic_id: nil) }
   scope :merged, -> { where.not(merged_into_topic_id: nil) }
+  scope :hidden_by_default, -> { where(hidden_by_default: true) }
+  scope :shown_by_default, -> { where(hidden_by_default: false) }
 
   validates :title, presence: true
 
   SLUG_FORMAT = /\A[a-z][a-z0-9._-]*\z/
   # t<digits> is the CI image tag namespace
   SLUG_RESERVED = /\A(t\d+|latest)\z/
+
+  # hidden when it has lists and all of them are hidden
+  HIDDEN_BY_DEFAULT_SQL = <<~SQL.squish.freeze
+    COALESCE((SELECT bool_and(ml.hidden_by_default)
+              FROM topic_mailing_lists tml
+              JOIN mailing_lists ml ON ml.id = tml.mailing_list_id
+              WHERE tml.topic_id = topics.id), false)
+  SQL
+
+  def self.refresh_hidden_by_default!(topic_ids)
+    where(id: topic_ids)
+      .where("topics.hidden_by_default <> #{HIDDEN_BY_DEFAULT_SQL}")
+      .update_all("hidden_by_default = #{HIDDEN_BY_DEFAULT_SQL}")
+  end
 
   before_validation :normalize_slug
 

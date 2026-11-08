@@ -113,6 +113,7 @@ end
 committers_list = MailingList.find_or_create_by!(identifier: "pgsql-committers") do |ml|
   ml.display_name = "committers"
   ml.email = "pgsql-committers@lists.postgresql.org"
+  ml.hidden_by_default = true
 end
 
 puts "Created mailing lists"

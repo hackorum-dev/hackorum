@@ -16,6 +16,30 @@ RSpec.describe "Topics", type: :request do
   end
 
   describe "GET /topics" do
+    context "with a hidden mailing list" do
+      let!(:hidden_list) { create(:mailing_list, hidden_by_default: true) }
+      let!(:shown_list) { create(:mailing_list) }
+      let!(:hidden_topic) { create(:topic, title: "pgsql: hidden notice") }
+      let!(:cross_topic) { create(:topic, title: "Cross posted discussion") }
+
+      before do
+        MessageMailingList.create!(message: create(:message, topic: hidden_topic), mailing_list: hidden_list)
+        MessageMailingList.create!(message: create(:message, topic: cross_topic), mailing_list: hidden_list)
+        MessageMailingList.create!(message: create(:message, topic: cross_topic), mailing_list: shown_list)
+      end
+
+      it "leaves hidden-only topics out" do
+        get topics_path
+        expect(response.body).not_to include("pgsql: hidden notice")
+        expect(response.body).to include("Cross posted discussion")
+      end
+
+      it "still serves the hidden topic page" do
+        get topic_path(hidden_topic)
+        expect(response).to have_http_status(:success)
+      end
+    end
+
     context "when there are topics with messages" do
       let!(:creator1) { create(:alias) }
       let!(:creator2) { create(:alias) }

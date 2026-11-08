@@ -13,11 +13,12 @@ class ProfileStats
 
   STARTED_THREAD_STATS_SQL = <<~SQL.squish
     SELECT
-      COUNT(*) AS started,
-      COUNT(*) FILTER (WHERE topics.message_count = 1) AS no_reply,
+      COUNT(*) FILTER (WHERE NOT topics.hidden_by_default) AS started,
+      COUNT(*) FILTER (WHERE topics.hidden_by_default) AS started_hidden,
+      COUNT(*) FILTER (WHERE NOT topics.hidden_by_default AND topics.message_count = 1) AS no_reply,
       percentile_cont(0.5) WITHIN GROUP (
         ORDER BY EXTRACT(EPOCH FROM (COALESCE(topics.last_message_at, topics.created_at) - topics.created_at))
-      ) AS median_lifetime_seconds
+      ) FILTER (WHERE NOT topics.hidden_by_default) AS median_lifetime_seconds
     FROM topics
     WHERE topics.creator_person_id IN (:ids)
   SQL
@@ -29,9 +30,10 @@ class ProfileStats
     @sources = Array(sources)
   end
 
-  def messages_sent    = message_totals[:count]
-  def first_message_at = message_totals[:first_at]
-  def last_message_at  = message_totals[:last_at]
+  def messages_sent        = message_totals[:count]
+  def messages_sent_hidden = message_totals[:hidden]
+  def first_message_at     = message_totals[:first_at]
+  def last_message_at      = message_totals[:last_at]
 
   def years_active
     return 0 unless first_message_at
@@ -39,14 +41,8 @@ class ProfileStats
     ((last_message_at - first_message_at) / 1.year).floor
   end
 
-  def threads_joined
-    @threads_joined ||=
-      if @person_ids.empty?
-        0
-      else
-        TopicParticipant.where(person_id: @person_ids).distinct.count(:topic_id)
-      end
-  end
+  def threads_joined        = thread_participation[false]
+  def threads_joined_hidden = thread_participation[true]
 
   def patches_sent = patch_counts[0]
 
@@ -122,7 +118,8 @@ class ProfileStats
       end
   end
 
-  def threads_started = started_thread_stats[:started]
+  def threads_started        = started_thread_stats[:started]
+  def threads_started_hidden = started_thread_stats[:started_hidden]
 
   def threads_without_reply = started_thread_stats[:no_reply]
 
@@ -165,12 +162,13 @@ class ProfileStats
   def started_thread_stats
     @started_thread_stats ||=
       if @person_ids.empty?
-        { started: 0, no_reply: 0, median_lifetime_seconds: nil }
+        { started: 0, started_hidden: 0, no_reply: 0, median_lifetime_seconds: nil }
       else
         sql = ActiveRecord::Base.sanitize_sql_array([ STARTED_THREAD_STATS_SQL, { ids: @person_ids } ])
         row = ActiveRecord::Base.connection.select_one(sql)
         {
           started: row["started"].to_i,
+          started_hidden: row["started_hidden"].to_i,
           no_reply: row["no_reply"].to_i,
           median_lifetime_seconds: row["median_lifetime_seconds"]&.to_f
         }
@@ -180,18 +178,32 @@ class ProfileStats
   def started_topics
     return Topic.none if @person_ids.empty?
 
-    Topic.where(creator_person_id: @person_ids)
+    Topic.where(creator_person_id: @person_ids).shown_by_default
          .select(:id, :title, :created_at, :last_message_at, :participant_count, :message_count)
+  end
+
+  def thread_participation
+    @thread_participation ||=
+      if @person_ids.empty?
+        Hash.new(0)
+      else
+        Hash.new(0).merge(
+          TopicParticipant.joins(:topic).where(person_id: @person_ids)
+                          .group("topics.hidden_by_default").distinct.count(:topic_id)
+        )
+      end
   end
 
   def message_totals
     @message_totals ||=
       if @person_ids.empty?
-        { count: 0, first_at: nil, last_at: nil }
+        { count: 0, hidden: 0, first_at: nil, last_at: nil }
       else
-        count, first_at, last_at = Message.where(sender_person_id: @person_ids)
-          .pick(Arel.sql("COUNT(*), MIN(messages.created_at), MAX(messages.created_at)"))
-        { count: count, first_at: first_at, last_at: last_at }
+        count, hidden, first_at, last_at = Message.joins(:topic).where(sender_person_id: @person_ids)
+          .pick(Arel.sql("COUNT(*) FILTER (WHERE NOT topics.hidden_by_default), " \
+                         "COUNT(*) FILTER (WHERE topics.hidden_by_default), " \
+                         "MIN(messages.created_at), MAX(messages.created_at)"))
+        { count: count, hidden: hidden, first_at: first_at, last_at: last_at }
       end
   end
 

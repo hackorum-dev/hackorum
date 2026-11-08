@@ -16,6 +16,7 @@
             th Identifier
             th Display Name
             th Email
+            th Hidden
             th Messages
             th Topics
             th Actions
@@ -26,6 +27,7 @@
                 code = ml.identifier
               td = ml.display_name
               td = ml.email || "—"
+              td = ml.hidden_by_default ? "yes" : ""
               td = ml.messages_count
               td = ml.topics_count
               td

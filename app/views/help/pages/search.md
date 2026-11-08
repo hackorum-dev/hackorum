@@ -157,6 +157,17 @@ has:patch first_after:1m         # Recent topics with patches
 has:contributor messages:>5      # Active discussions with contributor input
 ```
 
+### Hidden Lists
+
+Some mailing lists (e.g. `committers`) are hidden by default: their threads are not in the default topic list, but search still finds them.
+
+| Selector | Description |
+|----------|-------------|
+| `hidden:true` | Also include threads that are only on hidden lists (default) |
+| `hidden:false` | Leave them out |
+
+`hidden:` applies to the whole query, so use it at the top level, not inside `OR` or a negated group.
+
 ### Personal State Selectors
 
 These require being signed in and filter based on your reading state:
@@ -510,7 +521,7 @@ Topics you tagged "needs-review" in the last week that you haven't fully read.
 | **Counts** | `messages:`, `participants:`, `contributors:` |
 | **Presence** | `has:attachment`*, `has:patch`*, `has:contributor`, `has:committer`, `has:core_team`, `has:commitfest` |
 | **State** | `unread:`, `read:`, `reading:`, `new:`, `starred:`, `notes:`, `ignored:` |
-| **Lists** | `list:` (mailing list display name, e.g. `list:hackers`) |
+| **Lists** | `list:` (mailing list display name, e.g. `list:hackers`), `hidden:true`/`hidden:false` |
 | **Tags** | `tag:tagname`*, `tag:[from:source]` |
 
 *Supports [dependent conditions](#dependent-conditions-advanced)

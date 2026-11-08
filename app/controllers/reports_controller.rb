@@ -72,10 +72,14 @@ class ReportsController < ApplicationController
 
   private
 
+  def period_messages
+    Message.in_shown_topics.where(created_at: @period_range)
+  end
+
   def report_cache_key
     [
       "reports",
-      "v2",
+      "v3",
       @period_type,
       @year,
       @period_type == "weekly" ? @week : @month,
@@ -128,15 +132,15 @@ class ReportsController < ApplicationController
   end
 
   def compute_live_stats
-    messages_total = Message.where(created_at: @period_range).count
-    participants_active = Message.where(created_at: @period_range).distinct.count(:sender_person_id)
-    topics_new = Topic.where(created_at: @period_range).count
+    messages_total = period_messages.count
+    participants_active = period_messages.distinct.count(:sender_person_id)
+    topics_new = Topic.shown_by_default.where(created_at: @period_range).count
 
-    period_person_ids = Message.where(created_at: @period_range).distinct.pluck(:sender_person_id)
+    period_person_ids = period_messages.distinct.pluck(:sender_person_id)
     if period_person_ids.empty?
       participants_new = 0
     else
-      first_messages = Message
+      first_messages = Message.in_shown_topics
         .where(sender_person_id: period_person_ids)
         .group(:sender_person_id)
         .minimum(:created_at)
@@ -158,7 +162,7 @@ class ReportsController < ApplicationController
   end
 
   def ranking_total_messages
-    scope = Message.where(created_at: @period_range)
+    scope = period_messages
     scope = apply_contributor_filter(scope, :sender_person_id)
 
     person_ids_with_counts = scope
@@ -171,7 +175,7 @@ class ReportsController < ApplicationController
   end
 
   def ranking_started_thread
-    scope = Message.where(created_at: @period_range)
+    scope = period_messages
       .joins("INNER JOIN (SELECT topic_id, MIN(id) as first_id FROM messages GROUP BY topic_id) first_msgs ON messages.id = first_msgs.first_id")
     scope = apply_contributor_filter(scope, :sender_person_id)
 
@@ -185,7 +189,7 @@ class ReportsController < ApplicationController
   end
 
   def ranking_replied_own_thread
-    scope = Message.where(created_at: @period_range)
+    scope = period_messages
       .joins(:topic)
       .joins("INNER JOIN (SELECT topic_id, MIN(id) as first_id FROM messages GROUP BY topic_id) first_msgs ON messages.topic_id = first_msgs.topic_id")
       .where("messages.id != first_msgs.first_id")
@@ -202,7 +206,7 @@ class ReportsController < ApplicationController
   end
 
   def ranking_replied_other_thread
-    scope = Message.where(created_at: @period_range)
+    scope = period_messages
       .joins(:topic)
       .joins("INNER JOIN (SELECT topic_id, MIN(id) as first_id FROM messages GROUP BY topic_id) first_msgs ON messages.topic_id = first_msgs.topic_id")
       .where("messages.id != first_msgs.first_id")
@@ -219,7 +223,7 @@ class ReportsController < ApplicationController
   end
 
   def ranking_sent_first_patch
-    scope = Message.where(created_at: @period_range)
+    scope = period_messages
       .where(is_patch_submission: true)
       .joins("INNER JOIN (SELECT topic_id, MIN(id) as first_patch_id FROM messages WHERE is_patch_submission = true GROUP BY topic_id) first_patches ON messages.id = first_patches.first_patch_id")
     scope = apply_contributor_filter(scope, :sender_person_id)
@@ -234,7 +238,7 @@ class ReportsController < ApplicationController
   end
 
   def ranking_sent_followup_patch
-    scope = Message.where(created_at: @period_range)
+    scope = period_messages
       .where(is_patch_submission: true)
       .joins("INNER JOIN (SELECT topic_id, MIN(id) as first_patch_id FROM messages WHERE is_patch_submission = true GROUP BY topic_id) first_patches ON messages.topic_id = first_patches.topic_id")
       .where("messages.id != first_patches.first_patch_id")
@@ -268,7 +272,7 @@ class ReportsController < ApplicationController
   end
 
   def load_active_threads
-    scope = Topic.joins(:messages)
+    scope = Topic.shown_by_default.joins(:messages)
       .where(messages: { created_at: @period_range })
       .group("topics.id")
       .select(
@@ -303,10 +307,10 @@ class ReportsController < ApplicationController
   end
 
   def load_new_contributors
-    period_person_ids = Message.where(created_at: @period_range).distinct.pluck(:sender_person_id)
+    period_person_ids = period_messages.distinct.pluck(:sender_person_id)
     return @newcomers = [], @newcomer_count = 0 if period_person_ids.empty?
 
-    first_messages = Message
+    first_messages = Message.in_shown_topics
       .where(sender_person_id: period_person_ids)
       .group(:sender_person_id)
       .minimum(:created_at)
@@ -316,8 +320,8 @@ class ReportsController < ApplicationController
 
     @newcomer_count = newcomer_ids.size
 
-    person_ids_with_counts = Message
-      .where(sender_person_id: newcomer_ids, created_at: @period_range)
+    person_ids_with_counts = period_messages
+      .where(sender_person_id: newcomer_ids)
       .group(:sender_person_id)
       .order(Arel.sql("COUNT(*) DESC"))
       .limit(NEWCOMERS_LIMIT)
@@ -327,21 +331,21 @@ class ReportsController < ApplicationController
   end
 
   def load_notable_threads
-    @most_active_thread = Topic.joins(:messages)
+    @most_active_thread = Topic.shown_by_default.joins(:messages)
       .where(messages: { created_at: @period_range })
       .group("topics.id")
       .select("topics.*, COUNT(messages.id) as period_messages")
       .order("period_messages DESC")
       .first
 
-    @most_diverse_thread = Topic.joins(:messages)
+    @most_diverse_thread = Topic.shown_by_default.joins(:messages)
       .where(messages: { created_at: @period_range })
       .group("topics.id")
       .select("topics.*, COUNT(DISTINCT messages.sender_person_id) as period_participants")
       .order("period_participants DESC")
       .first
 
-    @longest_thread = Topic.joins(:messages)
+    @longest_thread = Topic.shown_by_default.joins(:messages)
       .where(messages: { created_at: @period_range })
       .group("topics.id")
       .select(

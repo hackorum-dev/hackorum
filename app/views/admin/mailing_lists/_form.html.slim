@@ -27,6 +27,12 @@
     small.form-hint Production: replies are sent here. Non-production: this must be set to enable sending; the actual recipient is taken from HACKORUM_DEV_REPLY_TO.
 
   .form-group
+    = f.label :hidden_by_default do
+      = f.check_box :hidden_by_default
+      '  Hidden by default
+    small.form-hint Threads only on hidden lists are left out of the default topic list and reports. Search still finds them.
+
+  .form-group
     = f.label :description
     = f.text_area :description, placeholder: "Optional description", rows: 3, class: "form-input"
 

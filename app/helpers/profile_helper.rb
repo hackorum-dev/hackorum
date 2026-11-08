@@ -103,17 +103,20 @@ module ProfileHelper
 
     [
       {
-        display: number_with_delimiter(stats.messages_sent),
-        label: "Messages sent"
+        display: profile_split_count(stats.messages_sent, stats.messages_sent_hidden),
+        label: "Messages sent",
+        title: profile_hidden_title(stats.messages_sent_hidden)
       },
       {
-        display: number_with_delimiter(stats.threads_started),
+        display: profile_split_count(stats.threads_started, stats.threads_started_hidden),
         label: "Threads started",
+        title: profile_hidden_title(stats.threads_started_hidden),
         query: ("starter:\"#{search_email}\"" if linkable)
       },
       {
-        display: number_with_delimiter(stats.threads_joined),
+        display: profile_split_count(stats.threads_joined, stats.threads_joined_hidden),
         label: "Threads joined",
+        title: profile_hidden_title(stats.threads_joined_hidden),
         query: ("from:\"#{search_email}\"" if linkable)
       },
       {
@@ -129,6 +132,16 @@ module ProfileHelper
         sub: profile_active_range(stats)
       }
     ]
+  end
+
+  def profile_split_count(shown, hidden)
+    return number_with_delimiter(shown) unless hidden.positive?
+
+    "#{number_with_delimiter(shown)}+#{number_with_delimiter(hidden)}"
+  end
+
+  def profile_hidden_title(hidden)
+    "#{number_with_delimiter(hidden)} more in hidden lists" if hidden.positive?
   end
 
   def profile_active_span(stats)

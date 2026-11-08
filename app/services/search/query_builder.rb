@@ -19,7 +19,9 @@ module Search
     def build
       return Result.new(relation: Topic.none, warnings: []) if @ast.nil?
 
-      relation = apply_node(@ast, Topic.all)
+      ast, show_hidden = extract_hidden_mode(@ast)
+      relation = ast ? apply_node(ast, Topic.all) : Topic.all
+      relation = relation.merge(Topic.shown_by_default) unless show_hidden
 
       if @user && !has_ignored_selector?(@ast)
         relation = apply_default_ignore_filter(relation)
@@ -930,6 +932,43 @@ module Search
       else
         relation.where(id: list_topic_ids)
       end
+    end
+
+    # hidden: is a mode for the whole query, so it only counts at the top
+    # level; search includes hidden-list topics unless asked not to
+    def extract_hidden_mode(node)
+      show = true
+      top = node[:type] == :and && !node[:negated] ? node[:children] : [ node ]
+      rest = top.reject do |child|
+        next false unless hidden_selector?(child)
+
+        show = (child[:value].to_s.downcase == "true") != child[:negated]
+        true
+      end
+      rest = rest.filter_map { |child| strip_nested_hidden(child) }
+
+      [ rest.size <= 1 ? rest.first : node.merge(children: rest), show ]
+    end
+
+    def strip_nested_hidden(node)
+      return node unless node[:type].in?(%i[and or])
+
+      children = node[:children].filter_map do |child|
+        if hidden_selector?(child)
+          @warnings << "hidden: applies to the whole query and was ignored inside a group"
+          nil
+        else
+          strip_nested_hidden(child)
+        end
+      end
+      return nil if children.empty?
+      return node.merge(children: children) if children.size > 1
+
+      node[:negated] ? children.first.merge(negated: !children.first[:negated]) : children.first
+    end
+
+    def hidden_selector?(node)
+      node[:type] == :selector && node[:key] == :hidden
     end
 
     # === Helpers ===

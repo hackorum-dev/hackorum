@@ -319,6 +319,37 @@ RSpec.describe 'People profile', type: :request do
     end
   end
 
+  describe 'hidden list split counts' do
+    let(:person) { create(:person) }
+    let!(:person_alias) do
+      al = create(:alias, person: person, name: 'Split Person', email: 'split@example.com')
+      person.update!(default_alias_id: al.id)
+      al
+    end
+
+    it 'renders X+Y with a title when hidden activity exists' do
+      shown = create(:topic, creator_alias: person_alias)
+      2.times { create(:message, topic: shown, sender: person_alias) }
+      hidden = create(:topic, creator_alias: person_alias)
+      msg = create(:message, topic: hidden, sender: person_alias)
+      MessageMailingList.create!(message: msg, mailing_list: create(:mailing_list, hidden_by_default: true))
+
+      get person_path(person_alias.email)
+
+      expect(response.body).to include('2+1')
+      expect(response.body).to include('1 more in hidden lists')
+    end
+
+    it 'renders a plain count without hidden activity' do
+      shown = create(:topic, creator_alias: person_alias)
+      2.times { create(:message, topic: shown, sender: person_alias) }
+
+      get person_path(person_alias.email)
+
+      expect(response.body).not_to include('hidden lists')
+    end
+  end
+
   describe 'landed patch rate era scoping' do
     let(:person) { create(:person) }
     let!(:person_alias) do

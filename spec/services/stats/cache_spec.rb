@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe Stats::Cache do
   let(:open_release) { instance_double(Stats::Period::Release, kind: :release, key: "19", closed?: false) }
   let(:closed_release) { instance_double(Stats::Period::Release, kind: :release, key: "18", closed?: true) }
-  let(:version) { 4 }
+  let(:version) { 5 }
 
   it "expires the open release after an hour" do
     expect(Rails.cache).to receive(:fetch)

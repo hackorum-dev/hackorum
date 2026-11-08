@@ -69,6 +69,14 @@ RSpec.describe "Admin::MailingLists", type: :request do
       expect(response).to redirect_to(admin_mailing_lists_path)
     end
 
+    it "saves the hidden by default flag" do
+      ml = create(:mailing_list)
+
+      patch admin_mailing_list_path(ml), params: { mailing_list: { hidden_by_default: "1" } }
+
+      expect(ml.reload.hidden_by_default).to be(true)
+    end
+
     it "re-renders form on validation error" do
       post admin_mailing_lists_path, params: { mailing_list: { identifier: "", display_name: "" } }
       expect(response).to have_http_status(:unprocessable_entity)
