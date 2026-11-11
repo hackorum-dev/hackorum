@@ -1,93 +1,99 @@
 - content_for :sidebar do
   - content_for :search_sidebar, true
-  .sidebar
+  .sidebar.filters-sidebar
 
-    .sidebar-section#search data-controller="search-focus" data-search-focus-target="section"
-      .sidebar-search.sidebar-content
-        = form_with url: search_topics_path, method: :get, local: true do |f|
-          = f.text_field :q, placeholder: "Search topics and messages...", class: "search-input", value: search_query, data: { "search-focus-target": "input" }
-          = f.submit "Search", class: "search-button"
-        .search-help-link
-          = link_to help_path("search") do
-            i.fas.fa-question-circle
-            |  Search syntax help
+    section.filters-card#search data-controller="search-focus" data-search-focus-target="section"
+      .filters-card-head
+        span.filters-card-label Search
+        = link_to help_path("search"), class: "filters-card-more", title: "Search syntax help" do
+          i.fas.fa-question-circle aria-hidden="true"
+          |  Syntax
+      = form_with url: search_topics_path, method: :get, local: true do |f|
+        = f.text_field :q, placeholder: "Search topics and messages...", class: "search-input", value: search_query, data: { "search-focus-target": "input" }
+        = f.submit "Search", class: "search-button"
 
     - if @all_mailing_lists&.any?
-      .sidebar-section
-        h3.sidebar-heading Mailing Lists
-        .sidebar-content
-          - active_list = nil
-          - if search_query.present?
-            - list_match = search_query.to_s.match(/\blist:(\S+)/)
-            - active_list = list_match[1] if list_match
-          ul.quick-filters
+      - active_list = nil
+      - if search_query.present?
+        - list_match = search_query.to_s.match(/\blist:(\S+)/)
+        - active_list = list_match[1] if list_match
+      section.filters-card
+        .filters-card-head
+          span.filters-card-label Mailing lists
+        ul.filters-list
+          li
+            = link_to "All lists", topics_path, class: [("is-active" unless active_list)]
+          - @all_mailing_lists.each do |ml|
             li
-              = link_to "All lists", topics_path, class: ("quick-filter-link is-active" unless active_list)
-            - @all_mailing_lists.each do |ml|
-              li
-                = link_to ml.display_name, search_topics_path(q: "list:#{ml.display_name}"), class: ("quick-filter-link is-active" if active_list == ml.display_name)
+              = link_to ml.display_name, search_topics_path(q: "list:#{ml.display_name}"), class: [("is-active" if active_list == ml.display_name)]
 
     - if @saved_searches.present?
-      .sidebar-section
-        h3.sidebar-heading Saved searches
-        .sidebar-content
-          - active_ss_id = params[:saved_search_id]&.to_i
-          - active_team_id = params[:team_id]&.to_i
+      - active_ss_id = params[:saved_search_id]&.to_i
+      - active_team_id = params[:team_id]&.to_i
+      section.filters-card
+        .filters-card-head
+          span.filters-card-label Saved searches
 
-          - global_searches = @saved_searches.select(&:scope_global?)
-          - if global_searches.any?
-            .filter-subsection
-              span.filter-subsection-label Global
-              ul.quick-filters
-                - global_searches.each do |ss|
+        - global_searches = @saved_searches.select(&:scope_global?)
+        - if global_searches.any?
+          .filters-group
+            span.filters-group-label Global
+            ul.filters-list
+              - global_searches.each do |ss|
+                li
+                  = link_to ss.name, search_topics_path(saved_search_id: ss.id), class: [("is-active" if active_ss_id == ss.id)]
+                  = button_to settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: true), method: :post, form_class: "filters-list-action", title: "Hide this search", data: { turbo_confirm: "Hide this search?" } do
+                    i.fa-solid.fa-eye-slash aria-hidden="true"
+
+        - if user_signed_in?
+          - user_searches = @saved_searches.select { |ss| ss.scope_user? && ss.user_id.present? }
+          - user_templates = @saved_searches.select { |ss| ss.scope_user? && ss.user_id.nil? }
+          - all_user = user_templates + user_searches
+          - if all_user.any?
+            .filters-group
+              span.filters-group-label My searches
+              ul.filters-list
+                - all_user.each do |ss|
                   li
-                    = link_to ss.name, search_topics_path(saved_search_id: ss.id), class: ("quick-filter-link is-active" if active_ss_id == ss.id)
-                    = button_to settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: true), method: :post, form_class: "quick-filter-action-form", data: { turbo_confirm: "Hide this search?" } do
-                      i.fa-solid.fa-eye-slash aria-hidden="true"
+                    = link_to ss.name, search_topics_path(saved_search_id: ss.id), class: [("is-active" if active_ss_id == ss.id)]
+                    - if ss.user_id == current_user.id
+                      = button_to settings_saved_search_path(ss), method: :delete, form_class: "filters-list-action", title: "Delete this search", data: { turbo_confirm: "Delete this search?" } do
+                        i.fa-solid.fa-trash-can aria-hidden="true"
+                    - else
+                      = button_to settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: true), method: :post, form_class: "filters-list-action", title: "Hide this search", data: { turbo_confirm: "Hide this search?" } do
+                        i.fa-solid.fa-eye-slash aria-hidden="true"
 
-          - if user_signed_in?
-            - user_searches = @saved_searches.select { |ss| ss.scope_user? && ss.user_id.present? }
-            - user_templates = @saved_searches.select { |ss| ss.scope_user? && ss.user_id.nil? }
-            - all_user = user_templates + user_searches
-            - if all_user.any?
-              .filter-subsection
-                span.filter-subsection-label My searches
-                ul.quick-filters
-                  - all_user.each do |ss|
+          - team_templates = @saved_searches.select { |ss| ss.scope_team? && ss.team_id.nil? }
+          - team_specific = @saved_searches.select { |ss| ss.scope_team? && ss.team_id.present? }
+          - current_user.teams.each do |team|
+            - team_searches = team_specific.select { |ss| ss.team_id == team.id }
+            - all_team = team_searches + team_templates
+            - if all_team.any?
+              .filters-group
+                span.filters-group-label = "#{team.name} searches"
+                ul.filters-list
+                  - all_team.each do |ss|
                     li
-                      = link_to ss.name, search_topics_path(saved_search_id: ss.id), class: ("quick-filter-link is-active" if active_ss_id == ss.id)
-                      - if ss.user_id == current_user.id
-                        = button_to settings_saved_search_path(ss), method: :delete, form_class: "quick-filter-action-form", data: { turbo_confirm: "Delete this search?" } do
-                          i.fa-solid.fa-trash-can aria-hidden="true"
-                      - else
-                        = button_to settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: true), method: :post, form_class: "quick-filter-action-form", data: { turbo_confirm: "Hide this search?" } do
-                          i.fa-solid.fa-eye-slash aria-hidden="true"
-
-            - team_templates = @saved_searches.select { |ss| ss.scope_team? && ss.team_id.nil? }
-            - team_specific = @saved_searches.select { |ss| ss.scope_team? && ss.team_id.present? }
-            - current_user.teams.each do |team|
-              - team_searches = team_specific.select { |ss| ss.team_id == team.id }
-              - all_team = team_searches + team_templates
-              - if all_team.any?
-                .filter-subsection
-                  span.filter-subsection-label = "#{team.name} searches"
-                  ul.quick-filters
-                    - all_team.each do |ss|
-                      li
-                        = link_to ss.name, search_topics_path(saved_search_id: ss.id, team_id: team.id), class: ("quick-filter-link is-active" if active_ss_id == ss.id && (!ss.scope_team? || active_team_id == team.id))
-                        = button_to settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: true), method: :post, form_class: "quick-filter-action-form", data: { turbo_confirm: "Hide this search?" } do
-                          i.fa-solid.fa-eye-slash aria-hidden="true"
+                      = link_to ss.name, search_topics_path(saved_search_id: ss.id, team_id: team.id), class: [("is-active" if active_ss_id == ss.id && (!ss.scope_team? || active_team_id == team.id))]
+                      = button_to settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: true), method: :post, form_class: "filters-list-action", title: "Hide this search", data: { turbo_confirm: "Hide this search?" } do
+                        i.fa-solid.fa-eye-slash aria-hidden="true"
 
     - if @global_tags.present?
-      .sidebar-section
-        h3.sidebar-heading Global tags
-        ul.quick-filters.tags-list
+      section.filters-card
+        .filters-card-head
+          span.filters-card-label = "Global tags · #{@global_tags.size}"
+        .filters-tags
           - @global_tags.each do |gt|
-            li = link_to "##{gt.name} (#{@global_tag_counts[gt.name].to_i})", search_topics_path(q: "tag:#{gt.name}"), title: gt.description.presence, class: ("quick-filter-link is-active" if params[:q] == "tag:#{gt.name}")
+            = link_to search_topics_path(q: "tag:#{gt.name}"), title: gt.description.presence, class: ["filters-tag", ("is-active" if params[:q] == "tag:#{gt.name}")] do
+              span.filters-tag-name = "##{gt.name}"
+              span.filters-tag-count = @global_tag_counts[gt.name].to_i
 
     - if user_signed_in? && @available_note_tags.present?
-      .sidebar-section
-        h3.sidebar-heading My tags
-        ul.quick-filters.tags-list
+      section.filters-card
+        .filters-card-head
+          span.filters-card-label = "My tags · #{@available_note_tags.size}"
+        .filters-tags
           - @available_note_tags.each do |tag, count|
-            li = link_to "##{tag} (#{count})", search_topics_path(q: "tag:#{tag}"), class: ("quick-filter-link is-active" if params[:q] == "tag:#{tag}")
+            = link_to search_topics_path(q: "tag:#{tag}"), class: ["filters-tag", ("is-active" if params[:q] == "tag:#{tag}")] do
+              span.filters-tag-name = "##{tag}"
+              span.filters-tag-count = count
