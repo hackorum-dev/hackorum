@@ -58,7 +58,37 @@ module Search
 
     def negate_relation(inner_relation, outer_relation)
       # Exclude topics that match the inner relation
-      outer_relation.where.not(id: inner_relation.select(:id))
+      without_topics(outer_relation, inner_relation.select(:id))
+    end
+
+    # topic_ids: relation or SQL selecting one column of topic ids
+    def restrict_topics(relation, topic_ids, negated:)
+      return without_topics(relation, topic_ids) if negated
+
+      topic_ids.is_a?(String) ? relation.where(Arel.sql("topics.id IN (#{topic_ids})")) : relation.where(id: topic_ids)
+    end
+
+    # NOT IN (subquery) is rescanned for every topic once its result outgrows
+    # work_mem. NOT EXISTS becomes an anti join or a probe per topic, but only
+    # with the topic condition inside the subquery; SQL strings must bring it
+    # themselves (outer_topic)
+    def without_topics(relation, topic_ids)
+      sql = if topic_ids.is_a?(String)
+        topic_ids
+      elsif topic_ids.klass == Topic
+        # its own topics table would shadow the outer one
+        "SELECT 1 FROM (#{topic_ids.to_sql}) excluded(topic_id) WHERE excluded.topic_id = topics.id"
+      else
+        column = topic_ids.select_values.first
+        column = "#{topic_ids.klass.quoted_table_name}.#{column}" if column.is_a?(Symbol)
+        topic_ids.distinct(false).where("#{column} = topics.id").to_sql
+      end
+
+      relation.where(Arel.sql("NOT EXISTS (#{sql})"))
+    end
+
+    def outer_topic(column, pinned)
+      pinned ? "#{column} = topics.id" : "TRUE"
     end
 
     def apply_and(children, relation)
@@ -162,7 +192,7 @@ module Search
       condition = build_text_search_condition(value, phrase: quoted)
 
       if negated
-        relation.where.not(id: Topic.where(condition))
+        relation.where.not(condition)
       else
         relation.where(condition)
       end
@@ -179,22 +209,26 @@ module Search
 
         # Check if messages have body_tsv
         if Message.column_names.include?("body_tsv")
-          body_topic_ids = Message.where(
-            "body_tsv @@ #{tsquery_func}('english', ?)", sanitized
-          ).select(:topic_id)
-          Arel.sql("(#{title_fts} OR topics.id IN (#{body_topic_ids.to_sql}))")
+          body_match = Message.where("body_tsv @@ #{tsquery_func}('english', ?)", sanitized)
+          Arel.sql("(#{title_fts} OR #{topic_has_message(body_match)})")
         else
           # Fall back to ILIKE for body
           pattern = "%#{sanitize_like(value)}%"
-          body_topic_ids = Message.where("body ILIKE ?", pattern).select(:topic_id)
-          Arel.sql("(#{title_fts} OR topics.id IN (#{body_topic_ids.to_sql}))")
+          body_match = Message.where("body ILIKE ?", pattern)
+          Arel.sql("(#{title_fts} OR #{topic_has_message(body_match)})")
         end
       else
         # Fall back to ILIKE for both
         pattern = "%#{sanitize_like(value)}%"
-        body_topic_ids = Message.where("body ILIKE ?", pattern).select(:topic_id)
-        Arel.sql("(topics.title ILIKE #{ActiveRecord::Base.connection.quote(pattern)} OR topics.id IN (#{body_topic_ids.to_sql}))")
+        body_match = Message.where("body ILIKE ?", pattern)
+        Arel.sql("(topics.title ILIKE #{ActiveRecord::Base.connection.quote(pattern)} OR #{topic_has_message(body_match)})")
       end
+    end
+
+    # IN (subquery) next to an OR cannot become a join and has the NOT IN
+    # problem; EXISTS can be probed per topic
+    def topic_has_message(messages)
+      "EXISTS (#{messages.where('messages.topic_id = topics.id').select('1').to_sql})"
     end
 
     # === Author Selectors ===
@@ -209,12 +243,12 @@ module Search
       if conditions.blank?
         # Original behavior - any message from these persons
         message_topic_ids = Message.where(sender_person_id: person_ids).select(:topic_id)
-        return negated ? relation.where.not(id: message_topic_ids) : relation.where(id: message_topic_ids)
+        return restrict_topics(relation, message_topic_ids, negated: negated)
       end
 
       # With conditions: use topic_participants with conditions
       topic_ids = build_from_condition_query(person_ids, conditions)
-      negated ? relation.where.not(id: topic_ids) : relation.where(id: topic_ids)
+      restrict_topics(relation, topic_ids, negated: negated)
     end
 
     def build_from_condition_query(person_ids, conditions)
@@ -365,11 +399,7 @@ module Search
         Message.where("body ILIKE ?", pattern).select(:topic_id)
       end
 
-      if negated
-        relation.where.not(id: message_topic_ids)
-      else
-        relation.where(id: message_topic_ids)
-      end
+      restrict_topics(relation, message_topic_ids, negated: negated)
     end
 
     # === State Selectors ===
@@ -393,39 +423,29 @@ module Search
     def apply_unread_for_user(user_id, relation, negated:)
       # Unread: last message id > max read range end
       sql = <<~SQL.squish
-        topics.id IN (
-          SELECT t.id FROM topics t
-          LEFT JOIN message_read_ranges mrr ON mrr.topic_id = t.id AND mrr.user_id = #{user_id.to_i}
-          GROUP BY t.id
-          HAVING t.last_message_id > COALESCE(MAX(mrr.range_end_message_id), 0)
-        )
+        SELECT t.id FROM topics t
+        LEFT JOIN message_read_ranges mrr ON mrr.topic_id = t.id AND mrr.user_id = #{user_id.to_i}
+        WHERE #{outer_topic('t.id', negated)}
+        GROUP BY t.id
+        HAVING t.last_message_id > COALESCE(MAX(mrr.range_end_message_id), 0)
       SQL
 
-      if negated
-        relation.where.not(Arel.sql(sql))
-      else
-        relation.where(Arel.sql(sql))
-      end
+      restrict_topics(relation, sql, negated: negated)
     end
 
     def apply_unread_for_users(user_ids, relation, negated:)
       # For team: topic is unread if NO team member has fully read
       sanitized_ids = user_ids.map(&:to_i).join(",")
       fully_read_sql = <<~SQL.squish
-        SELECT DISTINCT mrr.topic_id FROM message_read_ranges mrr
+        SELECT mrr.topic_id FROM message_read_ranges mrr
         JOIN topics t ON t.id = mrr.topic_id
-        WHERE mrr.user_id IN (#{sanitized_ids})
+        WHERE mrr.user_id IN (#{sanitized_ids}) AND #{outer_topic(%q(mrr.topic_id), !negated)}
         GROUP BY mrr.topic_id, t.last_message_id
         HAVING MAX(mrr.range_end_message_id) >= t.last_message_id
       SQL
 
-      if negated
-        # Negated unread = fully read by at least one team member
-        relation.where(Arel.sql("topics.id IN (#{fully_read_sql})"))
-      else
-        # Unread = not fully read by any team member
-        relation.where(Arel.sql("topics.id NOT IN (#{fully_read_sql})"))
-      end
+      # Unread = not fully read by any team member
+      restrict_topics(relation, fully_read_sql, negated: !negated)
     end
 
     def apply_read_selector(value, relation, negated:)
@@ -445,38 +465,27 @@ module Search
 
     def apply_read_for_user(user_id, relation, negated:)
       sql = <<~SQL.squish
-        topics.id IN (
-          SELECT t.id FROM topics t
-          JOIN message_read_ranges mrr ON mrr.topic_id = t.id AND mrr.user_id = #{user_id.to_i}
-          GROUP BY t.id
-          HAVING MAX(mrr.range_end_message_id) >= t.last_message_id
-        )
+        SELECT t.id FROM topics t
+        JOIN message_read_ranges mrr ON mrr.topic_id = t.id AND mrr.user_id = #{user_id.to_i}
+        WHERE #{outer_topic('t.id', negated)}
+        GROUP BY t.id
+        HAVING MAX(mrr.range_end_message_id) >= t.last_message_id
       SQL
 
-      if negated
-        relation.where.not(Arel.sql(sql))
-      else
-        relation.where(Arel.sql(sql))
-      end
+      restrict_topics(relation, sql, negated: negated)
     end
 
     def apply_read_for_users(user_ids, relation, negated:)
       sanitized_ids = user_ids.map(&:to_i).join(",")
       sql = <<~SQL.squish
-        topics.id IN (
-          SELECT mrr.topic_id FROM message_read_ranges mrr
-          JOIN topics t ON t.id = mrr.topic_id
-          WHERE mrr.user_id IN (#{sanitized_ids})
-          GROUP BY mrr.topic_id, t.last_message_id
-          HAVING MAX(mrr.range_end_message_id) >= t.last_message_id
-        )
+        SELECT mrr.topic_id FROM message_read_ranges mrr
+        JOIN topics t ON t.id = mrr.topic_id
+        WHERE mrr.user_id IN (#{sanitized_ids}) AND #{outer_topic('mrr.topic_id', negated)}
+        GROUP BY mrr.topic_id, t.last_message_id
+        HAVING MAX(mrr.range_end_message_id) >= t.last_message_id
       SQL
 
-      if negated
-        relation.where.not(Arel.sql(sql))
-      else
-        relation.where(Arel.sql(sql))
-      end
+      restrict_topics(relation, sql, negated: negated)
     end
 
     def apply_reading_selector(value, relation, negated:)
@@ -489,21 +498,15 @@ module Search
       # Topics partially read (some read, but not all)
       sanitized_ids = user_ids.map(&:to_i).join(",")
       sql = <<~SQL.squish
-        topics.id IN (
-          SELECT mrr.topic_id FROM message_read_ranges mrr
-          JOIN topics t ON t.id = mrr.topic_id
-          WHERE mrr.user_id IN (#{sanitized_ids})
-          GROUP BY mrr.topic_id, t.last_message_id
-          HAVING MAX(mrr.range_end_message_id) > 0
-            AND MAX(mrr.range_end_message_id) < t.last_message_id
-        )
+        SELECT mrr.topic_id FROM message_read_ranges mrr
+        JOIN topics t ON t.id = mrr.topic_id
+        WHERE mrr.user_id IN (#{sanitized_ids}) AND #{outer_topic('mrr.topic_id', negated)}
+        GROUP BY mrr.topic_id, t.last_message_id
+        HAVING MAX(mrr.range_end_message_id) > 0
+          AND MAX(mrr.range_end_message_id) < t.last_message_id
       SQL
 
-      if negated
-        relation.where.not(Arel.sql(sql))
-      else
-        relation.where(Arel.sql(sql))
-      end
+      restrict_topics(relation, sql, negated: negated)
     end
 
     def apply_new_selector(value, relation, negated:)
@@ -529,52 +532,41 @@ module Search
       sql = if aware_before
         aware_before_sql = ActiveRecord::Base.connection.quote(aware_before)
         <<~SQL.squish
-          topics.id IN (
-            SELECT t.id FROM topics t
-            LEFT JOIN thread_awarenesses ta ON ta.topic_id = t.id AND ta.user_id = #{user_id.to_i}
-            LEFT JOIN message_read_ranges mrr ON mrr.topic_id = t.id AND mrr.user_id = #{user_id.to_i}
-            WHERE ta.aware_until_message_id IS NULL
-            GROUP BY t.id
-            HAVING COALESCE(MAX(mrr.range_end_message_id), 0) = 0
-              AND t.last_message_at > #{aware_before_sql}
-          )
+          SELECT t.id FROM topics t
+          LEFT JOIN thread_awarenesses ta ON ta.topic_id = t.id AND ta.user_id = #{user_id.to_i}
+          LEFT JOIN message_read_ranges mrr ON mrr.topic_id = t.id AND mrr.user_id = #{user_id.to_i}
+          WHERE ta.aware_until_message_id IS NULL AND #{outer_topic('t.id', negated)}
+          GROUP BY t.id
+          HAVING COALESCE(MAX(mrr.range_end_message_id), 0) = 0
+            AND t.last_message_at > #{aware_before_sql}
         SQL
       else
         <<~SQL.squish
-          topics.id IN (
-            SELECT t.id FROM topics t
-            LEFT JOIN thread_awarenesses ta ON ta.topic_id = t.id AND ta.user_id = #{user_id.to_i}
-            LEFT JOIN message_read_ranges mrr ON mrr.topic_id = t.id AND mrr.user_id = #{user_id.to_i}
-            WHERE ta.aware_until_message_id IS NULL
-            GROUP BY t.id
-            HAVING COALESCE(MAX(mrr.range_end_message_id), 0) = 0
-          )
+          SELECT t.id FROM topics t
+          LEFT JOIN thread_awarenesses ta ON ta.topic_id = t.id AND ta.user_id = #{user_id.to_i}
+          LEFT JOIN message_read_ranges mrr ON mrr.topic_id = t.id AND mrr.user_id = #{user_id.to_i}
+          WHERE ta.aware_until_message_id IS NULL AND #{outer_topic('t.id', negated)}
+          GROUP BY t.id
+          HAVING COALESCE(MAX(mrr.range_end_message_id), 0) = 0
         SQL
       end
 
-      if negated
-        relation.where.not(Arel.sql(sql))
-      else
-        relation.where(Arel.sql(sql))
-      end
+      restrict_topics(relation, sql, negated: negated)
     end
 
     def apply_new_for_users(user_ids, relation, negated:)
       sanitized_ids = user_ids.map(&:to_i).join(",")
       # For team: topic is new if NO team member has any awareness or reads
       seen_sql = <<~SQL.squish
-        SELECT DISTINCT topic_id FROM thread_awarenesses WHERE user_id IN (#{sanitized_ids})
+        SELECT topic_id FROM thread_awarenesses
+        WHERE user_id IN (#{sanitized_ids}) AND #{outer_topic('thread_awarenesses.topic_id', !negated)}
         UNION
-        SELECT DISTINCT topic_id FROM message_read_ranges WHERE user_id IN (#{sanitized_ids})
+        SELECT topic_id FROM message_read_ranges
+        WHERE user_id IN (#{sanitized_ids}) AND #{outer_topic('message_read_ranges.topic_id', !negated)}
       SQL
 
-      if negated
-        # Negated new = someone has seen it
-        relation.where(Arel.sql("topics.id IN (#{seen_sql})"))
-      else
-        # New = nobody has seen it
-        relation.where(Arel.sql("topics.id NOT IN (#{seen_sql})"))
-      end
+      # New = nobody has seen it
+      restrict_topics(relation, seen_sql, negated: !negated)
     end
 
     def apply_starred_selector(value, relation, negated:)
@@ -586,11 +578,7 @@ module Search
 
       starred_topic_ids = TopicStar.where(user_id: user_ids).select(:topic_id)
 
-      if negated
-        relation.where.not(id: starred_topic_ids)
-      else
-        relation.where(id: starred_topic_ids)
-      end
+      restrict_topics(relation, starred_topic_ids, negated: negated)
     end
 
     def apply_ignored_selector(value, relation, negated:)
@@ -602,11 +590,7 @@ module Search
 
       ignored_topic_ids = TopicIgnore.where(user_id: user_ids).select(:topic_id)
 
-      if negated
-        relation.where.not(id: ignored_topic_ids)
-      else
-        relation.where(id: ignored_topic_ids)
-      end
+      restrict_topics(relation, ignored_topic_ids, negated: negated)
     end
 
     def apply_default_ignore_filter(relation)
@@ -640,11 +624,7 @@ module Search
 
       note_topic_ids = Note.active.visible_to(@user).where(author_id: user_ids).select(:topic_id)
 
-      if negated
-        relation.where.not(id: note_topic_ids)
-      else
-        relation.where(id: note_topic_ids)
-      end
+      restrict_topics(relation, note_topic_ids, negated: negated)
     end
 
     def apply_tag_selector(value, relation, negated:, conditions: nil)
@@ -710,11 +690,7 @@ module Search
 
       tagged_topic_ids = notes.select(:topic_id).distinct
 
-      if negated
-        relation.where.not(id: tagged_topic_ids)
-      else
-        relation.where(id: tagged_topic_ids)
-      end
+      restrict_topics(relation, tagged_topic_ids, negated: negated)
     end
 
     # === Presence Selectors ===
@@ -725,16 +701,16 @@ module Search
       # Handle conditions for attachment and patch
       if conditions.present? && %w[attachment patch].include?(normalized)
         topic_ids = build_has_condition_query(normalized, conditions)
-        return negated ? relation.where.not(id: topic_ids) : relation.where(id: topic_ids)
+        return restrict_topics(relation, topic_ids, negated: negated)
       end
 
       case normalized
       when "attachment"
         topic_ids_subquery = Attachment.joins(:message).select("messages.topic_id").distinct
-        negated ? relation.where.not(id: topic_ids_subquery) : relation.where(id: topic_ids_subquery)
+        restrict_topics(relation, topic_ids_subquery, negated: negated)
       when "patch"
         topic_ids_subquery = Message.where(is_patch_submission: true).select(:topic_id).distinct
-        negated ? relation.where.not(id: topic_ids_subquery) : relation.where(id: topic_ids_subquery)
+        restrict_topics(relation, topic_ids_subquery, negated: negated)
       when "contributor"
         # Use denormalized count
         if negated
@@ -745,14 +721,14 @@ module Search
       when "committer"
         committer_person_ids = ContributorMembership.where(contributor_type: "committer").select(:person_id)
         topic_ids_subquery = TopicParticipant.where(person_id: committer_person_ids).select(:topic_id).distinct
-        negated ? relation.where.not(id: topic_ids_subquery) : relation.where(id: topic_ids_subquery)
+        restrict_topics(relation, topic_ids_subquery, negated: negated)
       when "core_team"
         core_person_ids = ContributorMembership.where(contributor_type: "core_team").select(:person_id)
         topic_ids_subquery = TopicParticipant.where(person_id: core_person_ids).select(:topic_id).distinct
-        negated ? relation.where.not(id: topic_ids_subquery) : relation.where(id: topic_ids_subquery)
+        restrict_topics(relation, topic_ids_subquery, negated: negated)
       when "commitfest"
         topic_ids_subquery = CommitfestPatchTopic.select(:topic_id).distinct
-        negated ? relation.where.not(id: topic_ids_subquery) : relation.where(id: topic_ids_subquery)
+        restrict_topics(relation, topic_ids_subquery, negated: negated)
       else
         @warnings << "Unknown has: value '#{value}'"
         relation
@@ -867,7 +843,7 @@ module Search
       # "has a message after X" negates to "has none after X", not to
       # "has one before X"
       message_topic_ids = Message.where("messages.created_at #{operator} ?", date).select(:topic_id)
-      negated ? relation.where.not(id: message_topic_ids) : relation.where(id: message_topic_ids)
+      restrict_topics(relation, message_topic_ids, negated: negated)
     end
 
     def apply_last_date_selector(operator, value, relation, negated:)
@@ -910,7 +886,7 @@ module Search
       end
 
       topic_ids = links.select(:topic_id)
-      negated ? relation.where.not(id: topic_ids) : relation.where(id: topic_ids)
+      restrict_topics(relation, topic_ids, negated: negated)
     end
 
     def commitfest_filter(scope, column, value)
@@ -927,11 +903,7 @@ module Search
         .where("LOWER(mailing_lists.display_name) = LOWER(?)", value)
         .select(:topic_id)
 
-      if negated
-        relation.where.not(id: list_topic_ids)
-      else
-        relation.where(id: list_topic_ids)
-      end
+      restrict_topics(relation, list_topic_ids, negated: negated)
     end
 
     # hidden: is a mode for the whole query, so it only counts at the top
