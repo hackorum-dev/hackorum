@@ -1,0 +1,4512 @@
+openapi: 3.1.0
+info:
+  title: Hackorum API
+  version: "1"
+  description: |
+    Access to hackorum, an archive of the PostgreSQL mailing lists with
+    patch tracking. Everything is read with GET. The one thing that can be
+    written is a draft of a reply, and the API has no way to send it. All
+    of it is JSON except attachment content, the YAML form of this
+    document and the guide.
+
+    Two more documents describe the API. The guide,
+    [/api/v1/guide.md](/api/v1/guide.md), is a short text in plain
+    markdown for language models and tool authors: how to read a thread,
+    find patches and CI results, follow the feed and prepare a draft, in
+    one request. [/api/docs](/api/docs) on the site is this document as
+    a page for people.
+
+    What is here:
+
+    - Threads (`/topics`): the thread list with search, one thread, the
+      commits linked to it.
+    - Messages: the messages of a thread, one message by id or by
+      Message-ID header, attachments and their content.
+    - Notes: the notes people left on a thread and on its messages, as far
+      as the caller may see them.
+    - Patchsets: the messages that carry patches, per thread and per person.
+    - Branches and CI: the git branches hackorum builds from patchsets,
+      and their CI runs.
+    - Events (`/events`): what happened since your last call, to follow
+      changes by polling.
+    - People: a person by email address, the threads they wrote in.
+    - Lists: the mailing lists.
+    - Me: the token owner's saved searches and activities.
+    - Drafts: the token owner's drafts of replies. They can be written,
+      read, changed and deleted here, and are sent on the site only.
+    - Meta: `/me`, this document and the guide.
+
+    Words used below:
+
+    - thread, topic: one discussion on a mailing list. The paths say
+      `topics`, the text says thread.
+    - merged thread: a thread that was folded into another one because
+      both are the same discussion. It is not listed, and a request for it
+      under `/topics/{id}` is answered with 301, see below.
+    - hidden list: a mailing list with `hidden_by_default` true. Threads
+      that are only on such lists are left out of default listings.
+    - patchset: one message with patch files attached, a version of the
+      proposed change.
+    - branch: hackorum's try to apply one patchset on PostgreSQL's master.
+      When it worked and was pushed there is a git branch named
+      `t<topic id>_<n>`; n is set when the branch is first built and does
+      not change after.
+    - commitfest: the PostgreSQL project's patch review tracker, at
+      commitfest.postgresql.org. A thread can have entries there.
+
+    Naming: a field named `x_id` is always the numeric id of an x.
+    `message_id` is the id of a message, its Message-ID header is
+    `rfc_message_id`.
+
+    Authentication: optional. A token (Settings, API tokens on the site) is
+    sent as `Authorization: Bearer hko_...`. Everything public is answered
+    without one. What a token gives:
+
+    - A higher rate limit, see below.
+    - The owner's own state: threads carry it in `me` (stars, ignores,
+      what is read, a note count), messages say in `me` whether the owner
+      read them. `me` is null without a token.
+    - The thread list as the owner sees it: `/topics` leaves out the
+      threads the owner ignores and its search runs as the owner, so the
+      selectors that need a caller work (`unread:me`, `starred:me`,
+      `from:me` and the others listed at `q`). Without a token they match
+      nothing and the answer says so in `warnings`.
+    - Notes: `/topics/{id}/notes` gives the public notes without a token,
+      and with one also the private notes the owner wrote or is mentioned
+      in, directly or through a team.
+    - Saved searches: `/me/saved_searches` lists the owner's and
+      `/topics?saved_search_id=` runs one. Without a token only the
+      site-wide ones can be run.
+    - Activities: `/me/activities` is the owner's activity list.
+    - Drafts: the owner's drafts of replies can be written, read, changed
+      and deleted, see below. Not sent.
+    - Lineage data, when the account has the feature for it, see below.
+
+    `me` only ever holds the token owner's own state, and no response
+    names teammates. In the search, the name of a team works in the state
+    selectors as it does on the site, for a member of that team only.
+    No GET changes the owner's state: reading a thread, a message, a note
+    or the activity list here does not mark anything as seen. A token that
+    is invalid, expired or revoked gets 401 `invalid_token`, never an
+    anonymous answer. This document and the guide are the exception:
+    they are public and ignore the header.
+
+    Lineage: for some threads a language model has read the patchsets and
+    the linked commits and written down how the patchsets derive from each
+    other, which commits belong to the thread, who reviewed what and a short
+    story of the thread. This is only given to accounts with the
+    `patchset_lineage` feature, set per user or per team by the site
+    admins. Such a caller gets `/topics/{id}/lineage`, a `lineage` field on
+    patchsets, `link_source`, `verdict` and a `source` per credit on
+    commits, the commits and credits a model added, and `links.lineage` on
+    a thread. For everyone else these fields are absent, not null, and the
+    responses are the same as without a token. All of it is model output
+    with a confidence, not fact: it can be wrong.
+
+    Drafts: a token owner whose account has a Gmail identity that may
+    send (`send_authorized` in `/me`) can have replies prepared:
+
+    1. `POST /drafts` with the message to reply to makes a draft, or gives
+       the one the owner already has for that message.
+    2. `PATCH /drafts/{id}` changes its subject and text, `GET` reads it
+       back with the recipients a send would use.
+    3. `POST /drafts/{id}/attachments` adds a file, a patch for example,
+       as Base64 in JSON.
+       `DELETE /drafts/{id}/attachments/{attachment_id}` takes one off.
+    4. The owner opens `html_url` on the site and reads the draft in the
+       composer there, where it is marked as made or edited through the
+       API, with the name of the token. Before a send the site shows the
+       whole text, the recipients and the attachments, which the owner can
+       download to check them. Then the owner sends it, or not.
+    5. `DELETE /drafts/{id}` throws an unsent draft away.
+
+    The API cannot send mail. There is no operation that sends a draft or
+    starts a send, and a token does not carry that permission: sending
+    takes a signed-in person and a confirmation on the site. A draft can
+    still be changed through a token until it is sent. The site refuses to
+    send a draft that changed after the owner confirmed it and asks to
+    look at it again, so what goes out is what the owner saw.
+
+    The limits of drafts: a subject has at most 998 characters, the text
+    1 MB (on `POST` the quote counts with the body), the attachments of
+    one draft 2 MB together in decoded bytes, a request 4 MB. Through
+    tokens an account can have 50 drafts that are not sent, and 20 MB of
+    attachments on them together; over that the answer is 422
+    `draft_limit` until drafts are sent or deleted. The byte limit is
+    checked per request without a lock on the account, so two uploads at
+    the same moment can pass it by one file.
+
+    What is stored of an attachment can differ from what was sent, and the
+    response shows the stored values. The content type is reduced to
+    `type/subtype` in lower case, with a `charset` parameter when it is a
+    common one; every other parameter is dropped, and `multipart/*`,
+    `message/*` and a type the site cannot use are stored as
+    `application/octet-stream`. Of a file name only the last part of a
+    path is kept, invisible and control characters are taken out or
+    replaced, and a name with nothing left is `attachment`.
+
+    Request bodies: `POST` and `PATCH` take a JSON object and need
+    `Content-Type: application/json`, anything else is 415
+    `unsupported_media_type`. JSON that cannot be parsed is 400
+    `bad_request`. A body that is not an object, has a field the operation
+    does not document, a value of the wrong type or one over its limit is
+    422 `invalid_body`, and the message names the field. Nothing is read
+    from the query string of these requests. A request body may have 4 MB
+    at most, on any operation: a larger one is 413 `payload_too_large`
+    and is not parsed, whatever its content type. A body that is not JSON
+    is never parsed, so form fields do nothing. That includes the method
+    override of HTML forms: `_method` and `X-HTTP-Method-Override` are
+    ignored, a request has the method it was sent with. A request that is
+    answered with an error has changed nothing. A write that has to wait
+    more than 2 seconds for a draft another request is working on is 409
+    `conflict`: try again.
+
+    Caching: every response has `Vary: Authorization`. A response to a
+    request with a token belongs to that token's user and must not be
+    stored for anyone else.
+
+    Rate limits are per minute: 60 requests per IP address without a
+    token, 600 per token with one. These are the defaults, a site can set
+    other numbers, and `RateLimit-Limit` says what applies. They are
+    counted per server process, so on a site with several processes more
+    can get through. Every response has `RateLimit-Limit`,
+    `RateLimit-Remaining` and `RateLimit-Reset` (seconds). Over the limit
+    you get 429 `rate_limited` with `Retry-After`.
+
+    Time limit: a database statement that runs longer than 5 seconds
+    (the default, a site can set another limit) is stopped and the answer
+    is 400 `query_too_expensive`. Any operation can
+    give it, a broad search is the usual cause: narrow the query, a date
+    selector helps.
+
+    Parameters: an operation takes only the query parameters it documents,
+    any other one is 400 `invalid_parameter`. A parameter that is present
+    with an empty or whitespace-only value is 400 `invalid_parameter` as
+    well: leave it out instead.
+
+    Paging: lists take `limit` (default 50; a value above 200 is lowered
+    to 200) and an opaque `cursor`. Pass `next_cursor` back as `cursor` to
+    get the next page, `next_cursor: null` means the end. A cursor belongs
+    to the request that gave it: the same path and the same query
+    parameters with the same values. Only `limit` and `body` may change
+    between pages. Anything else is 400 `invalid_cursor`. A cursor of
+    `/topics`, of `/topics/{id}/notes`, of `/me/activities` or of `/drafts`
+    also belongs to its caller, because the list does: one made with a token works with any token of
+    the same user, one made without a token only without one.
+
+    Three lists are not paged: `/mailing_lists`, `/topics/{id}/commits`
+    and `/me/saved_searches` give everything at once, with
+    `next_cursor: null`. They do not take `limit` and `cursor`: sending
+    one is 400 `invalid_parameter`.
+
+    Following changes: `/events` is a feed of what happened: a message
+    arrived, a patchset was posted, a branch was created, a CI run
+    finished. Make the first call with `since=<duration>`, `since=24h`
+    for example, and from then on pass the `next_cursor` of the last
+    response as `since`. `next_cursor` is never null there, also not on
+    an empty page, and `has_more: true` says that the next page is
+    waiting now. Poll once a minute at most: the limits below allow more
+    (60 calls a minute without a token, 600 with one), but nothing is
+    gained by it. Events are held back for 5 seconds before they are
+    given out, so that none is passed over. The feed keeps 90 days. A
+    position older than that is answered with 410 `cursor_expired`: read
+    the state again from the list endpoints and start over with a
+    duration. A cursor of the feed is a position in it, not tied to the
+    filters or to the caller, and it is not a `cursor` of the lists.
+
+    By default the feed leaves out CI runs that only repeat the previous
+    verdict of the same patchset: branches are rebased and run again
+    about daily, so most runs say what the run before them said. Pass
+    `ci_runs=all` to get every run.
+
+    Message bodies: operations that return messages take `body`. `text`
+    (the default) is the body without quoted lines, attribution lines and
+    forwarded originals, `full` is the stored body, `none` gives
+    `body: null`.
+
+    Merged threads: `/topics/{id}` and the lists under it answer a merged
+    thread with 301 and no body. `Location` is the same request on the
+    thread it was merged into, follow it.
+
+    Errors always look the same: `{"error": {"code": ..., "message": ...}}`.
+    `code` is stable and meant for programs, `message` is for people.
+    Unknown paths under `/api/v1` get a 404 in this shape too. The codes:
+
+    | code | status | meaning |
+    |---|---|---|
+    | `bad_request` | 400 | The request could not be read, for example a badly encoded query string |
+    | `invalid_parameter` | 400 | A parameter is unknown, blank or has a value that cannot be used |
+    | `invalid_query` | 400 | `q` cannot be parsed, is too long or has a value out of range |
+    | `invalid_cursor` | 400 | `cursor` is malformed or belongs to another request |
+    | `invalid_limit` | 400 | `limit` is not a positive integer |
+    | `query_too_expensive` | 400 | A database statement ran longer than 5 seconds or needed too much memory and was stopped. Any operation can give it, a broad search is the usual cause: narrow the query |
+    | `token_required` | 401 | `/me`, a path under it or `/drafts` without a token, or `starred` or `participating` on `/events` without one |
+    | `invalid_token` | 401 | The token sent is invalid, expired or revoked |
+    | `feature_required` | 403 | The resource is only for accounts with a feature the caller does not have, or no token was sent |
+    | `no_send_identity` | 403 | A draft was asked for and the account has no Gmail identity that may send. Connect one on the site |
+    | `not_found` | 404 | No such record or path |
+    | `method_not_allowed` | 405 | The HTTP method is not usable here |
+    | `not_acceptable` | 406 | The requested format cannot be served |
+    | `cursor_expired` | 410 | `since` of `/events` is a position older than the 90 days the feed keeps. Read the state again from the list endpoints and start over |
+    | `conflict` | 409 | The draft is being sent, it changed since the `updated_at` the request gave, or another request holds it right now: try again |
+    | `payload_too_large` | 413 | The request body has more than 4 MB |
+    | `unsupported_media_type` | 415 | A request body that is not sent as `application/json` |
+    | `invalid_body` | 422 | The request body is not an object, has an unknown field or a value that cannot be used, the stored text of a new draft would be over 1 MB, the draft was sent and cannot be changed, or a file would take its attachments over 2 MB |
+    | `draft_limit` | 422 | The account has 50 drafts that are not sent and a new one was asked for, or a file would take the attachments of those drafts over 20 MB. Send or delete drafts on the site, or delete them here |
+    | `unprocessable_content` | 422 | The request was understood and cannot be processed |
+    | `rate_limited` | 429 | Too many requests, wait `Retry-After` seconds |
+    | `internal_error` | 500 | A failure on the server |
+
+    A failure answered with a status that is not in the table has the
+    reason phrase of that status as its code, in lower case with
+    underscores.
+
+    This API cannot send email. There is no send endpoint.
+tags:
+  - name: Meta
+    description: The caller, this document and the guide
+  - name: Me
+    description: The token owner's saved searches and activities
+  - name: Drafts
+    description: The token owner's drafts of replies. Written here, sent on the site only
+  - name: Lists
+    description: The mailing lists
+  - name: People
+    description: A person by email address, and what they wrote
+  - name: Threads
+    description: The thread list with search, one thread and its commits
+  - name: Messages
+    description: Messages and their attachments
+  - name: Notes
+    description: Notes on threads and messages, public ones and the caller's private ones
+  - name: Patchsets
+    description: Messages that carry patches
+  - name: Lineage
+    description: What a language model wrote about the patchsets and commits of a thread, for accounts with the feature
+  - name: Branches and CI
+    description: The git branches hackorum builds from patchsets, and their CI runs
+  - name: Events
+    description: The feed of what happened, for following changes by polling
+servers:
+  - url: /api/v1
+security:
+  - {}
+  - bearer: []
+paths:
+  /me:
+    get:
+      operationId: getMe
+      tags: [Meta]
+      summary: The user the token belongs to
+      security:
+        - bearer: []
+      responses:
+        "200":
+          description: The current user
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /me/saved_searches:
+    get:
+      operationId: listMySavedSearches
+      tags: [Me]
+      summary: The saved searches the site offers the token owner
+      description: |
+        What the sidebar of the site shows the owner, in its order: the
+        site-wide searches (`scope` `global`), then the owner's
+        (`scope` `user`: the ones every user gets, then the ones the owner
+        made), then per team of the owner that team's searches followed by
+        the team templates (`scope` `team`). Inside a group the order is
+        the position set on the site, then the name. Searches the owner hid
+        on the site are left out.
+
+        A team template is one saved search whose query has a placeholder
+        for a team name. It is listed once per team of the owner, with the
+        same `id`, that team in `team` and the name filled into `query`.
+        To run an entry, GET its `topics_url`.
+
+        The list is not paged: `next_cursor` is always null, and `limit`
+        and `cursor` are refused with 400 `invalid_parameter`.
+      security:
+        - bearer: []
+      responses:
+        "200":
+          description: The saved searches
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, next_cursor]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SavedSearch"
+                  next_cursor:
+                    type: "null"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /me/activities:
+    get:
+      operationId: listMyActivities
+      tags: [Me]
+      summary: The token owner's activities, newest first
+      description: |
+        The activity list of the site: a new message in a thread the owner
+        starred, a note the owner wrote, a note that mentions the owner or
+        one of the owner's teams. Ordered by `id`, newest first. Unlike the
+        site, which shows the latest 100, the list pages through all of
+        them.
+
+        Reading the list changes nothing: no entry is marked as read, and
+        there is no operation here that does.
+
+        An entry stays in the list when the message or note it is about is
+        gone, or when the note is no longer visible to the owner: it then
+        has `message_id` and `note_id` null.
+      security:
+        - bearer: []
+      parameters:
+        - name: unread
+          in: query
+          description: |
+            `true` gives only the entries with `read_at` null. Any other
+            value is answered with `invalid_parameter`: leave the parameter
+            out for the whole list.
+          schema:
+            type: string
+            enum: ["true"]
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      responses:
+        "200":
+          description: A page of activities
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, next_cursor]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Activity"
+                  next_cursor:
+                    type: [string, "null"]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /mailing_lists:
+    get:
+      operationId: listMailingLists
+      tags: [Lists]
+      summary: All mailing lists, by display name
+      description: |
+        The list is not paged: `next_cursor` is always null, and `limit`
+        and `cursor` are refused with 400 `invalid_parameter`.
+      responses:
+        "200":
+          description: Every list in one page, `next_cursor` is always null
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, next_cursor]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MailingList"
+                  next_cursor:
+                    type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /people/{email}:
+    get:
+      operationId: getPerson
+      tags: [People]
+      summary: A person, by any of their email addresses
+      description: |
+        The address is matched without case. An address of a merged person
+        answers with the person it was merged into. There is no lookup by id.
+      parameters:
+        - $ref: "#/components/parameters/personEmail"
+      responses:
+        "200":
+          description: The person
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Person"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /people/{email}/topics:
+    get:
+      operationId: listPersonTopics
+      tags: [People]
+      summary: The threads a person took part in, last active first
+      description: |
+        Threads with a message of the person, ordered by the person's last
+        message in each. Merged threads and threads of lists hidden by
+        default are left out.
+        With a token each row has the token owner's
+        state in `me`; the rows are the same for every caller, threads the
+        owner ignores included.
+      parameters:
+        - $ref: "#/components/parameters/personEmail"
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      responses:
+        "200":
+          description: A page of threads
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, next_cursor]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PersonTopic"
+                  next_cursor:
+                    type: [string, "null"]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /people/{email}/patchsets:
+    get:
+      operationId: listPersonPatchsets
+      tags: [People, Patchsets]
+      summary: The patchsets a person sent, newest first
+      description: |
+        Messages of the person that carry patches, over all threads. Merged
+        threads and threads of lists hidden by default are left out, so the
+        list can be shorter than `stats.patches_sent` of the person, which
+        also counts patches posted to hidden lists.
+      parameters:
+        - $ref: "#/components/parameters/personEmail"
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      responses:
+        "200":
+          description: A page of patchsets
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, next_cursor]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Patchset"
+                  next_cursor:
+                    type: [string, "null"]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /topics:
+    get:
+      operationId: listTopics
+      tags: [Threads]
+      summary: Threads, newest activity first, optionally searched
+      description: |
+        Without `q` and `list` this is the default listing: threads that are
+        only on lists hidden by default are left out. With `q` it is the site
+        search, which includes them unless the query says `hidden:false`.
+        With `list` you get the threads of that list, hidden or not. Merged
+        threads are never listed.
+
+        With a token the list is the token owner's: threads the owner
+        ignores are left out unless they are starred too, with `q` unless the
+        query has an `ignored:` selector (`ignored:me` lists them). The
+        search runs as the owner, see `q` for the selectors that need a
+        token. Each row has the owner's state in `me`. Because the rows
+        depend on the caller, so does the cursor: it is only taken back from
+        the same user, or without a token when it was made without one.
+
+        `saved_search_id` runs a saved search in place of `q`. The answer
+        then has `query`, the text that ran.
+      parameters:
+        - name: q
+          in: query
+          description: |
+            A query in the site's search language, at most 500 characters;
+            a longer one is answered with `invalid_query`. In short:
+
+            - A bare word matches thread titles and message bodies, full-text
+              with English stemming. `"two words"` in quotes is a phrase.
+            - Terms are joined with AND, written or not. `OR` is the
+              alternative, AND binds tighter, parentheses group. A leading
+              `-` negates a word, a selector or a group: `-(a OR b)`.
+            - A selector is `name:value`, a value with spaces is quoted:
+              `from:"Tom Lane"`. Text: `title:`, `body:`.
+            - Authors: `from:` (wrote in the thread), `starter:`,
+              `last_from:`. The value is part of a name or address; with an
+              `@` only addresses are searched, in quotes the match is exact.
+              It can also be `contributor`, `committer`, `core_team`,
+              `major_contributor`, `significant_contributor` or the name of
+              a public team; with a token also `me` and the name of a
+              private team the token owner is in.
+            - Dates: `first_after:`, `first_before:` (first message),
+              `messages_after:`, `messages_before:` (any message),
+              `last_after:`, `last_before:` (last message), with
+              `2024-01-15`, `2024-01`, `2024`, an ISO timestamp, `today`,
+              `yesterday`, or an age as `7d`, `2w`, `3m`, `1y`.
+            - Counts: `messages:`, `participants:`, `contributors:` with
+              `10`, `>10`, `<10`, `>=10` or `<=10`.
+            - `has:` with `attachment`, `patch`, `contributor`, `committer`,
+              `core_team` or `commitfest`. `list:` with the `display_name`
+              of a mailing list. `commitfest:` with a commitfest name,
+              `[status:committed]` or `[tag:bugfix]`. `hidden:false` leaves
+              out threads that are only on hidden lists, top level only.
+            - Brackets tie conditions to the same author or attachment:
+              `from:andres[messages:>=10]`, `has:patch[from:michael]`.
+
+            A part that cannot be used is skipped and named in `warnings`;
+            only a query that cannot be parsed is an error.
+
+            Selectors that need a token: `unread:`, `read:`, `reading:`,
+            `new:`, `starred:`, `ignored:` and `notes:` take `me` or the
+            name of a team the token owner is in (`starred:<team>`,
+            `unread:<team>` and so on: the state of its members taken
+            together, exactly as the site's search does for that user; the
+            answer still does not say which member), `from:me`,
+            `starter:me` and `last_from:me` are the owner's own messages.
+            `tag:` finds threads by the tags of notes; with a token the
+            notes the owner can see, with `tag:name[from:me]` or
+            `[from:<user or team name>]` for one author, without a token
+            public notes only. Without a token `me` and the state selectors
+            match nothing and add a warning.
+
+            The value of a state selector says whose state is meant, it is
+            not a yes or no: write `unread:me`, not `unread:true`. A value
+            that is neither `me` nor a team of the owner matches nothing
+            and is named in `warnings`, with a token as well.
+
+            `read:me` and `unread:me` compare the highest message the owner
+            read with the last message of the thread. They can disagree
+            with `me.status` for someone who read only the newest message:
+            `read:me` finds the thread, `me.status` says `reading`.
+
+            The whole language: `/help/search` on the site.
+          schema:
+            type: string
+            maxLength: 500
+        - name: saved_search_id
+          in: query
+          description: |
+            Run a saved search: its stored query is used as `q`, with the
+            same checks (`invalid_query` when it cannot be parsed or is too
+            long, `warnings` for the parts that were skipped). `q` cannot be
+            given with it, that is `invalid_parameter`; `list`, `author`
+            and `sort` can.
+
+            The ids come from `/me/saved_searches`, whose `topics_url` is
+            this request ready made. A search the caller may not see is 404:
+            without a token only the site-wide ones (`scope` `global`) can
+            be run, with one also the owner's and those of the owner's
+            teams. A search hidden on the site still runs.
+
+            A cursor belongs to the id, not to the text of the search: when
+            its owner changes the search between two pages, the next page
+            is from the new text.
+          schema:
+            type: integer
+            minimum: 0
+        - name: team_id
+          in: query
+          description: |
+            The team a team search (`scope` `team`) is run for: its name is
+            filled into the query of a team template. Only with
+            `saved_search_id`, alone it is `invalid_parameter`. The team
+            must be one the caller is in or a public one, any other is 404.
+            Without it a search that belongs to a team is run for that
+            team; a team template, which belongs to none, is
+            `invalid_parameter`. On a search that is not a team search the
+            parameter is ignored.
+          schema:
+            type: integer
+            minimum: 0
+        - name: list
+          in: query
+          description: |
+            Mailing list identifier, as `/mailing_lists` gives it. A list hidden by default is shown when asked for.
+            An identifier that is not a list is answered with `invalid_parameter`.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+        - name: author
+          in: query
+          description: |
+            Email of a person, for the threads they wrote in. An unknown address gives an empty list.
+            A value over 254 characters is answered with `invalid_parameter`.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 254
+        - name: sort
+          in: query
+          description: |
+            `activity` orders by the last message and leaves out threads without one,
+            `created` by the first. Newest first, a cursor belongs to one sort.
+          schema:
+            type: string
+            enum: [activity, created]
+            default: activity
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      responses:
+        "200":
+          description: A page of threads
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, next_cursor, warnings]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TopicBrief"
+                  next_cursor:
+                    type: [string, "null"]
+                  warnings:
+                    type: array
+                    description: Parts of the query that were ignored or could not be used
+                    items:
+                      type: string
+                  query:
+                    type: string
+                    description: |
+                      Only with `saved_search_id`: the query of the saved
+                      search as it ran, with the team name filled in.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /topics/{id}:
+    get:
+      operationId: getTopic
+      tags: [Threads]
+      summary: A thread, by id or slug
+      description: |
+        Digits are an id, anything else is a slug, matched without case.
+        This is the metadata of the thread, its messages, patchsets and
+        commits are under `links`. For an account with the
+        `patchset_lineage` feature `links` also has `lineage` when the
+        thread has lineage data.
+        With a token `me` is the token owner's state
+        and names the first unread message.
+      parameters:
+        - $ref: "#/components/parameters/topicId"
+      responses:
+        "200":
+          description: The thread
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Topic"
+        "301":
+          $ref: "#/components/responses/TopicMoved"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /topics/{id}/messages:
+    get:
+      operationId: listTopicMessages
+      tags: [Messages]
+      summary: The messages of a thread, oldest first
+      description: |
+        Every message of the thread, ordered by `created_at`, then `id`.
+        `number` is the current position in that order and does not depend
+        on the page. A message sent through the site that the mailing list has not
+        delivered back yet is listed with the state `pending`. Drafts are
+        never listed.
+      parameters:
+        - $ref: "#/components/parameters/topicId"
+        - $ref: "#/components/parameters/body"
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      responses:
+        "200":
+          description: A page of messages
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, next_cursor]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Message"
+                  next_cursor:
+                    type: [string, "null"]
+        "301":
+          $ref: "#/components/responses/TopicMoved"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /topics/{id}/patchsets:
+    get:
+      operationId: listTopicPatchsets
+      tags: [Patchsets]
+      summary: The patchsets of a thread, newest first
+      description: |
+        Every message of the thread that carries patches, ordered by
+        `created_at`, then `id`, both descending. For an account with the
+        `patchset_lineage` feature each row has `lineage`, see the
+        description of the API.
+      parameters:
+        - $ref: "#/components/parameters/topicId"
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      responses:
+        "200":
+          description: A page of patchsets
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, next_cursor]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Patchset"
+                  next_cursor:
+                    type: [string, "null"]
+        "301":
+          $ref: "#/components/responses/TopicMoved"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /topics/{id}/commits:
+    get:
+      operationId: listTopicCommits
+      tags: [Threads]
+      summary: The commits linked to a thread, newest first
+      description: |
+        The commits whose message names the thread in a `Discussion:` trailer.
+        A change and its backports are one entry, so there are usually fewer
+        entries than the `commit_count` of the thread, which counts every
+        backport. Ordered by `committed_at`, descending. The list is not
+        paged: `next_cursor` is always null, and `limit` and `cursor` are
+        refused with 400 `invalid_parameter`.
+
+        For an account with the `patchset_lineage` feature the list also
+        has the commits a language model linked to the thread, and the
+        credits it added. Each entry then has `link_source` and `verdict`,
+        each credit a `source`. For everyone else these fields are absent
+        and nothing a model produced is in the list.
+      parameters:
+        - $ref: "#/components/parameters/topicId"
+      responses:
+        "200":
+          description: Every commit entry of the thread
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, next_cursor]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CommitGroup"
+                  next_cursor:
+                    type: "null"
+        "301":
+          $ref: "#/components/responses/TopicMoved"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /topics/{id}/notes:
+    get:
+      operationId: listTopicNotes
+      tags: [Notes]
+      summary: The notes on a thread the caller may see, oldest first
+      description: |
+        Notes are short remarks users of the site leave on a thread or on
+        one of its messages. Ordered by `created_at`, then `id`.
+
+        Who sees what, the same as on the site: a public note (`global`
+        true) is given to everyone, also without a token. A private note is
+        given only to its author, to the users it mentions and to the
+        members of the teams it mentions. Without a token the list has the
+        public notes only. Deleted notes are never listed.
+
+        Reading the list changes nothing, a mention is not marked as seen.
+      parameters:
+        - $ref: "#/components/parameters/topicId"
+        - name: message_id
+          in: query
+          description: |
+            Only the notes on this message. A message that is not in the
+            thread gives an empty list. Notes on the thread itself have
+            `message_id: null` and cannot be asked for alone.
+          schema:
+            type: integer
+            minimum: 0
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      responses:
+        "200":
+          description: A page of notes
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, next_cursor]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Note"
+                  next_cursor:
+                    type: [string, "null"]
+        "301":
+          $ref: "#/components/responses/TopicMoved"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /topics/{id}/lineage:
+    get:
+      operationId: getTopicLineage
+      tags: [Lineage]
+      summary: The lineage of a thread, as a language model wrote it
+      description: |
+        The result of the latest finished lineage run on the thread: a
+        short story of the thread and, for each patchset the run looked at,
+        the patchset it derives from. Everything here is the output of a
+        language model with a confidence, not fact.
+
+        Only for accounts with the `patchset_lineage` feature. Any other
+        caller gets 403 `feature_required`, also without a token: this is
+        not a 401, a token alone does not help. A caller with the feature
+        gets 404 when the thread has no finished run. The verdicts of the
+        same run on commits are in `/topics/{id}/commits`.
+
+        References in `text`, `reason` and `evidence` fields are tokens:
+        `[msg:<id>]` is a message, read it at `/messages/{id}`;
+        `[commit:<sha>]` is a commit of the PostgreSQL repository by its
+        full sha. The text is given as stored, tokens included.
+      parameters:
+        - $ref: "#/components/parameters/topicId"
+      responses:
+        "200":
+          description: The lineage of the thread
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lineage"
+        "301":
+          $ref: "#/components/responses/TopicMoved"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: The caller's account does not have the `patchset_lineage` feature, or no token was sent (`feature_required`)
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such thread, or the thread has no finished lineage run (`not_found`)
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /messages/lookup:
+    get:
+      operationId: lookupMessage
+      tags: [Messages]
+      summary: A message, by its Message-ID header
+      parameters:
+        - name: rfc_message_id
+          in: query
+          required: true
+          description: |
+            The Message-ID, with or without the angle brackets. It is a query
+            parameter and has to be percent-encoded: a `+` sent as it is reads
+            as a space, send `%2B`.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 998
+        - $ref: "#/components/parameters/body"
+      responses:
+        "200":
+          description: The message
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /messages/{id}:
+    get:
+      operationId: getMessage
+      tags: [Messages]
+      summary: A message, by id
+      description: |
+        A message of a thread that was merged into another one is served
+        from the thread it is stored in, there is no redirect.
+      parameters:
+        - $ref: "#/components/parameters/messageId"
+        - $ref: "#/components/parameters/body"
+      responses:
+        "200":
+          description: The message
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /attachments/{id}:
+    get:
+      operationId: getAttachment
+      tags: [Messages]
+      summary: An attachment, without its content
+      parameters:
+        - $ref: "#/components/parameters/attachmentId"
+      responses:
+        "200":
+          description: The attachment
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Attachment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /attachments/{id}/content:
+    get:
+      operationId: getAttachmentContent
+      tags: [Messages]
+      summary: The bytes of an attachment
+      description: |
+        Always a download, and never with the stored content type. What the
+        stored type says is text comes as `text/plain; charset=utf-8`,
+        anything else as `application/octet-stream`. The bytes are the
+        decoded attachment as it was sent: text can be in another encoding
+        than the header says, the stored `content_type` names it.
+      parameters:
+        - $ref: "#/components/parameters/attachmentId"
+      responses:
+        "200":
+          description: The content
+          headers:
+            Content-Disposition:
+              description: "`attachment`, with the file name"
+              schema:
+                type: string
+            X-Content-Type-Options:
+              description: Always `nosniff`
+              schema:
+                type: string
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            text/plain:
+              schema:
+                type: string
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+          description: No such attachment, or it has no content (`not_found`)
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /branches:
+    get:
+      operationId: listBranches
+      tags: [Branches and CI]
+      summary: The git branches hackorum built from patchsets, last changed first
+      description: |
+        One branch per patchset that hackorum tried to apply, with where it
+        stands on CI. Ordered by `updated_at`, then `id`, both descending.
+        Without `current=false` only the newest patchset of each thread is
+        listed. The filters combine with AND.
+
+        A branch `id` is one patchset and stays with it. hackorum applies
+        every live patchset on the current master again about once a day,
+        pushes the result and runs CI on it: each time `pushed_head_sha`
+        changes and `updated_at` moves, while `id` and `created_at` stay.
+        Most rows near the top are therefore daily rebases, and a row whose
+        `created_at` is new to you is a new patchset.
+
+        To follow new branches and finished CI runs use `/events`, not
+        this list. The feed does not report the daily rebases or a change
+        of `state`: for those read the branch again.
+      parameters:
+        - name: topic
+          in: query
+          description: Numeric id of a thread, not a slug. A merged thread has its own branches, there is no redirect.
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 999999999
+        - name: author
+          in: query
+          description: |
+            Email address of the sender of the patch message, any address of that person.
+            An unknown address gives no rows. A value over 254 characters is answered
+            with `invalid_parameter`.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 254
+        - name: state
+          in: query
+          description: The `state` of the branch
+          schema:
+            $ref: "#/components/schemas/BranchState"
+        - name: ci_status
+          in: query
+          description: The `ci_status` of the branch, `none` for branches CI never ran for
+          schema:
+            type: string
+            enum:
+              [ci_none, pushed_awaiting_ci, push_failed, queued, running, success, build_failed,
+              build_timeout, tests_failed, tests_timeout, cancelled, infra_error, none]
+        - name: pg_major
+          in: query
+          description: PostgreSQL major version the branch was built for
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 999
+        - name: current
+          in: query
+          description: "`false` also lists the branches of patchsets that a newer one of the thread replaced"
+          schema:
+            type: string
+            enum: ["true", "false"]
+            default: "true"
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      responses:
+        "200":
+          description: A page of branches
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, next_cursor]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Branch"
+                  next_cursor:
+                    type: [string, "null"]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /branches/{id}:
+    get:
+      operationId: getBranch
+      tags: [Branches and CI]
+      summary: One branch
+      parameters:
+        - $ref: "#/components/parameters/branchId"
+      responses:
+        "200":
+          description: The branch
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branch"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /branches/{id}/ci_runs:
+    get:
+      operationId: listBranchCiRuns
+      tags: [Branches and CI]
+      summary: The CI runs of a branch, newest first
+      description: |
+        Ordered by `created_at`, the time hackorum first recorded the run,
+        then `id`, both descending.
+      parameters:
+        - $ref: "#/components/parameters/branchId"
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      responses:
+        "200":
+          description: A page of CI runs
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, next_cursor]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CiRun"
+                  next_cursor:
+                    type: [string, "null"]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /events:
+    get:
+      operationId: listEvents
+      tags: [Events]
+      summary: What happened after a position, oldest first
+      description: |
+        The feed for following changes. Four things are reported, once each:
+
+        - `message.received`: a message arrived on a list, or was sent
+          through the site.
+        - `patchset.posted`: a message turned out to carry patches. It
+          comes with the `message.received` of the same message.
+        - `branch.created`: hackorum tried to apply a patchset for the
+          first time, whether it applied or not. Later rebases of the same
+          branch are not reported.
+        - `ci.completed`: a CI run reached its final status. A run is
+          reported again, as a new event, if its verdict changes: a result
+          that arrives late replaces an `infra_error`. A branch that is
+          stuck without a run produces no event.
+
+        By default the feed leaves out CI runs that only repeat the
+        previous verdict of the same patchset. Every live branch is
+        rebased and run again about daily, and most of these runs say what
+        the one before said. A `ci.completed` event is given when the run
+        is the first of its branch or its verdict differs from the run
+        before it; `ci_run.first_run` and `ci_run.previous_status` say
+        which. Pass `ci_runs=all` to get every run.
+
+        Events are ordered by `id`, ascending, which is the order hackorum
+        recorded them in. `since` says where to start, see there.
+        `next_cursor` is the position after the last event this request
+        looked at and is always a string: pass it as `since` next time.
+        On a page that is not full it is the end of the feed as of now, so
+        a filter that matches little still moves forward. `has_more` is
+        true when the page is full and more is waiting.
+
+        Events of the last 5 seconds are not given out yet, and
+        `next_cursor` stays before them, so they come with a later call.
+        Following `next_cursor` gives every event once. `occurred_at` is
+        when the thing happened, the date of a mail or the end of a run,
+        and can be long ago; `recorded_at` is when hackorum stored the
+        event, and the order of the feed and `since` go by that one.
+
+        Each event carries the record as it is now, not as it was when the
+        event was recorded, in the shape its own endpoint gives it:
+        `message` without the body, `patchset`, `branch` or `ci_run`,
+        exactly one of them, by `type`. `topic` is the thread the message
+        is in now. Left out are events whose record was deleted since,
+        events of threads that are only on hidden lists (unless `list` is
+        given) and events of a patchset that is not one any more. In rare
+        cases such an event becomes visible again behind a cursor, at its
+        old position: when a thread stops being hidden, or a message is a
+        patchset again. A client that followed `next_cursor` past it does
+        not get it.
+
+        The filters combine with AND. A cursor is only a position: it can
+        be used with other filters than the request that gave it, and by
+        any caller. The feed keeps 90 days, an older position is 410
+        `cursor_expired`.
+      parameters:
+        - name: since
+          in: query
+          description: |
+            Where to start. One of:
+
+            - the `next_cursor` of an earlier response: events after it.
+            - a duration, a number and `m`, `h` or `d`: `90m`, `12h`, `7d`.
+              Events recorded in that last time span, 90 days at most.
+            - a timestamp, ISO 8601 with seconds and `Z` or an offset,
+              `2026-11-12T10:00:00Z`: events recorded at or after it. A
+              `+` in an offset has to be sent as `%2B`. A time in the
+              future gives an empty page with a cursor to go on with, one
+              more than 90 days back is 410 `cursor_expired`.
+
+            The two differ at the edge: a duration over 90 days is 400
+            `invalid_parameter`, a timestamp older than that is 410.
+
+            A duration and a timestamp go by the time hackorum recorded
+            the event (`recorded_at`), not by `occurred_at`. Without
+            `since` it is `24h`. Anything else, a `cursor` of a list
+            included, is `invalid_parameter`.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+            pattern: "^[A-Za-z0-9_.:+-]+$"
+            default: 24h
+        - name: types
+          in: query
+          description: Only events of these types, separated by commas. An unknown type is `invalid_parameter`.
+          schema:
+            type: string
+            pattern: "^(message\\.received|patchset\\.posted|branch\\.created|ci\\.completed)(,(message\\.received|patchset\\.posted|branch\\.created|ci\\.completed))*$"
+        - name: topic
+          in: query
+          description: |
+            Numeric id of a thread, not a slug: events whose message is in
+            that thread now. The id of a merged thread stands for the
+            thread it was merged into. An id that is no thread gives no rows.
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 999999999
+        - name: author
+          in: query
+          description: |
+            Email address of the sender of the message, of the patchset, or of
+            the patchset a branch or a run belongs to, any address of that
+            person. An unknown address gives no rows. A value over 254
+            characters is answered with `invalid_parameter`.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 254
+        - name: list
+          in: query
+          description: |
+            Mailing list identifier, as `/mailing_lists` gives it: events of the threads on that list. A list hidden
+            by default is shown when asked for. An identifier that is not a list is answered with `invalid_parameter`.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+        - name: starred
+          in: query
+          description: |
+            `true`: only events of threads the token owner starred. Needs a
+            token, without one the answer is 401 `token_required`. Any other
+            value is `invalid_parameter`.
+          schema:
+            type: string
+            enum: ["true"]
+        - name: participating
+          in: query
+          description: |
+            `true`: only events of threads the token owner wrote in. Needs a
+            token, without one the answer is 401 `token_required`. Any other
+            value is `invalid_parameter`. With `starred` both have to hold.
+          schema:
+            type: string
+            enum: ["true"]
+        - name: ci_runs
+          in: query
+          description: |
+            Which `ci.completed` events to give. `changed`, the default:
+            only runs that are the first of their branch or whose verdict
+            differs from the run before them on the branch, as it was when
+            the event was recorded. `all`: every run. The other event
+            types are not affected. Any other value is `invalid_parameter`.
+          schema:
+            type: string
+            enum: [changed, all]
+            default: changed
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: A page of events
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, next_cursor, has_more]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Event"
+                  next_cursor:
+                    type: string
+                    description: The position to pass as `since` next time. Never null.
+                  has_more:
+                    type: boolean
+                    description: True when more events are waiting after this page
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "410":
+          $ref: "#/components/responses/CursorExpired"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /drafts:
+    get:
+      operationId: listDrafts
+      tags: [Drafts]
+      summary: The token owner's drafts, last changed first
+      description: |
+        Every draft of the owner, the sent ones too, whether it was made
+        here or on the site. Ordered by `updated_at`, then `id`, both
+        descending. The site orders its list by the time of sending for
+        sent drafts, this list does not. The rows have no `body` and no
+        `recipients`: read one draft for those.
+      security:
+        - bearer: []
+      parameters:
+        - name: state
+          in: query
+          description: Only the drafts in this state. Without it, all of them.
+          schema:
+            $ref: "#/components/schemas/DraftState"
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      responses:
+        "200":
+          description: A page of drafts
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, next_cursor]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DraftBrief"
+                  next_cursor:
+                    type: [string, "null"]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createDraft
+      tags: [Drafts]
+      summary: Make a draft of a reply to a message
+      description: |
+        Makes the owner's draft of a reply to the message
+        `reply_to_message_id`, as the Reply button of the site does, and
+        answers 201. The owner can have one unsent draft per message: when
+        there is one already, made here or on the site, it is given back
+        with 200 and nothing of it is changed, whatever the request says.
+        Use `PATCH` to change it.
+
+        `reply_to_message_id` is required for now: drafts that start a
+        thread are not supported yet, and a request without it is 422
+        `invalid_body`.
+
+        The draft is not sent, and nothing here can send it. The owner
+        sends it on the site, at `html_url`.
+
+        The stored text is the quote, as the site formats it, followed by
+        `body`. Together they may have 1 MB, more is 422 `invalid_body`.
+        An account can have 50 drafts that are not sent: a request for one
+        more is 422 `draft_limit`. An existing draft is still given back.
+
+        The account needs a Gmail identity that may send, connected on the
+        site (`send_authorized` in `/me`), and that address must be one of
+        the account's addresses. Otherwise the answer is 403
+        `no_send_identity`.
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DraftCreate"
+      responses:
+        "200":
+          description: The unsent draft the owner already has for the message, unchanged
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Draft"
+        "201":
+          description: The new draft
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Draft"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/NoSendIdentity"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/InvalidBody"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /drafts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/draftId"
+    get:
+      operationId: getDraft
+      tags: [Drafts]
+      summary: A draft of the token owner
+      description: A draft of another user is 404.
+      security:
+        - bearer: []
+      responses:
+        "200":
+          description: The draft
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Draft"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: updateDraft
+      tags: [Drafts]
+      summary: Change the subject or the text of a draft
+      description: |
+        Only the fields that are sent change, an empty object changes
+        nothing and gives the draft back. The draft then names the token
+        in `last_edited_via`, until it is edited on the site.
+
+        To not overwrite what was changed in between, on the site or by
+        another client, send the `updated_at` the client saw last. When
+        the draft has another one now the answer is 409 `conflict`: read
+        the draft again. Without `updated_at` the last write wins.
+
+        A draft that is being sent is 409 `conflict`. A sent draft cannot
+        be changed, that is 422 `invalid_body`. A draft of another user is
+        404.
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DraftUpdate"
+      responses:
+        "200":
+          description: The draft after the change
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Draft"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/InvalidBody"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: deleteDraft
+      tags: [Drafts]
+      summary: Delete an unsent draft
+      description: |
+        Deletes the draft and its attachments. A draft that is being sent
+        is 409 `conflict`. A sent draft is kept as the record of the mail
+        and cannot be deleted, that is 422 `unprocessable_content`. A
+        draft of another user is 404.
+      security:
+        - bearer: []
+      responses:
+        "204":
+          description: The draft is deleted, there is no body
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /drafts/{id}/attachments:
+    parameters:
+      - $ref: "#/components/parameters/draftId"
+    post:
+      operationId: addDraftAttachment
+      tags: [Drafts]
+      summary: Attach a file to a draft
+      description: |
+        One file per request, its content as Base64 inside the JSON body.
+        There is no multipart upload. The answer is the whole draft, with
+        the new file and its id in `attachments` and a new `updated_at`.
+        The draft then names the token in `last_edited_via`.
+
+        The files of a draft may have 2 MB together, counted in decoded
+        bytes. A file that would take the draft over that is 422
+        `invalid_body` and is not stored. Content that is not Base64, or
+        empty, is 422 `invalid_body` as well. The files of all drafts of
+        the account that are not sent may have 20 MB together: over that
+        the answer is 422 `draft_limit`.
+
+        The file is stored as an upload in the composer of the site stores
+        it, and goes out with the mail when the owner sends the draft
+        there. `file_name` and `content_type` are cleaned before they are
+        stored, see the fields of the request: the answer shows the stored
+        values. The content is not given back by the API, the owner can
+        download the file on the site.
+
+        A draft that is being sent is 409 `conflict`. A sent draft cannot
+        be changed, that is 422 `invalid_body`. A draft of another user is
+        404.
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DraftAttachmentCreate"
+      responses:
+        "201":
+          description: The draft with the new file
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Draft"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/InvalidBody"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /drafts/{id}/attachments/{attachment_id}:
+    parameters:
+      - $ref: "#/components/parameters/draftId"
+      - name: attachment_id
+        in: path
+        required: true
+        description: Numeric id of the file, from `attachments` of the draft
+        schema:
+          type: integer
+    delete:
+      operationId: deleteDraftAttachment
+      tags: [Drafts]
+      summary: Take a file off a draft
+      description: |
+        The answer is the whole draft, without the file and with a new
+        `updated_at`. The draft then names the token in `last_edited_via`.
+
+        A file that is not on this draft is 404, as is a draft of another
+        user. A draft that is being sent is 409 `conflict`. A sent draft
+        cannot be changed, that is 422 `unprocessable_content`.
+      security:
+        - bearer: []
+      responses:
+        "200":
+          description: The draft without the file
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Draft"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /openapi.json:
+    get:
+      operationId: getOpenapiJson
+      tags: [Meta]
+      summary: This document as JSON
+      responses:
+        "200":
+          description: OpenAPI document
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                type: object
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /openapi.yaml:
+    get:
+      operationId: getOpenapiYaml
+      tags: [Meta]
+      summary: This document as YAML
+      responses:
+        "200":
+          description: OpenAPI document
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            application/yaml:
+              schema:
+                type: string
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /guide.md:
+    get:
+      operationId: getGuide
+      tags: [Meta]
+      summary: A guide to this API as plain markdown, for agents and tool authors
+      description: |
+        One text of under 2500 words that says how to use the API: the
+        rules, how to read a thread, patches and CI, the event feed,
+        drafts, and a table of the operations. Made to be loaded in one
+        request by a language model or by somebody who writes a tool.
+        Public like this document: the `Authorization` header is ignored.
+      responses:
+        "200":
+          description: The guide
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimit-Limit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimit-Remaining"
+            RateLimit-Reset:
+              $ref: "#/components/headers/RateLimit-Reset"
+          content:
+            text/markdown:
+              schema:
+                type: string
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+  parameters:
+    topicId:
+      name: id
+      in: path
+      required: true
+      description: Numeric id, or the topic's slug
+      schema:
+        type: string
+    personEmail:
+      name: email
+      in: path
+      required: true
+      description: The address, percent-encoded (`alice%40example.org`). A plain `@` is taken too.
+      schema:
+        type: string
+    branchId:
+      name: id
+      in: path
+      required: true
+      description: Numeric id of the branch
+      schema:
+        type: integer
+    messageId:
+      name: id
+      in: path
+      required: true
+      description: Numeric id of the message
+      schema:
+        type: integer
+    attachmentId:
+      name: id
+      in: path
+      required: true
+      description: Numeric id of the attachment
+      schema:
+        type: integer
+    draftId:
+      name: id
+      in: path
+      required: true
+      description: Numeric id of the draft
+      schema:
+        type: integer
+    limit:
+      name: limit
+      in: query
+      description: |
+        Page size, default 50. A value above 200 is lowered to 200. Anything
+        that is not a positive integer is answered with `invalid_limit`.
+      schema:
+        type: integer
+        minimum: 1
+        default: 50
+    cursor:
+      name: cursor
+      in: query
+      description: |
+        The `next_cursor` of the previous page. It is only taken with the
+        path and the query parameters of the request that gave it; `limit`
+        and `body` may differ. Otherwise the answer is `invalid_cursor`.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 500
+    body:
+      name: body
+      in: query
+      description: |
+        How much of the message text to send: `none` gives `body: null`,
+        `text` the body without quoted lines, attribution lines and
+        forwarded originals, `full` the stored body. It does not change
+        which messages a list has, so it may change between pages.
+      schema:
+        type: string
+        enum: [none, text, full]
+        default: text
+  headers:
+    RateLimit-Limit:
+      description: Requests allowed per minute for this caller
+      schema:
+        type: integer
+    RateLimit-Remaining:
+      description: Requests left in the current minute
+      schema:
+        type: integer
+    RateLimit-Reset:
+      description: Seconds until the budget is full again
+      schema:
+        type: integer
+    Retry-After:
+      description: Seconds to wait before the next request
+      schema:
+        type: integer
+  responses:
+    TopicMoved:
+      description: The thread was merged into another one, `Location` is the same request on that thread, query string included
+      headers:
+        Location:
+          description: URL of the thread this one was merged into
+          schema:
+            type: string
+        RateLimit-Limit:
+          $ref: "#/components/headers/RateLimit-Limit"
+        RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimit-Remaining"
+        RateLimit-Reset:
+          $ref: "#/components/headers/RateLimit-Reset"
+    Unauthorized:
+      description: |
+        A token was sent and is not usable, because it is invalid, expired
+        or revoked: `invalid_token`. Every operation that reads the token
+        can answer this, the request is never served anonymously instead.
+        On `/me`, the paths under it and `/drafts`, and on `/events` with
+        `starred` or `participating`: no token was sent, `token_required`.
+      headers:
+        RateLimit-Limit:
+          $ref: "#/components/headers/RateLimit-Limit"
+        RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimit-Remaining"
+        RateLimit-Reset:
+          $ref: "#/components/headers/RateLimit-Reset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    BadRequest:
+      description: |
+        A parameter is unknown, blank or not usable: `invalid_parameter`,
+        `invalid_query`, `invalid_cursor` or `invalid_limit`. Or the request
+        could not be read: `bad_request`. Or the request was stopped
+        because it ran too long or needed too much memory:
+        `query_too_expensive`, narrow the query.
+      headers:
+        RateLimit-Limit:
+          $ref: "#/components/headers/RateLimit-Limit"
+        RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimit-Remaining"
+        RateLimit-Reset:
+          $ref: "#/components/headers/RateLimit-Reset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: No such record (`not_found`)
+      headers:
+        RateLimit-Limit:
+          $ref: "#/components/headers/RateLimit-Limit"
+        RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimit-Remaining"
+        RateLimit-Reset:
+          $ref: "#/components/headers/RateLimit-Reset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NoSendIdentity:
+      description: The account has no Gmail identity that may send, or its address is not an address of the account (`no_send_identity`)
+      headers:
+        RateLimit-Limit:
+          $ref: "#/components/headers/RateLimit-Limit"
+        RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimit-Remaining"
+        RateLimit-Reset:
+          $ref: "#/components/headers/RateLimit-Reset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: The draft is being sent, it changed since the `updated_at` the request gave, or another request is working on it right now and this one can be tried again (`conflict`)
+      headers:
+        RateLimit-Limit:
+          $ref: "#/components/headers/RateLimit-Limit"
+        RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimit-Remaining"
+        RateLimit-Reset:
+          $ref: "#/components/headers/RateLimit-Reset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    PayloadTooLarge:
+      description: The request body has more than 4 MB (`payload_too_large`)
+      headers:
+        RateLimit-Limit:
+          $ref: "#/components/headers/RateLimit-Limit"
+        RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimit-Remaining"
+        RateLimit-Reset:
+          $ref: "#/components/headers/RateLimit-Reset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    UnsupportedMediaType:
+      description: The body was not sent as `application/json` (`unsupported_media_type`)
+      headers:
+        RateLimit-Limit:
+          $ref: "#/components/headers/RateLimit-Limit"
+        RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimit-Remaining"
+        RateLimit-Reset:
+          $ref: "#/components/headers/RateLimit-Reset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InvalidBody:
+      description: The body is not a JSON object, has an unknown field or a value that cannot be used, the message names the field. Or the stored text of a new draft would be over 1 MB, the draft was sent and cannot be changed, or the file would take the attachments of the draft over 2 MB (`invalid_body`). Or the account has 50 drafts that are not sent, or 20 MB of attachments on them (`draft_limit`)
+      headers:
+        RateLimit-Limit:
+          $ref: "#/components/headers/RateLimit-Limit"
+        RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimit-Remaining"
+        RateLimit-Reset:
+          $ref: "#/components/headers/RateLimit-Reset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unprocessable:
+      description: The draft was sent and cannot be deleted or changed (`unprocessable_content`)
+      headers:
+        RateLimit-Limit:
+          $ref: "#/components/headers/RateLimit-Limit"
+        RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimit-Remaining"
+        RateLimit-Reset:
+          $ref: "#/components/headers/RateLimit-Reset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    CursorExpired:
+      description: |
+        `since` is a position older than the feed keeps (`cursor_expired`).
+        Read the state again from the list endpoints and start over with a
+        duration.
+      headers:
+        RateLimit-Limit:
+          $ref: "#/components/headers/RateLimit-Limit"
+        RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimit-Remaining"
+        RateLimit-Reset:
+          $ref: "#/components/headers/RateLimit-Reset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    RateLimited:
+      description: Too many requests (`rate_limited`)
+      headers:
+        RateLimit-Limit:
+          $ref: "#/components/headers/RateLimit-Limit"
+        RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimit-Remaining"
+        RateLimit-Reset:
+          $ref: "#/components/headers/RateLimit-Reset"
+        Retry-After:
+          $ref: "#/components/headers/Retry-After"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Error:
+      description: Any other error, for example `bad_request`, `query_too_expensive` or `internal_error`. The description of the API lists every code.
+      headers:
+        RateLimit-Limit:
+          $ref: "#/components/headers/RateLimit-Limit"
+        RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimit-Remaining"
+        RateLimit-Reset:
+          $ref: "#/components/headers/RateLimit-Reset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: One of the codes listed in the description of the API
+            message:
+              type: string
+    AliasRef:
+      type: object
+      additionalProperties: false
+      description: A name and an address somebody sent mail with
+      required: [name, email]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+    PersonBrief:
+      type: object
+      additionalProperties: false
+      description: |
+        A person, as other records name them. One person can have several
+        addresses.
+      required: [id, name, email, url, html_url]
+      properties:
+        id:
+          type: integer
+          description: Numeric id of the person. People are looked up by address, not by id.
+        name:
+          type: string
+          description: |
+            The name on the person's main address, or on another address of
+            theirs when no main one is set. `Unknown` when the person has no
+            address at all.
+        email:
+          type: [string, "null"]
+          description: The address that name belongs to, null when the person has no address
+        url:
+          type: [string, "null"]
+          description: The person in this API, `/people/{email}`. Null when `email` is null.
+        html_url:
+          type: [string, "null"]
+          description: The person's page on the site. Null when `email` is null.
+    MailingList:
+      type: object
+      additionalProperties: false
+      required: [identifier, display_name, hidden_by_default]
+      properties:
+        identifier:
+          type: string
+        display_name:
+          type: string
+        hidden_by_default:
+          type: boolean
+          description: Threads that are only on such lists are left out of default listings
+    MailingListRef:
+      type: object
+      additionalProperties: false
+      description: A mailing list, as other records name it
+      required: [identifier, display_name]
+      properties:
+        identifier:
+          type: string
+        display_name:
+          type: string
+    ContributorType:
+      type: [string, "null"]
+      description: PostgreSQL contributor status, null for none
+      enum:
+        - core_team
+        - committer
+        - major_contributor
+        - significant_contributor
+        - past_major_contributor
+        - past_significant_contributor
+        - null
+    TopicParticipant:
+      type: object
+      additionalProperties: false
+      description: A person who wrote in the thread
+      required: [person, message_count, first_message_at, last_message_at, contributor_type]
+      properties:
+        person:
+          $ref: "#/components/schemas/PersonBrief"
+        message_count:
+          type: integer
+        first_message_at:
+          type: string
+          format: date-time
+        last_message_at:
+          type: string
+          format: date-time
+        contributor_type:
+          $ref: "#/components/schemas/ContributorType"
+    TopicCommitfest:
+      type: object
+      additionalProperties: false
+      description: The thread's entry in the latest commitfest it is in
+      required: [name, status, commitfest_url, patch_url, committed]
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          description: Status of the patch in that commitfest, for example `Needs review`
+        commitfest_url:
+          type: string
+        patch_url:
+          type: string
+        committed:
+          type: boolean
+    TopicCi:
+      type: object
+      additionalProperties: false
+      description: The current patchset of the thread on hackorum's CI, when there is something to say about it
+      required: [state, ci_status, branch_id, branch_name, url]
+      properties:
+        state:
+          $ref: "#/components/schemas/BranchState"
+        ci_status:
+          oneOf:
+            - $ref: "#/components/schemas/CiStatus"
+            - type: "null"
+          description: CI verdict for the commit that is pushed now, null when CI never ran for this patchset
+        branch_id:
+          type: integer
+        branch_name:
+          type: string
+        url:
+          type: string
+          description: The branch, `/branches/{branch_id}`
+    TopicBrief:
+      type: object
+      additionalProperties: false
+      required:
+        [id, slug, title, url, html_url, created_at, last_message_at, message_count,
+        participant_count, contributor_participant_count, highest_contributor_type,
+        has_attachments, commit_count, last_commit_at, creator, last_sender,
+        mailing_lists, commitfest, ci, me]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: [string, "null"]
+          description: Short name of the thread, when it has one
+        title:
+          type: string
+        url:
+          type: string
+        html_url:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        last_message_at:
+          type: [string, "null"]
+          format: date-time
+        message_count:
+          type: integer
+        participant_count:
+          type: integer
+        contributor_participant_count:
+          type: integer
+          description: Participants with a PostgreSQL contributor status
+        highest_contributor_type:
+          $ref: "#/components/schemas/ContributorType"
+          description: Highest contributor status among the participants
+        has_attachments:
+          type: boolean
+        commit_count:
+          type: integer
+          description: |
+            Commits linked to this thread. Each backport of a change is
+            counted separately; `/topics/{id}/commits` groups them.
+        last_commit_at:
+          type: [string, "null"]
+          format: date-time
+        creator:
+          $ref: "#/components/schemas/PersonBrief"
+        last_sender:
+          oneOf:
+            - $ref: "#/components/schemas/PersonBrief"
+            - type: "null"
+        mailing_lists:
+          type: array
+          items:
+            $ref: "#/components/schemas/MailingListRef"
+        commitfest:
+          oneOf:
+            - $ref: "#/components/schemas/TopicCommitfest"
+            - type: "null"
+        ci:
+          oneOf:
+            - $ref: "#/components/schemas/TopicCi"
+            - type: "null"
+        me:
+          oneOf:
+            - $ref: "#/components/schemas/TopicMe"
+            - type: "null"
+          description: The token owner's own state on the thread, null without a token
+    TopicMe:
+      type: object
+      additionalProperties: false
+      description: |
+        What the token owner did with a thread. It only ever holds the state
+        of the user the token belongs to, and no response names teammates.
+        (The search can still use the combined state of a team: a member
+        can put the team's name into a state selector of `q`, as on the
+        site.) Reading it changes nothing: a thread is not marked as seen by
+        an API request.
+      required: [starred, ignored, status, read_count, unread_count, note_count]
+      properties:
+        starred:
+          type: boolean
+        ignored:
+          type: boolean
+          description: |
+            Ignored threads are left out of `/topics` for this user, unless
+            they are starred as well.
+        status:
+          type: string
+          enum: [new, aware, reading, read]
+          description: |
+            `read`: every message is read. `reading`: some are. `aware`: none
+            is read, but the user has seen the thread in a list or marked
+            everything up to a date as seen and the thread has no later
+            message. `new`: none of that.
+        read_count:
+          type: integer
+          description: Messages of the thread the user has read
+        unread_count:
+          type: integer
+          minimum: 0
+          description: "`message_count` minus `read_count`, never below 0"
+        note_count:
+          type: integer
+          description: |
+            Notes on the thread the user can see: their own, public ones and
+            those that mention the user or one of their teams.
+        first_unread_message_id:
+          type: [integer, "null"]
+          description: |
+            On `/topics/{id}` only, lists do not have the key. The first
+            message in thread order (`created_at`, then `id`) the user has
+            not read, null when all are read or the thread has no messages.
+            It can be null while `unread_count` is above 0 after threads
+            were merged: the count comes from stored read ranges, the id
+            from what those ranges cover.
+    Topic:
+      type: object
+      additionalProperties: false
+      description: Everything `TopicBrief` has, and the detail
+      required:
+        [id, slug, title, url, html_url, created_at, last_message_at, message_count,
+        participant_count, contributor_participant_count, highest_contributor_type,
+        has_attachments, commit_count, last_commit_at, creator, last_sender,
+        mailing_lists, commitfest, ci, me,
+        participants, commitfest_patches, patchset_count, links]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: [string, "null"]
+          description: Short name of the thread, when it has one
+        title:
+          type: string
+        url:
+          type: string
+        html_url:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        last_message_at:
+          type: [string, "null"]
+          format: date-time
+        message_count:
+          type: integer
+        participant_count:
+          type: integer
+        contributor_participant_count:
+          type: integer
+          description: Participants with a PostgreSQL contributor status
+        highest_contributor_type:
+          $ref: "#/components/schemas/ContributorType"
+          description: Highest contributor status among the participants
+        has_attachments:
+          type: boolean
+        commit_count:
+          type: integer
+          description: |
+            Commits linked to this thread. Each backport of a change is
+            counted separately; `/topics/{id}/commits` groups them.
+        last_commit_at:
+          type: [string, "null"]
+          format: date-time
+        creator:
+          $ref: "#/components/schemas/PersonBrief"
+        last_sender:
+          oneOf:
+            - $ref: "#/components/schemas/PersonBrief"
+            - type: "null"
+        mailing_lists:
+          type: array
+          items:
+            $ref: "#/components/schemas/MailingListRef"
+        commitfest:
+          oneOf:
+            - $ref: "#/components/schemas/TopicCommitfest"
+            - type: "null"
+        ci:
+          oneOf:
+            - $ref: "#/components/schemas/TopicCi"
+            - type: "null"
+        me:
+          oneOf:
+            - $ref: "#/components/schemas/TopicMe"
+            - type: "null"
+          description: The token owner's own state on the thread, null without a token
+        participants:
+          type: array
+          description: At most 50, most messages first
+          items:
+            $ref: "#/components/schemas/TopicParticipant"
+        commitfest_patches:
+          type: array
+          description: Commitfest entries of the thread, each with its state in its latest commitfest
+          items:
+            type: object
+            additionalProperties: false
+            required: [external_id, title, status, commitfest_name, reviewers, committer, tags, ci_status, url]
+            properties:
+              external_id:
+                type: integer
+                description: Id of the patch in the commitfest app
+              title:
+                type: string
+              status:
+                type: string
+              commitfest_name:
+                type: string
+              reviewers:
+                type: array
+                items:
+                  type: string
+              committer:
+                type: [string, "null"]
+              tags:
+                type: array
+                items:
+                  type: string
+              ci_status:
+                type: [string, "null"]
+                description: CI result as the commitfest app reports it
+              url:
+                type: string
+        patchset_count:
+          type: integer
+          description: Messages of the thread that carry patches
+        links:
+          type: object
+          additionalProperties: false
+          required: [messages, patchsets, commits]
+          properties:
+            messages:
+              type: string
+            patchsets:
+              type: string
+            commits:
+              type: string
+            lineage:
+              type: string
+              description: |
+                `/topics/{id}/lineage`. Only present for accounts with the
+                `patchset_lineage` feature, and only when the thread has a
+                finished lineage run.
+    PersonTopic:
+      type: object
+      additionalProperties: false
+      description: Everything `TopicBrief` has, and what the person did in the thread
+      required:
+        [id, slug, title, url, html_url, created_at, last_message_at, message_count,
+        participant_count, contributor_participant_count, highest_contributor_type,
+        has_attachments, commit_count, last_commit_at, creator, last_sender,
+        mailing_lists, commitfest, ci, me,
+        participation]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: [string, "null"]
+          description: Short name of the thread, when it has one
+        title:
+          type: string
+        url:
+          type: string
+        html_url:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        last_message_at:
+          type: [string, "null"]
+          format: date-time
+        message_count:
+          type: integer
+        participant_count:
+          type: integer
+        contributor_participant_count:
+          type: integer
+          description: Participants with a PostgreSQL contributor status
+        highest_contributor_type:
+          $ref: "#/components/schemas/ContributorType"
+          description: Highest contributor status among the participants
+        has_attachments:
+          type: boolean
+        commit_count:
+          type: integer
+          description: |
+            Commits linked to this thread. Each backport of a change is
+            counted separately; `/topics/{id}/commits` groups them.
+        last_commit_at:
+          type: [string, "null"]
+          format: date-time
+        creator:
+          $ref: "#/components/schemas/PersonBrief"
+        last_sender:
+          oneOf:
+            - $ref: "#/components/schemas/PersonBrief"
+            - type: "null"
+        mailing_lists:
+          type: array
+          items:
+            $ref: "#/components/schemas/MailingListRef"
+        commitfest:
+          oneOf:
+            - $ref: "#/components/schemas/TopicCommitfest"
+            - type: "null"
+        ci:
+          oneOf:
+            - $ref: "#/components/schemas/TopicCi"
+            - type: "null"
+        me:
+          oneOf:
+            - $ref: "#/components/schemas/TopicMe"
+            - type: "null"
+          description: The token owner's own state on the thread, null without a token
+        participation:
+          type: object
+          additionalProperties: false
+          required: [message_count, first_message_at, last_message_at, started]
+          properties:
+            message_count:
+              type: integer
+              description: Messages of the person in the thread
+            first_message_at:
+              type: string
+              format: date-time
+            last_message_at:
+              type: string
+              format: date-time
+            started:
+              type: boolean
+              description: True when the person started the thread
+    Person:
+      type: object
+      additionalProperties: false
+      required: [id, name, email, url, html_url, aliases, contributor_type, contributor_badge, stats]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          description: As in `PersonBrief`
+        email:
+          type: [string, "null"]
+          description: As in `PersonBrief`
+        url:
+          type: [string, "null"]
+          description: As in `PersonBrief`
+        html_url:
+          type: [string, "null"]
+          description: As in `PersonBrief`
+        aliases:
+          type: array
+          description: |
+            Names and addresses the person sent mail with, by address. An
+            address that was only mentioned is not listed, so `email` can be
+            missing here when the main address never sent mail.
+          items:
+            $ref: "#/components/schemas/AliasRef"
+        contributor_type:
+          $ref: "#/components/schemas/ContributorType"
+          description: Highest PostgreSQL contributor status, null for none
+        contributor_badge:
+          type: [string, "null"]
+          description: The status as the site labels it
+        stats:
+          type: object
+          additionalProperties: false
+          description: |
+            All-time numbers. `messages_sent`, `threads_started` and
+            `threads_joined` leave out lists hidden by default; the hidden part
+            of each is its `_hidden` count, add the two for the total.
+            `patches_sent`, `patch_threads` and the two timestamps include
+            hidden lists.
+          required:
+            - messages_sent
+            - messages_sent_hidden
+            - threads_started
+            - threads_started_hidden
+            - threads_joined
+            - threads_joined_hidden
+            - patches_sent
+            - patch_threads
+            - first_message_at
+            - last_message_at
+          properties:
+            messages_sent:
+              type: integer
+            messages_sent_hidden:
+              type: integer
+            threads_started:
+              type: integer
+            threads_started_hidden:
+              type: integer
+            threads_joined:
+              type: integer
+            threads_joined_hidden:
+              type: integer
+            patches_sent:
+              type: integer
+            patch_threads:
+              type: integer
+            first_message_at:
+              type: [string, "null"]
+              format: date-time
+            last_message_at:
+              type: [string, "null"]
+              format: date-time
+    Attachment:
+      type: object
+      additionalProperties: false
+      required: [id, message_id, file_name, content_type, byte_size, is_patch, url, content_url]
+      properties:
+        id:
+          type: integer
+        message_id:
+          type: integer
+          description: Numeric id of the message the file came with; use `/messages/{message_id}`
+        file_name:
+          type: string
+        content_type:
+          type: [string, "null"]
+          description: The type the mail gave, parameters included. The content is not served with it.
+        byte_size:
+          type: integer
+          description: Size of the content in bytes, as `content_url` serves it
+        is_patch:
+          type: boolean
+          description: |
+            True when hackorum takes the file for a patch of the message: by
+            its name (`.patch`, `.diff`, `.diffs`, also with `.gz`, `.bz2`,
+            `.txt` or a number after it, or a bare `patch` or `diff`) or by a
+            patch content type as the mail gave it (`text/x-diff`,
+            `text/x-patch`, `application/x-patch`). The content is not
+            looked at. A file is left out when its name has `nocfbot` or
+            `no_cfbot` in it: authors put that in the name of a file that
+            the project's CI bot should skip, a file that is not part of
+            the patch series. These are the `files` of a patchset and the
+            files of its `download_url` archive.
+        url:
+          type: string
+        content_url:
+          type: string
+    Message:
+      type: object
+      additionalProperties: false
+      required:
+        [id, url, html_url, topic_id, number, rfc_message_id, subject, created_at, state,
+        sender, sender_alias, reply_to_id, depth, is_patch_submission, body, attachments, me]
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        html_url:
+          type: string
+          description: The thread page of the site, at this message
+        topic_id:
+          type: integer
+        number:
+          type: integer
+          description: |
+            Current position of the message in its thread, from 1, by
+            `created_at` and `id`. It can change when older mail arrives
+            late, and may differ from the suffix of a branch name.
+        rfc_message_id:
+          type: [string, "null"]
+          description: The Message-ID header, usually without angle brackets
+        subject:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        state:
+          type: string
+          enum: [sent, pending]
+          description: "`pending` is a message written on the site that has not come back from the list yet"
+        sender:
+          $ref: "#/components/schemas/PersonBrief"
+        sender_alias:
+          $ref: "#/components/schemas/AliasRef"
+          description: The name and address this message was sent with
+        reply_to_id:
+          type: [integer, "null"]
+          description: Id of the message this one answers, which can be in another thread
+        depth:
+          type: integer
+          description: Replies above this message inside the thread, 0 for a root and for a reply to a message outside of it
+        is_patch_submission:
+          type: boolean
+          description: |
+            True when at least one attachment of the message has `is_patch`
+            true, see `Attachment`. The message is then a patchset.
+        body:
+          type: [string, "null"]
+          description: As the `body` parameter asks, null for `none`
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attachment"
+        me:
+          oneOf:
+            - $ref: "#/components/schemas/MessageMe"
+            - type: "null"
+          description: The token owner's own state on the message, null without a token
+    MessageMe:
+      type: object
+      additionalProperties: false
+      description: |
+        What the token owner did with a message. It is only ever the state
+        of the user the token belongs to. Reading a message here does not
+        mark it as read.
+      required: [read]
+      properties:
+        read:
+          type: boolean
+          description: The user has read the message, on the site or by marking the thread as read
+    NoteUser:
+      type: object
+      additionalProperties: false
+      description: |
+        A user of the site, as a note shows them: by the display name the
+        site shows. Never an e-mail address. The display name falls back
+        to the username when the account has no name on record.
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: |
+            The name the site shows: the name of the user's main address,
+            else the username, else `User #<n>`. `Deleted user` for a
+            deleted account.
+    NoteMention:
+      type: object
+      additionalProperties: false
+      required: [type, name]
+      properties:
+        type:
+          type: string
+          enum: [user, team]
+        name:
+          type: string
+          description: |
+            The username or the team name the site shows as `@name`,
+            without the `@`. For a user without a username it is the name
+            the site shows instead.
+    Note:
+      type: object
+      additionalProperties: false
+      description: |
+        A remark a user left on a thread or on one message of it. Public
+        notes (`global` true) are given to everyone. A private note is given
+        only to its author, to the users it mentions and to the members of
+        the teams it mentions.
+      required:
+        [id, topic_id, message_id, author, body, global, tags, mentions, created_at,
+        updated_at, edited, last_editor]
+      properties:
+        id:
+          type: integer
+        topic_id:
+          type: integer
+        message_id:
+          type: [integer, "null"]
+          description: The message the note is on, null for a note on the thread itself
+        author:
+          $ref: "#/components/schemas/NoteUser"
+        body:
+          type: string
+          description: |
+            Plain text as it was written, with its `@mentions` and `#tags`
+            in place. Not HTML: escape it before showing it in a page.
+        global:
+          type: boolean
+          description: True for a public note, which everyone can read
+        tags:
+          type: array
+          description: The `#tags` of the body, lower case, without the `#`
+          items:
+            type: string
+        mentions:
+          type: array
+          description: |
+            The users and teams the note mentions; `@global`, which makes a
+            note public, is not one of them. Everyone who can read the note
+            gets all of them, as on the site, also the name of a private
+            team they are not a member of.
+          items:
+            $ref: "#/components/schemas/NoteMention"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        edited:
+          type: boolean
+          description: |
+            True when the body was changed after the note was written.
+            Earlier versions are not available.
+        last_editor:
+          oneOf:
+            - $ref: "#/components/schemas/NoteUser"
+            - type: "null"
+          description: |
+            Who changed the note last when that was not its author (an
+            admin can edit a public note), else null.
+    MessageDetail:
+      type: object
+      additionalProperties: false
+      required:
+        [id, url, html_url, topic_id, number, rfc_message_id, subject, created_at, state,
+        sender, sender_alias, reply_to_id, depth, is_patch_submission, body, attachments, me, topic]
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        html_url:
+          type: string
+          description: The thread page of the site, at this message
+        topic_id:
+          type: integer
+        number:
+          type: integer
+          description: |
+            Current position of the message in its thread, from 1, by
+            `created_at` and `id`. It can change when older mail arrives
+            late, and may differ from the suffix of a branch name.
+        rfc_message_id:
+          type: [string, "null"]
+          description: The Message-ID header, usually without angle brackets
+        subject:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        state:
+          type: string
+          enum: [sent, pending]
+          description: "`pending` is a message written on the site that has not come back from the list yet"
+        sender:
+          $ref: "#/components/schemas/PersonBrief"
+        sender_alias:
+          $ref: "#/components/schemas/AliasRef"
+          description: The name and address this message was sent with
+        reply_to_id:
+          type: [integer, "null"]
+          description: Id of the message this one answers, which can be in another thread
+        depth:
+          type: integer
+          description: Replies above this message inside the thread, 0 for a root and for a reply to a message outside of it
+        is_patch_submission:
+          type: boolean
+          description: |
+            True when at least one attachment of the message has `is_patch`
+            true, see `Attachment`. The message is then a patchset.
+        body:
+          type: [string, "null"]
+          description: As the `body` parameter asks, null for `none`
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attachment"
+        me:
+          oneOf:
+            - $ref: "#/components/schemas/MessageMe"
+            - type: "null"
+          description: The token owner's own state on the message, null without a token
+        topic:
+          $ref: "#/components/schemas/TopicRef"
+          description: The thread the message is stored in
+    BranchBrief:
+      type: object
+      additionalProperties: false
+      description: |
+        The record of hackorum trying to apply this patchset. `status` says
+        whether it applied. A git branch to fetch exists only when
+        `pushed_at` is set.
+      required: [id, branch_name, status, ci_status, pushed_at, url]
+      properties:
+        id:
+          type: integer
+        branch_name:
+          type: string
+          description: The name the git branch has, or would have, `t<topic id>_<n>`
+        status:
+          type: string
+          enum: [applied, failed]
+          description: Whether the patches applied
+        pushed_at:
+          type: [string, "null"]
+          format: date-time
+          description: When the branch was last pushed. Null means no git branch exists to fetch.
+        ci_status:
+          oneOf:
+            - $ref: "#/components/schemas/CiStatus"
+            - type: "null"
+          description: CI verdict for the commit that is pushed now, null when CI never ran for this branch
+        url:
+          type: string
+    TopicRef:
+      type: object
+      additionalProperties: false
+      description: A thread, as the records that belong to one name it
+      required: [id, slug, title, url, html_url]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: [string, "null"]
+        title:
+          type: string
+        url:
+          type: string
+        html_url:
+          type: string
+    BranchState:
+      type: string
+      enum: [applies, awaiting_ci, needs_rebase, never_applied, wont_retry]
+      description: |
+        Where the patchset stands, as the CI pages of the site name it.
+        It is computed when the request is made, from the row, its thread
+        and the master hackorum last fetched, so it can change while
+        `updated_at` stays.
+
+        The values are tested in a fixed order and the first match wins:
+        `wont_retry` when CI was skipped, when the patchset was mailed at
+        or before the last commit linked to its thread, or when the thread
+        was merged into another; then `never_applied`, then `awaiting_ci`,
+        then `wont_retry` when the base is too old, then `applies`, and
+        `needs_rebase` for the rest. So `wont_retry` outranks the others: a
+        frozen branch that applied does not read `applies`. Only a base
+        that is too old, with no other reason, comes after `never_applied`
+        and `awaiting_ci`.
+
+        A commit freezes only the patchsets that were there when it
+        landed. A patchset mailed after the last linked commit of its
+        thread stays live.
+
+        `applies`: the patches applied on the master of the last try
+        (`master_apply_sha`), and the pushed branch is based on it. This
+        says nothing about CI, not all of these passed: read `ci_status`.
+
+        `needs_rebase`: the patches do not apply on the current master
+        (`master_apply_error`, `master_conflict_files`). The pushed branch
+        still exists, on the older base in `base_sha`, and `ci_status`
+        refers to that base. hackorum keeps trying master; it stays here
+        until that works or the author sends a rebased patchset.
+
+        `awaiting_ci`: the branch is not pushed yet, or it is pushed and
+        its CI run has not finished. Wait and ask again.
+
+        `never_applied`: the patches did not apply anywhere, `failure_stage`
+        and `failure_reason` say why. There is nothing to fetch or test,
+        ignore the row. Careful with `failure_stage: empty`: such a row can
+        still have `pushed_at` and a pushed branch, which holds an empty
+        commit.
+
+        `wont_retry`: frozen. hackorum will not rebase or re-run it again,
+        because the patchset is not newer than the last commit linked to
+        its thread, the thread was merged into another, the base is too
+        old, or CI was skipped; `state_reason` says which. Its
+        last results stay: the branch when one was pushed, `ci_status` and
+        `latest_run` are valid for the base in `base_sha`, not for the
+        current master.
+    CiStatus:
+      type: string
+      enum:
+        [ci_none, pushed_awaiting_ci, push_failed, queued, running, success, build_failed,
+        build_timeout, tests_failed, tests_timeout, cancelled, infra_error]
+      description: |
+        Where CI stands for a branch. `ci_none` hackorum
+        runs no CI for this branch, `ci_skip_reason` says why.
+        `pushed_awaiting_ci` the branch is pushed and no run was seen yet.
+        `push_failed` the push did not work, it is tried again. `queued` the
+        run waits for a runner. `running` the run is in progress. `success`
+        it built and every test passed. `build_failed` the build broke.
+        `build_timeout` the build ran out of time. `tests_failed` it built
+        and tests failed. `tests_timeout` the tests ran out of time.
+        `cancelled` the run was cancelled. `infra_error` the run ended or
+        went silent without a usable result, which says nothing about the
+        patches. The first three are set on a branch only, a run has a
+        `CiRunStatus`.
+    CiRunStatus:
+      type: string
+      enum:
+        [queued, running, success, build_failed, build_timeout, tests_failed, tests_timeout,
+        cancelled, infra_error]
+      description: Where one run stands. The values mean what they mean in `CiStatus`.
+    CiRun:
+      type: object
+      additionalProperties: false
+      description: One run of the CI workflow on a branch
+      required:
+        [id, github_run_id, run_attempt, status, head_sha, pg_major, queued_at, started_at,
+        completed_at, build_seconds, test_seconds, tests_total, failed_tests, image_ref,
+        image_pull_ref, image_digest, created_at, github_url]
+      properties:
+        id:
+          type: integer
+        github_run_id:
+          type: integer
+          format: int64
+        run_attempt:
+          type: integer
+          description: From 1, a re-run of the same GitHub run has the next number
+        status:
+          $ref: "#/components/schemas/CiRunStatus"
+        head_sha:
+          type: [string, "null"]
+          description: The commit that was tested
+        pg_major:
+          type: [integer, "null"]
+        queued_at:
+          type: [string, "null"]
+          format: date-time
+        started_at:
+          type: [string, "null"]
+          format: date-time
+        completed_at:
+          type: [string, "null"]
+          format: date-time
+        build_seconds:
+          type: [integer, "null"]
+        test_seconds:
+          type: [integer, "null"]
+        tests_total:
+          type: [integer, "null"]
+          description: Number of tests the run reported
+        failed_tests:
+          type: array
+          description: Names of the tests that failed
+          items:
+            type: string
+        image_ref:
+          type: [string, "null"]
+          description: |
+            Docker image the run pushed, by tag. The tag is per thread and
+            moves: every later run of the thread overwrites it, also a run of
+            another patchset, so it may no longer be the image of this run.
+        image_pull_ref:
+          type: [string, "null"]
+          description: |
+            The image of exactly this run, as `<repository>@<digest>`. Pull
+            this one. Null when the run recorded no digest.
+        image_digest:
+          type: [string, "null"]
+          description: Digest of the image this run built
+        created_at:
+          type: string
+          format: date-time
+          description: When hackorum first saw the run. The list of runs is ordered by it.
+        github_url:
+          type: string
+          description: The run on GitHub
+    Event:
+      description: |
+        One thing that happened. `type` says which, and which of `message`,
+        `patchset`, `branch` and `ci_run` the event has: exactly one.
+      oneOf:
+        - $ref: "#/components/schemas/MessageReceivedEvent"
+        - $ref: "#/components/schemas/PatchsetPostedEvent"
+        - $ref: "#/components/schemas/BranchCreatedEvent"
+        - $ref: "#/components/schemas/CiCompletedEvent"
+    MessageReceivedEvent:
+      description: A message arrived on a list or was sent through the site
+      type: object
+      additionalProperties: false
+      required: [id, type, occurred_at, recorded_at, topic, author, message]
+      properties:
+        id:
+          type: integer
+          description: Position of the event in the feed
+        type:
+          const: message.received
+        occurred_at:
+          type: string
+          format: date-time
+          description: The date of the message, which can be well before `recorded_at` for mail that came late
+        recorded_at:
+          type: string
+          format: date-time
+          description: When hackorum recorded the event. `since` as a time goes by this.
+        topic:
+          $ref: "#/components/schemas/TopicRef"
+        author:
+          oneOf:
+            - $ref: "#/components/schemas/PersonBrief"
+            - type: "null"
+          description: The sender of the message
+        message:
+          $ref: "#/components/schemas/Message"
+    PatchsetPostedEvent:
+      description: A message turned out to carry patches
+      type: object
+      additionalProperties: false
+      required: [id, type, occurred_at, recorded_at, topic, author, patchset]
+      properties:
+        id:
+          type: integer
+          description: Position of the event in the feed
+        type:
+          const: patchset.posted
+        occurred_at:
+          type: string
+          format: date-time
+          description: The date of the message
+        recorded_at:
+          type: string
+          format: date-time
+          description: When hackorum recorded the event. `since` as a time goes by this.
+        topic:
+          $ref: "#/components/schemas/TopicRef"
+        author:
+          oneOf:
+            - $ref: "#/components/schemas/PersonBrief"
+            - type: "null"
+          description: The sender of the message
+        patchset:
+          $ref: "#/components/schemas/Patchset"
+    BranchCreatedEvent:
+      description: hackorum tried to apply a patchset for the first time
+      type: object
+      additionalProperties: false
+      required: [id, type, occurred_at, recorded_at, topic, author, branch]
+      properties:
+        id:
+          type: integer
+          description: Position of the event in the feed
+        type:
+          const: branch.created
+        occurred_at:
+          type: string
+          format: date-time
+          description: When the patchset was applied, or failed to
+        recorded_at:
+          type: string
+          format: date-time
+          description: When hackorum recorded the event. `since` as a time goes by this.
+        topic:
+          $ref: "#/components/schemas/TopicRef"
+        author:
+          oneOf:
+            - $ref: "#/components/schemas/PersonBrief"
+            - type: "null"
+          description: The sender of the patchset
+        branch:
+          $ref: "#/components/schemas/Branch"
+    CiCompletedEvent:
+      description: A CI run reached its final status. A run is reported again, with a new id, if its verdict changes.
+      type: object
+      additionalProperties: false
+      required: [id, type, occurred_at, recorded_at, topic, author, ci_run]
+      properties:
+        id:
+          type: integer
+          description: Position of the event in the feed
+        type:
+          const: ci.completed
+        occurred_at:
+          type: string
+          format: date-time
+          description: When the run completed
+        recorded_at:
+          type: string
+          format: date-time
+          description: When hackorum recorded the event. `since` as a time goes by this.
+        topic:
+          $ref: "#/components/schemas/TopicRef"
+        author:
+          oneOf:
+            - $ref: "#/components/schemas/PersonBrief"
+            - type: "null"
+          description: The sender of the patchset the run tested
+        ci_run:
+          $ref: "#/components/schemas/EventCiRun"
+    EventCiRun:
+      type: object
+      additionalProperties: false
+      description: |
+        A CI run as an event carries it: a `CiRun` with its branch, and how
+        it compares to the run before it on the branch
+      required:
+        [id, github_run_id, run_attempt, status, head_sha, pg_major, queued_at, started_at,
+        completed_at, build_seconds, test_seconds, tests_total, failed_tests, image_ref,
+        image_pull_ref, image_digest, created_at, github_url, branch, first_run, previous_status]
+      properties:
+        id:
+          type: integer
+        github_run_id:
+          type: integer
+          format: int64
+        run_attempt:
+          type: integer
+          description: From 1, a re-run of the same GitHub run has the next number
+        status:
+          $ref: "#/components/schemas/CiRunStatus"
+        head_sha:
+          type: [string, "null"]
+          description: The commit that was tested
+        pg_major:
+          type: [integer, "null"]
+        queued_at:
+          type: [string, "null"]
+          format: date-time
+        started_at:
+          type: [string, "null"]
+          format: date-time
+        completed_at:
+          type: [string, "null"]
+          format: date-time
+        build_seconds:
+          type: [integer, "null"]
+        test_seconds:
+          type: [integer, "null"]
+        tests_total:
+          type: [integer, "null"]
+          description: Number of tests the run reported
+        failed_tests:
+          type: array
+          description: Names of the tests that failed
+          items:
+            type: string
+        image_ref:
+          type: [string, "null"]
+          description: |
+            Docker image the run pushed, by tag. The tag is per thread and
+            moves: every later run of the thread overwrites it, also a run of
+            another patchset, so it may no longer be the image of this run.
+        image_pull_ref:
+          type: [string, "null"]
+          description: |
+            The image of exactly this run, as `<repository>@<digest>`. Pull
+            this one. Null when the run recorded no digest.
+        image_digest:
+          type: [string, "null"]
+          description: Digest of the image this run built
+        created_at:
+          type: string
+          format: date-time
+          description: When hackorum first saw the run. The list of runs is ordered by it.
+        github_url:
+          type: string
+          description: The run on GitHub
+        branch:
+          $ref: "#/components/schemas/BranchBrief"
+        first_run:
+          type: boolean
+          description: True when no run of the branch had finished before this one, as of when the event was recorded
+        previous_status:
+          oneOf:
+            - $ref: "#/components/schemas/CiRunStatus"
+            - type: "null"
+          description: |
+            The final status of the run before this one on the branch, as of
+            when the event was recorded. Null for a first run. With
+            `ci_runs=changed` it differs from `status`, except on a run that
+            is reported again because its own verdict changed.
+    Branch:
+      type: object
+      additionalProperties: false
+      description: |
+        The record of hackorum trying to apply a patchset, and where it
+        stands on CI. A git branch exists only when `pushed_at` is set.
+      required:
+        [id, url, html_url, branch_name, topic, message_id, status, failure_stage,
+        failure_reason, conflict_files, state, state_reason, superseded, base_sha, base_source,
+        base_committed_at,
+        on_master, pg_major, behind, attempted_at, pushed_at, pushed_head_sha, github_url, git_url,
+        last_master_apply_at, master_apply_sha, master_apply_error, master_conflict_files, ci_status,
+        ci_skip_reason, latest_run, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        html_url:
+          type: string
+          description: The CI page of the thread on the site
+        branch_name:
+          type: string
+          description: |
+            `t<topic id>_<n>`. n is the position the patch message had in
+            its thread when the branch was first built and is not changed
+            after, so it can differ from the `number` of the message now.
+            The git branch of that name exists only when `pushed_at` is set.
+        topic:
+          $ref: "#/components/schemas/TopicRef"
+        message_id:
+          type: integer
+          description: Numeric id of the patch message; use `/messages/{message_id}`
+        status:
+          type: string
+          enum: [applied, failed]
+          description: Whether the patches applied when the branch was built
+        failure_stage:
+          type: [string, "null"]
+          enum: [extract, base_detection, apply, error, empty, null]
+          description: Where building the branch failed
+        failure_reason:
+          type: [string, "null"]
+          description: Output of the failed step, the first 2000 characters
+        conflict_files:
+          type: array
+          items:
+            type: string
+        state:
+          $ref: "#/components/schemas/BranchState"
+        state_reason:
+          type: [string, "null"]
+          description: |
+            Why the state is `wont_retry`. `committed`: the patchset was
+            mailed at or before the last commit linked to its thread.
+            `merged thread`: the thread was merged into another.
+            `base too old`: the base is too far behind master. When CI was
+            skipped, the text of `ci_skip_reason` (`ci_none` when none was
+            stored). Null for every other state.
+        superseded:
+          type: boolean
+          description: |
+            True when the thread has a newer patchset. hackorum only works
+            on the newest patchset of a thread, so a superseded row is
+            frozen whatever `state` reads: it is not rebased or tested
+            again. Becoming superseded does not move `updated_at`.
+        base_sha:
+          type: [string, "null"]
+          description: The commit the patches were applied on
+        base_source:
+          type: [string, "null"]
+          enum: [master, history, submission_head, base_line, master_head, null]
+          description: |
+            How the base commit was chosen. `master` the master of that time.
+            The others are used when master did not work: `base_line` the
+            base commit named in the patch, `master_head` and `history` a
+            master commit whose files match the ones the patches were made
+            from, the newest or an older one, `submission_head` master as
+            it was when the patch was sent.
+        base_committed_at:
+          type: [string, "null"]
+          format: date-time
+        on_master:
+          type: boolean
+          description: True when the base was the master of that time
+        pg_major:
+          type: [integer, "null"]
+        behind:
+          type: [object, "null"]
+          additionalProperties: false
+          description: |
+            How far the base is behind the master hackorum last fetched, never
+            negative. Null when hackorum has no master yet or knows nothing
+            about the base. One of the two can be null alone.
+          required: [days, commits]
+          properties:
+            days:
+              type: [integer, "null"]
+            commits:
+              type: [integer, "null"]
+        attempted_at:
+          type: [string, "null"]
+          format: date-time
+        pushed_at:
+          type: [string, "null"]
+          format: date-time
+        pushed_head_sha:
+          type: [string, "null"]
+          description: The commit at the tip of the pushed branch. It changes with every rebase.
+        github_url:
+          type: [string, "null"]
+          description: The branch on GitHub, null until it is pushed
+        git_url:
+          type: [string, "null"]
+          description: |
+            Clone URL of the git repository the branch is pushed to, null
+            until it is pushed. Fetch `branch_name` from it:
+            `git fetch <git_url> <branch_name>`.
+        last_master_apply_at:
+          type: [string, "null"]
+          format: date-time
+          description: When the patches were last tried on master
+        master_apply_sha:
+          type: [string, "null"]
+          description: The master commit of that try
+        master_apply_error:
+          type: [string, "null"]
+          description: Why that try failed, the first 2000 characters. Null when it worked.
+        master_conflict_files:
+          type: array
+          items:
+            type: string
+        ci_status:
+          oneOf:
+            - $ref: "#/components/schemas/CiStatus"
+            - type: "null"
+          description: |
+            CI verdict for `pushed_head_sha`, null when CI never ran for this
+            branch. A new push sets it to `pushed_awaiting_ci` until a run
+            of that commit is seen.
+        ci_skip_reason:
+          type: [string, "null"]
+          description: Why CI was skipped or could not run
+        latest_run:
+          oneOf:
+            - $ref: "#/components/schemas/CiRun"
+            - type: "null"
+          description: |
+            The last run hackorum accepted for this branch. After a new push
+            it is still the run of the previous commit until a run of the
+            new one is seen: it describes the pushed commit only when
+            `latest_run.head_sha` equals `pushed_head_sha`, and its `status`
+            can differ from `ci_status`.
+        created_at:
+          type: string
+          format: date-time
+          description: When hackorum first recorded the patchset. It never changes, so it tells a new patchset from a rebase.
+        updated_at:
+          type: string
+          format: date-time
+          description: |
+            When the row last changed: a try to apply, a push, a CI result.
+            Not every change of what you read moves it. `state` is computed
+            per request, and a branch being superseded, a commit getting
+            linked to its thread, the thread getting merged, or the base
+            growing too old change `superseded`, `state` and `state_reason`
+            without touching it.
+    Patchset:
+      type: object
+      additionalProperties: false
+      description: A message that carries patches
+      required:
+        [message_id, number, url, html_url, created_at, subject, sender, topic, files,
+        changed_paths, branch, download_url]
+      properties:
+        message_id:
+          type: integer
+          description: Numeric id of the message; use `/messages/{message_id}`
+        number:
+          type: integer
+          description: |
+            Current position of the message in its thread, from 1, by
+            `created_at` and `id`. The site shows it as the version of the
+            patchset. It can change when older mail arrives late, and may
+            differ from the suffix of a branch name.
+        url:
+          type: string
+          description: The message that carries the patchset in this API, `/messages/{message_id}`
+        html_url:
+          type: string
+          description: The thread page of the site, at this message
+        created_at:
+          type: string
+          format: date-time
+        subject:
+          type: string
+        sender:
+          $ref: "#/components/schemas/PersonBrief"
+        topic:
+          $ref: "#/components/schemas/TopicRef"
+        files:
+          type: array
+          description: |
+            The patch files of the message, the same set the `download_url`
+            archive contains. Each has `is_patch` true.
+          items:
+            $ref: "#/components/schemas/Attachment"
+        changed_paths:
+          type: array
+          description: |
+            Paths in the source tree the patches touch, sorted in database
+            collation order. An empty array can also mean the paths were not
+            extracted for that message.
+          items:
+            type: string
+        branch:
+          oneOf:
+            - $ref: "#/components/schemas/BranchBrief"
+            - type: "null"
+          description: Null when hackorum never tried to apply this message
+        download_url:
+          type: string
+          description: |
+            The patch files of the message as one tar.gz. A URL of the
+            site, not under `/api/v1`: it takes no token and is not counted
+            against the API rate limit.
+        lineage:
+          oneOf:
+            - $ref: "#/components/schemas/PatchsetStep"
+            - type: "null"
+          description: |
+            Only present for accounts with the `patchset_lineage` feature.
+            What a language model said this patchset derives from, in the
+            latest finished lineage run of its thread. Null when the thread
+            has no such run or the run has nothing for this message. Model
+            output with a confidence, not fact.
+    StepKind:
+      type: string
+      enum: [resend, rebase, minor_revision, major_rework, remainder, fix_on_top, new_series]
+      description: |
+        How a patchset relates to its parent, as a language model judged it.
+        `resend`: the same content sent again. `rebase`: the same change on
+        a newer base. `minor_revision`: review feedback applied, the same
+        design. `major_rework`: the same need, done differently.
+        `remainder`: part of the series was committed, the rest sent again.
+        `fix_on_top`: a delta against an earlier patchset, not a full
+        version. `new_series`: new work in the thread, without a parent.
+    PatchsetStep:
+      type: object
+      additionalProperties: false
+      description: |
+        One step of the lineage of a thread: the patchset a patchset derives
+        from. Written by a language model, it can be wrong.
+      required: [parent_message_id, step_kind, confidence, reason]
+      properties:
+        parent_message_id:
+          type: [integer, "null"]
+          description: |
+            The message that carries the earlier patchset this one derives
+            from, as the model judged it. Null when it has none.
+        step_kind:
+          $ref: "#/components/schemas/StepKind"
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: How sure the model said it is, from 0 to 1
+        reason:
+          type: [string, "null"]
+          description: The model's reason, in its own words. Can have `[msg:<id>]` and `[commit:<sha>]` tokens.
+    Lineage:
+      type: object
+      additionalProperties: false
+      description: |
+        The latest finished lineage run of a thread. All of it is written by
+        a language model and can be wrong.
+      required: [run, story, steps]
+      properties:
+        run:
+          type: object
+          additionalProperties: false
+          required: [id, model, finished_at]
+          properties:
+            id:
+              type: integer
+              description: Changes when the thread is processed again
+            model:
+              type: [string, "null"]
+              description: Name of the language model, null when it was not recorded
+            finished_at:
+              type: [string, "null"]
+              format: date-time
+        story:
+          type: array
+          description: |
+            The story of the thread as the model told it, one entry per
+            line, in order. Empty when the run wrote none.
+          items:
+            type: object
+            additionalProperties: false
+            required: [text, message_ids, commit_shas]
+            properties:
+              text:
+                type: string
+                description: |
+                  Model-written text, as stored. A `[msg:<id>]` token names
+                  a message (`/messages/{id}`), a `[commit:<sha>]` token a
+                  commit of the PostgreSQL repository by its full sha.
+              message_ids:
+                type: array
+                description: The ids of the `[msg:<id>]` tokens of `text`, each once, in order of appearance. The model wrote them, a message may not exist.
+                items:
+                  type: integer
+              commit_shas:
+                type: array
+                description: The shas of the `[commit:<sha>]` tokens of `text`, each once, in order of appearance
+                items:
+                  type: string
+        steps:
+          type: array
+          description: |
+            The messages the run judged, in thread order. Model output with
+            a confidence each. A step's message is usually a patchset, but
+            it can be a message that `/topics/{id}/patchsets` does not
+            list. A patchset newer than the run is not here.
+          items:
+            type: object
+            additionalProperties: false
+            required: [message_id, parent_message_id, step_kind, confidence, reason]
+            properties:
+              message_id:
+                type: integer
+                description: The message that carries the patchset
+              parent_message_id:
+                type: [integer, "null"]
+                description: |
+                  The message that carries the earlier patchset this one
+                  derives from, as the model judged it. Null when it has none.
+              step_kind:
+                $ref: "#/components/schemas/StepKind"
+              confidence:
+                type: number
+                minimum: 0
+                maximum: 1
+                description: How sure the model said it is, from 0 to 1
+              reason:
+                type: [string, "null"]
+                description: The model's reason, in its own words. Can have `[msg:<id>]` and `[commit:<sha>]` tokens.
+    CommitVerdict:
+      type: object
+      additionalProperties: false
+      description: |
+        What a language model concluded about a commit and the patchsets of
+        the thread. Model output with a confidence, it can be wrong.
+      required:
+        [verdict, confidence, change_level, origin, source_message_id, evidence, reviewers_final,
+        reviewers_earlier, reviewers_none, reviews]
+      properties:
+        verdict:
+          type: string
+          enum: [as_is, modified, partial, from_discussion, undecided]
+          description: |
+            The model's judgement. `as_is`: a posted patchset landed as
+            posted. `modified`: a posted patchset was changed before the
+            commit. `partial`: the commit is part of a posted patchset.
+            `from_discussion`: written from the discussion, no posted patch
+            matches. `undecided`: the model could not tell.
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: How sure the model said it is, from 0 to 1
+        change_level:
+          type: [string, "null"]
+          enum: [light, moderate, significant, null]
+          description: |
+            How much the committed change differs from the posted patchset,
+            as the model judged it. `light`: formatting, naming, comments,
+            tests. `moderate`: local logic. `significant`: the approach
+            changed. Null when nothing was changed or it was not judged.
+        origin:
+          type: string
+          enum: [trailer, overlap, manual, previous, extra]
+          description: |
+            Why the commit was given to the model. `trailer`: its
+            `Discussion:` trailer names the thread. `overlap`: it changes
+            the same files as a patchset. `manual`: given by hand.
+            `previous`: linked by an earlier run. `extra`: the model found
+            the commit itself.
+        source_message_id:
+          type: [integer, "null"]
+          description: The message whose patchset the model says the commit comes from, null when it named none
+        evidence:
+          type: [string, "null"]
+          description: The model's reasoning, in its own words. Can have `[msg:<id>]` and `[commit:<sha>]` tokens.
+        reviewers_final:
+          type: integer
+          description: Entries of `reviews` with coverage `final`
+        reviewers_earlier:
+          type: integer
+          description: Entries of `reviews` with coverage `earlier`
+        reviewers_none:
+          type: integer
+          description: Entries of `reviews` with coverage `none`
+        reviews:
+          type: array
+          description: |
+            Per reviewer, which version of the patch the model says they
+            looked at. Model output.
+          items:
+            type: object
+            additionalProperties: false
+            required: [reviewer, coverage, source, note]
+            properties:
+              reviewer:
+                type: string
+                description: Name of the reviewer, as the commit message or the model has it
+              coverage:
+                type: string
+                enum: [final, earlier, none]
+                description: |
+                  `final`: reviewed the version that was committed.
+                  `earlier`: reviewed an earlier version only. `none`: the
+                  model found no review by them in the thread.
+              source:
+                type: [string, "null"]
+                description: |
+                  Where the reviewer comes from. `trailer`: the commit
+                  message credits them. `committer`: they committed the
+                  patch, which counts as a review of the final version.
+                  `llm`: the model named them from the thread, the commit
+                  message does not. Null on old data.
+              note:
+                type: [string, "null"]
+                description: The model's remark on this reviewer. Can have `[msg:<id>]` tokens.
+    CommitRole:
+      type: string
+      enum: [author, reviewer, tested_by, reported_by, co_author, committer]
+    CommitGroup:
+      type: object
+      additionalProperties: false
+      description: |
+        A change in the PostgreSQL repository together with its backports.
+        The fields describe the commit that landed the change, on master when
+        that one is linked to the thread. Commits are not a resource of this
+        API: there is no `id` and `url` is the upstream page of the commit.
+      required: [sha, subject, committed_at, committer_name, url, branches, people]
+      properties:
+        link_source:
+          type: string
+          enum: [trailer, llm]
+          description: |
+            Only present for accounts with the `patchset_lineage` feature.
+            How the entry is linked to the thread. `trailer`: a commit of
+            the entry names the thread in a `Discussion:` trailer. `llm`: a
+            language model linked it, which can be wrong.
+        verdict:
+          oneOf:
+            - $ref: "#/components/schemas/CommitVerdict"
+            - type: "null"
+          description: |
+            Only present for accounts with the `patchset_lineage` feature.
+            What the latest finished lineage run of the thread concluded
+            about the entry. Null when there is no run or it has no verdict
+            to show for the entry. Model output with a confidence.
+        sha:
+          type: string
+        subject:
+          type: string
+        committed_at:
+          type: string
+          format: date-time
+        committer_name:
+          type: [string, "null"]
+        url:
+          type: string
+          description: The commit on the GitHub mirror of the repository
+        branches:
+          type: array
+          description: |
+            The branches the change is on, master first, then the stable
+            branches from the newest. One row per branch.
+          items:
+            type: object
+            additionalProperties: false
+            required: [branch, version, released_in]
+            properties:
+              branch:
+                type: string
+                description: Branch name, `master` or like `REL_18_STABLE`
+              version:
+                type: string
+                description: "`devel` for master, else the version of the branch, like `18` or `9.6`"
+              released_in:
+                type: [string, "null"]
+                description: The first release with the change on this branch, null when not released yet
+        people:
+          type: array
+          description: |
+            The people the commit messages of the entry credit, each once per
+            role, in the order of the `CommitRole` values and by name inside
+            a role. A committer of a patch whose commit message names
+            somebody else as the author is also listed as a `reviewer`.
+            A credit without a name is left out. For accounts with the
+            `patchset_lineage` feature the list also has the credits a
+            language model added, and the committer is listed as a
+            `reviewer` also where only a model named the author.
+          items:
+            type: object
+            additionalProperties: false
+            required: [role, name, person]
+            properties:
+              role:
+                $ref: "#/components/schemas/CommitRole"
+              name:
+                type: string
+                description: |
+                  The `name` of `person`, or the name as the commit message
+                  has it when no person is known
+              person:
+                oneOf:
+                  - $ref: "#/components/schemas/PersonBrief"
+                  - type: "null"
+                description: Null when the credit could not be matched to a person
+              source:
+                type: string
+                enum: [parsed, committer, llm]
+                description: |
+                  Only present for accounts with the `patchset_lineage`
+                  feature. Where the credit comes from. `parsed`: the commit
+                  message. `committer`: the committer of somebody else's
+                  patch, counted as a reviewer. `llm`: a language model
+                  named the person from the thread, which can be wrong. A
+                  credit several sources give has the first of these.
+    SavedSearch:
+      type: object
+      additionalProperties: false
+      description: One entry of the saved searches offered to a user. A team template gives one entry per team, so `id` alone does not name an entry, `id` and `team` do.
+      required: [id, name, query, scope, team, default, topics_url]
+      properties:
+        id:
+          type: integer
+          description: The `saved_search_id` of `/topics`
+        name:
+          type: string
+        query:
+          type: string
+          description: The query in the search language of `/topics`, for a team entry with the team name filled in
+        scope:
+          type: string
+          enum: [global, user, team]
+          description: |
+            `global`: offered to everyone. `user`: the owner's own, or one
+            every signed-in user gets. `team`: of one team, or a template
+            run for a team.
+        team:
+          description: The team the entry is run for, null unless `scope` is `team`
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [id, name]
+              properties:
+                id:
+                  type: integer
+                  description: The `team_id` of `/topics`
+                name:
+                  type: string
+            - type: "null"
+        default:
+          type: boolean
+          description: True for the search the owner chose as the start page of the site. A template chosen as default is marked in each of its entries.
+        topics_url:
+          type: string
+          description: The `/topics` request that runs the entry
+    Activity:
+      type: object
+      additionalProperties: false
+      required: [id, type, created_at, read_at, topic, message_id, note_id, title]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [topic_message_received, note_created, note_mentioned]
+          description: |
+            `topic_message_received`: a new message in a thread the owner
+            starred. `note_created`: the owner wrote a note.
+            `note_mentioned`: a note mentions the owner or a team of the
+            owner.
+        created_at:
+          type: string
+          format: date-time
+        read_at:
+          type: [string, "null"]
+          format: date-time
+          description: |
+            When the owner opened the entry on the site, null while it is
+            unread. An entry about a note the owner wrote is created
+            already read.
+        topic:
+          description: |
+            The thread the message or note is in now, so after a merge the
+            thread it was merged into. When the note is gone or no longer
+            visible to the owner, or the message is gone, the thread
+            recorded when the entry was made; if that thread was merged
+            since, following its `url` redirects. Null when that thread is
+            gone too.
+          oneOf:
+            - $ref: "#/components/schemas/TopicRef"
+            - type: "null"
+        message_id:
+          type: [integer, "null"]
+          description: The message the entry is about, or the message the note is on. Null for a note on the thread itself and when the message or note cannot be given.
+        note_id:
+          type: [integer, "null"]
+          description: The note the entry is about, as `/topics/{id}/notes` lists it. Null for a message entry, and when the note was deleted or is no longer visible to the owner.
+        title:
+          type: string
+          description: The label the site gives the entry, for example "New message from Tom Lane"
+    DraftState:
+      type: string
+      enum: [in_progress, failed, sending, sent]
+      description: |
+        `in_progress`: not sent, can be changed. `failed`: a send on the
+        site failed, see `last_send_error`; it can be changed and sent
+        again there. `sending`: the site is sending it right now, it
+        cannot be changed. `sent`: it was sent and stays as a record,
+        it cannot be changed or deleted. Only the site moves a draft to
+        `sending` and `sent`.
+    DraftToken:
+      type: object
+      additionalProperties: false
+      required: [token_name]
+      properties:
+        token_name:
+          type: string
+          description: The name the owner gave the token. A revoked token keeps it.
+    DraftAttachment:
+      type: object
+      additionalProperties: false
+      required: [id, file_name, content_type, byte_size]
+      properties:
+        id:
+          type: integer
+        file_name:
+          type: string
+          description: The name as it is stored, which can differ from the one that was sent
+        content_type:
+          type: [string, "null"]
+          description: The media type as it is stored, which can differ from the one that was sent
+        byte_size:
+          type: integer
+          description: The size of the decoded content
+    DraftBrief:
+      type: object
+      additionalProperties: false
+      description: A draft as the list gives it, without the text and the recipients
+      required: [id, url, html_url, state, topic, reply_to_message_id, subject, sender, attachments, last_send_error, created_via, last_edited_via, sent_message_id, sent_at, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        html_url:
+          type: string
+          description: |
+            Where the owner finds the draft on the site, signed in: the
+            thread, at the message it replies to, where the composer opens
+            with the draft and has the send button. For a sent draft, the
+            page of the sent mail.
+        state:
+          $ref: "#/components/schemas/DraftState"
+        topic:
+          $ref: "#/components/schemas/TopicRef"
+        reply_to_message_id:
+          type: integer
+          description: The message the draft replies to
+        subject:
+          type: string
+        sender:
+          type: object
+          additionalProperties: false
+          description: The address of the owner the mail is sent from
+          required: [name, email]
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+        attachments:
+          type: array
+          description: The files attached to the draft, without their content
+          items:
+            $ref: "#/components/schemas/DraftAttachment"
+        last_send_error:
+          type: [string, "null"]
+          description: Why the last send on the site failed, null when none did. Set in the state `failed`.
+        created_via:
+          description: The token the draft was made with, null for a draft made on the site
+          oneOf:
+            - $ref: "#/components/schemas/DraftToken"
+            - type: "null"
+        last_edited_via:
+          description: The token that changed the draft last, null when it was not changed through the API or was edited on the site since
+          oneOf:
+            - $ref: "#/components/schemas/DraftToken"
+            - type: "null"
+        sent_message_id:
+          type: [integer, "null"]
+          description: The message the sent draft became, null before
+        sent_at:
+          type: [string, "null"]
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          description: Changes with every change of the draft. `PATCH` takes it back to detect a change in between.
+    Draft:
+      type: object
+      additionalProperties: false
+      required: [id, url, html_url, state, topic, reply_to_message_id, subject, body, sender, recipients, recipients_error, attachments, last_send_error, created_via, last_edited_via, sent_message_id, sent_at, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        html_url:
+          type: string
+          description: |
+            Where the owner finds the draft on the site, signed in: the
+            thread, at the message it replies to, where the composer opens
+            with the draft and has the send button. For a sent draft, the
+            page of the sent mail.
+        state:
+          $ref: "#/components/schemas/DraftState"
+        topic:
+          $ref: "#/components/schemas/TopicRef"
+        reply_to_message_id:
+          type: integer
+          description: The message the draft replies to
+        subject:
+          type: string
+        body:
+          type: string
+          description: The text of the mail, plain text
+        sender:
+          type: object
+          additionalProperties: false
+          description: The address of the owner the mail is sent from
+          required: [name, email]
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+        recipients:
+          type: [object, "null"]
+          additionalProperties: false
+          description: |
+            Who a send would go to now, as mail addresses with or without
+            a display name. They follow from the message replied to and
+            its mailing list and cannot be set. Null when they cannot be
+            worked out, `recipients_error` then says why.
+          required: [to, cc]
+          properties:
+            to:
+              type: array
+              items:
+                type: string
+            cc:
+              type: array
+              items:
+                type: string
+        recipients_error:
+          type: [string, "null"]
+          description: Why `recipients` is null, in a few words for people. Null when there are recipients.
+        attachments:
+          type: array
+          description: The files attached to the draft, without their content
+          items:
+            $ref: "#/components/schemas/DraftAttachment"
+        last_send_error:
+          type: [string, "null"]
+          description: Why the last send on the site failed, null when none did. Set in the state `failed`.
+        created_via:
+          description: The token the draft was made with, null for a draft made on the site
+          oneOf:
+            - $ref: "#/components/schemas/DraftToken"
+            - type: "null"
+        last_edited_via:
+          description: The token that changed the draft last, null when it was not changed through the API or was edited on the site since
+          oneOf:
+            - $ref: "#/components/schemas/DraftToken"
+            - type: "null"
+        sent_message_id:
+          type: [integer, "null"]
+          description: The message the sent draft became, null before
+        sent_at:
+          type: [string, "null"]
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          description: Changes with every change of the draft. `PATCH` takes it back to detect a change in between.
+    DraftCreate:
+      type: object
+      additionalProperties: false
+      required: [reply_to_message_id]
+      properties:
+        reply_to_message_id:
+          type: integer
+          minimum: 1
+          description: The message to reply to. Required for now, drafts that start a thread are not supported yet.
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 998
+          description: |
+            One line. Without it the subject of the message replied to,
+            with one leading `Re:`, `Aw:` or `Fwd:` taken off and `Re: `
+            in front.
+        body:
+          type: string
+          description: The text of the mail, plain text, at most 1 MB of UTF-8. Empty without it.
+        quote:
+          type: string
+          description: |
+            Text of the message replied to, at most 100 KB. It is put in
+            front of `body` as the composer of the site does it: an
+            attribution line, the text with `> ` before every line, an
+            empty line. To place quotes yourself, leave it out and write
+            them into `body`.
+    DraftAttachmentCreate:
+      type: object
+      additionalProperties: false
+      required: [file_name, content_base64]
+      properties:
+        file_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: |
+            The name of the file, one line. Only the last part of a path
+            is kept, a double quote, a backslash or a control character
+            becomes `_`, and invisible format characters and line or
+            paragraph separators are taken out. A name of dots only, or
+            with nothing left, is stored as `attachment`.
+        content_type:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: '^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+( *; *[A-Za-z0-9!#$&^_.+-]+=([A-Za-z0-9!#$&^_.+-]+|"[^"\\]*"))*$'
+          description: |
+            The media type the mail gives the file, such as `text/x-diff`.
+            `application/octet-stream` without it. It is stored as
+            `type/subtype` in lower case. Of the parameters only `charset`
+            is kept, when it is `utf-8`, `us-ascii`, `iso-8859-1`,
+            `iso-8859-15` or `windows-1252`. `multipart/*`, `message/*`
+            and a type or subtype of more than 64 characters are stored as
+            `application/octet-stream`. It is not checked against the
+            content.
+        content_base64:
+          type: string
+          minLength: 1
+          description: |
+            The content of the file in Base64 with padding, the standard
+            alphabet. Line breaks and spaces in it are ignored, so the
+            output of the `base64` tool can be sent as it is. Not empty.
+            The files of a draft may have 2 MB together, in decoded bytes.
+    DraftUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 998
+          description: One line, not blank
+        body:
+          type: string
+          description: The text of the mail, plain text, at most 1 MB of UTF-8. It replaces the whole text.
+        updated_at:
+          type: string
+          format: date-time
+          description: |
+            The `updated_at` of the draft as the client saw it last. When
+            the draft has another one now, the request is refused with 409
+            `conflict`. Compared to the millisecond, as it is printed.
+    Me:
+      type: object
+      additionalProperties: false
+      required: [username, person, emails, features, send_authorized, token]
+      properties:
+        username:
+          type: [string, "null"]
+        person:
+          oneOf:
+            - $ref: "#/components/schemas/PersonBrief"
+            - type: "null"
+        emails:
+          type: array
+          items:
+            type: string
+          description: Verified addresses of the account
+        features:
+          type: array
+          items:
+            type: string
+          description: Feature flags enabled for the account
+        send_authorized:
+          type: boolean
+          description: True when the account has a Gmail identity authorized for sending mail from the site. This API cannot send.
+        token:
+          type: object
+          additionalProperties: false
+          required: [name, created_at, expires_at]
+          properties:
+            name:
+              type: string
+            created_at:
+              type: string
+              format: date-time
+            expires_at:
+              type: [string, "null"]
+              format: date-time

@@ -75,4 +75,16 @@ RSpec.describe AccountDeletionService do
     expect(OutgoingDraft.where(user_id: user.id)).to be_empty
     expect(DraftAttachment.where(outgoing_draft_id: draft.id)).to be_empty
   end
+
+  it "deletes drafts made and edited through tokens, and the tokens" do
+    token = ApiToken.issue!(user: user, name: "laptop").first
+    other = create(:outgoing_draft, created_via_token: token, last_edited_via_token: token)
+    create(:outgoing_draft, user: user, created_via_token: token, last_edited_via_token: token)
+
+    call
+
+    expect(OutgoingDraft.where(user_id: user.id)).to be_empty
+    expect(ApiToken.where(user_id: user.id)).to be_empty
+    expect(other.reload).to have_attributes(created_via_token_id: nil, last_edited_via_token_id: nil)
+  end
 end

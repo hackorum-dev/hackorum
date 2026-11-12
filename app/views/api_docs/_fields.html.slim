@@ -1,0 +1,12 @@
+ul.api-fields
+  - fields.each do |field|
+    li.api-field
+      .api-field-head
+        code.api-field-name = field.name
+        span.api-type = api_type(field.type)
+        - if field.required
+          span.api-required required
+      = api_markdown(field.description)
+      = api_notes(field)
+      - if field.fields.any?
+        = render "api_docs/fields", fields: field.fields

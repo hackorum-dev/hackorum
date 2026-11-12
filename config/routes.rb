@@ -58,6 +58,46 @@ Rails.application.routes.draw do
     end
     get "queue", to: "queue#show"
   end
+
+  namespace :api, defaults: { format: :json } do
+    namespace :v1, format: false do
+      get "me", to: "me#show"
+      get "me/saved_searches", to: "me/saved_searches#index"
+      get "me/activities", to: "me/activities#index"
+      get "openapi.json", to: "openapi#show"
+      get "openapi.yaml", to: "openapi#show", defaults: { format: :yaml }
+      get "guide.md", to: "openapi#guide"
+      get "mailing_lists", to: "mailing_lists#index"
+      get "people/:email", to: "people#show", constraints: { email: %r{[^/]+} }
+      get "people/:email/topics", to: "people#topics", constraints: { email: %r{[^/]+} }
+      get "people/:email/patchsets", to: "people#patchsets", constraints: { email: %r{[^/]+} }
+      get "topics", to: "topics#index"
+      get "topics/:id", to: "topics#show", constraints: { id: /[A-Za-z0-9._-]+/ }
+      get "topics/:id/messages", to: "messages#index", constraints: { id: /[A-Za-z0-9._-]+/ }
+      get "topics/:id/patchsets", to: "patchsets#index", constraints: { id: /[A-Za-z0-9._-]+/ }
+      get "topics/:id/commits", to: "commits#index", constraints: { id: /[A-Za-z0-9._-]+/ }
+      get "topics/:id/notes", to: "notes#index", constraints: { id: /[A-Za-z0-9._-]+/ }
+      get "topics/:id/lineage", to: "lineage#show", constraints: { id: /[A-Za-z0-9._-]+/ }
+      get "messages/lookup", to: "messages#lookup"
+      get "messages/:id", to: "messages#show", constraints: { id: /\d+/ }
+      get "attachments/:id", to: "attachments#show", constraints: { id: /\d+/ }
+      get "attachments/:id/content", to: "attachments#content", constraints: { id: /\d+/ }
+      get "branches", to: "branches#index"
+      get "branches/:id", to: "branches#show", constraints: { id: /\d+/ }
+      get "branches/:id/ci_runs", to: "ci_runs#index", constraints: { id: /\d+/ }
+      get "events", to: "events#index"
+      get "drafts", to: "drafts#index"
+      post "drafts", to: "drafts#create"
+      get "drafts/:id", to: "drafts#show", constraints: { id: /\d+/ }
+      patch "drafts/:id", to: "drafts#update", constraints: { id: /\d+/ }
+      delete "drafts/:id", to: "drafts#destroy", constraints: { id: /\d+/ }
+      post "drafts/:id/attachments", to: "draft_attachments#create", constraints: { id: /\d+/ }
+      delete "drafts/:id/attachments/:attachment_id", to: "draft_attachments#destroy", constraints: { id: /\d+/, attachment_id: /\d+/ }
+
+      # keep last
+      match "(*unmatched)(.:format)", to: "errors#not_found", via: :all
+    end
+  end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   get "up" => "rails/health#show", as: :rails_health_check
@@ -90,6 +130,7 @@ Rails.application.routes.draw do
     resource :import, only: [ :show, :create ]
     resource :deletion, only: [ :show, :create ]
     resources :saved_searches
+    resources :api_tokens, only: [ :index, :create, :destroy ]
     resources :saved_search_preferences, only: [ :create ] do
       post :set_default, on: :collection
     end
@@ -150,7 +191,7 @@ Rails.application.routes.draw do
       get  :confirm
       post :send_now
     end
-    resources :attachments, only: [ :create, :destroy ], controller: "draft_attachments"
+    resources :attachments, only: [ :show, :create, :destroy ], controller: "draft_attachments"
   end
   namespace :stats do
     root "index#show"
@@ -181,6 +222,7 @@ Rails.application.routes.draw do
 
   # Help pages
   resources :help, only: [ :index, :show ], param: :slug
+  get "api/docs", to: "api_docs#show", as: :api_docs
 
   # must precede the person/*email glob - it would otherwise swallow /commits
   # into the email itself

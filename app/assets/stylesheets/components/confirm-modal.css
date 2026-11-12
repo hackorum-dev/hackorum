@@ -21,7 +21,7 @@
   background: var(--color-bg-card);
   border-radius: var(--border-radius-lg);
   box-shadow: var(--shadow-md);
-  max-width: 32rem;
+  max-width: 44rem;
   width: 100%;
   padding: var(--spacing-6) var(--spacing-8);
   max-height: calc(100vh - 2 * var(--spacing-6));
@@ -82,6 +82,44 @@
 .confirm-modal .confirm-row .confirm-value {
   color: var(--color-text-primary);
   word-break: break-word;
+}
+
+.confirm-modal .confirm-via {
+  margin: 0 0 var(--spacing-2);
+  color: var(--color-warning-text);
+  font-size: var(--font-size-sm);
+}
+
+.confirm-modal .confirm-attachments {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.confirm-modal .confirm-message {
+  padding: var(--spacing-2) 0;
+}
+
+.confirm-modal .confirm-message strong {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.confirm-modal .confirm-body {
+  margin: var(--spacing-2) 0 0;
+  padding: var(--spacing-3);
+  max-height: 16rem;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-md);
 }
 
 .confirm-modal .dev-warning {

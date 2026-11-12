@@ -39,6 +39,10 @@ export default class extends Controller {
         // new pending message appears in the timeline.
         history.replaceState({}, "", res.url)
         window.location.reload()
+      } else if (res.status === 409) {
+        // the composer shows it, with a way to reload the draft
+        this.dispatch("conflict", { detail: { message: await res.text() } })
+        this.cancel()
       } else {
         const body = await res.text()
         alert(`Cannot send: ${body || res.statusText}`)

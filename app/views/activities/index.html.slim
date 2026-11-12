@@ -21,7 +21,7 @@
             - if activity.read_at.nil?
               span.activity-unread-badge Unread
 
-          - if subject.is_a?(Note)
+          - if subject.is_a?(Note) && @visible_note_ids.include?(subject.id)
             .activity-body
               .activity-title
                 = link_to subject.topic.title, read_activity_path(activity)
@@ -43,5 +43,8 @@
           - else
             .activity-body
               span.activity-missing Content not available anymore.
+              - if activity.read_at.nil?
+                '
+                = link_to "Mark read", read_activity_path(activity), class: "activity-mark-read"
   - else
     p No activity yet.

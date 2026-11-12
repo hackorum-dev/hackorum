@@ -174,4 +174,64 @@ RSpec.describe Outgoing::MessageBuilder do
       expect(blob.decoded.b).to eq(blob_bytes)
     end
   end
+
+  context 'with stored content types that would change the structure of the mail' do
+    let(:payload) { "--abc\nContent-Type: text/plain\n\nread me as the message\n--abc--\n" }
+    let(:hostile) {
+      [ 'multipart/mixed; boundary=abc', 'Multipart/Alternative; boundary="abc"', 'message/rfc822',
+        'text/plain; name="evil.exe"', 'text/plain; charset=utf-8; charset=utf-7', "text/plain\r\nX-Evil: 1",
+        'text/html; boundary=abc; name=evil.exe', 'nonsense' ]
+    }
+
+    def leaves(part)
+      part.multipart? ? part.parts.flat_map { |p| leaves(p) } : [ part ]
+    end
+
+    it 'has one text body and plain attachment parts, whatever the stored type says' do
+      draft = build_draft(body: 'the real text')
+      hostile.each do |type|
+        draft.draft_attachments.delete_all
+        2.times do |i|
+          create(:draft_attachment, outgoing_draft: draft, file_name: "file#{i}.txt", content_type: type, content: payload)
+        end
+
+        raw = described_class.build(draft).encoded
+        mail = Mail.new(raw)
+
+        expect(mail.mime_type).to eq('multipart/mixed'), type
+        expect(mail.parts.size).to eq(3), type
+        expect(mail.parts.map(&:multipart?)).to all(be(false)), type
+        expect(mail.parts.map(&:main_type)).not_to include('multipart', 'message'), type
+        expect(leaves(mail).size).to eq(3), type
+
+        text, *files = mail.parts
+        expect(text.mime_type).to eq('text/plain'), type
+        expect(text.content_disposition).to be_nil, type
+        expect(text.decoded.strip).to eq('the real text'), type
+
+        files.each_with_index do |part, i|
+          expect(part.content_disposition).to start_with('attachment'), type
+          expect(part.filename).to eq("file#{i}.txt"), type
+          expect(part.header.fields.map(&:name)).to match_array(%w[Content-Type Content-Transfer-Encoding Content-Disposition]), type
+          expect(part.content_type_parameters.to_h.keys - %w[charset]).to eq([]), type
+          expect(part.decoded).to eq(payload), type
+          expect(part.encoded.scan(/file#{i}\.txt/).size).to eq(1), type
+        end
+        expect(raw).not_to include('evil.exe', 'X-Evil', 'utf-7'), type
+        expect(raw.scan(/^Content-Type: multipart/i).size).to eq(1), type
+        expect(raw).not_to match(/^Content-Type: message/i), type
+      end
+    end
+
+    it 'keeps a known charset of a text attachment' do
+      draft = build_draft
+      create(:draft_attachment, outgoing_draft: draft, file_name: 'a.txt',
+             content_type: 'text/plain; charset=ISO-8859-1; name=x', content: 'abc')
+
+      part = Mail.new(described_class.build(draft).encoded).attachments.sole
+
+      expect(part.mime_type).to eq('text/plain')
+      expect(part.content_type_parameters['charset']).to match(/\Aiso-8859-1\z/i)
+    end
+  end
 end

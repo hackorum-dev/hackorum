@@ -1,0 +1,19 @@
+- unless local_assigns[:described]
+  = api_markdown(response.description)
+- if response.headers.any?
+  details.api-headers
+    summary
+      ' Headers:
+      - response.headers.each_with_index do |header, index|
+        - if index.positive?
+          ' ,
+        code = header.name
+    ul.api-fields
+      - response.headers.each do |header|
+        li.api-field
+          .api-field-head
+            code.api-field-name = header.name
+            span.api-type = api_type(header.schema.type)
+          = api_markdown(header.description)
+          = api_notes(header.schema)
+= render "api_docs/contents", contents: response.contents

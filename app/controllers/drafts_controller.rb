@@ -4,6 +4,8 @@ class DraftsController < ApplicationController
   before_action :reject_sent_drafts, only: [ :update, :destroy, :edit, :confirm, :send_now ]
   layout :resolve_layout
 
+  CHANGED_ELSEWHERE = "This draft was changed elsewhere. Reload the composer to see what would be sent."
+
   include DraftSidebarLoader
 
   helper_method :active_settings_section
@@ -28,30 +30,7 @@ class DraftsController < ApplicationController
 
   def create
     parent = Message.find(params[:reply_to_message_id])
-    identity = current_user.identities.send_authorized.first
-    return head :forbidden if identity.nil?
-
-    sender = current_user.sender_alias_for(identity.email)
-    return head :unprocessable_entity if sender.nil?
-
-    draft = current_user.outgoing_drafts
-                        .where.not(status: OutgoingDraft::STATUS_SENT)
-                        .find_by(reply_to_message_id: parent.id)
-    draft ||= begin
-      current_user.outgoing_drafts.create!(
-        topic: parent.topic,
-        reply_to_message: parent,
-        identity: identity,
-        sender_alias: sender,
-        subject: build_default_subject(parent),
-        body: build_quoted_body(parent, params[:selected_text])
-      )
-    rescue ActiveRecord::RecordNotUnique
-      current_user.outgoing_drafts
-                  .where.not(status: OutgoingDraft::STATUS_SENT)
-                  .find_by!(reply_to_message_id: parent.id)
-    end
-
+    draft = Drafts::Creator.call(user: current_user, reply_to_message: parent, quote: params[:selected_text]).draft
     @draft = draft
     @sidebar_drafts, @message_numbers = load_sidebar_drafts(parent.topic)
     respond_to do |format|
@@ -59,6 +38,10 @@ class DraftsController < ApplicationController
       format.turbo_stream # renders create.turbo_stream.slim
       format.html { redirect_to topic_path(parent.topic, anchor: "message-#{parent.id}") }
     end
+  rescue Drafts::Creator::NoSendIdentity
+    head :forbidden
+  rescue Drafts::Creator::NoSenderAlias
+    head :unprocessable_entity
   end
 
   def edit
@@ -67,7 +50,10 @@ class DraftsController < ApplicationController
 
   def update
     return head :conflict if @draft.sending?
-    @draft.update!(draft_params)
+    @draft.assign_attributes(draft_params)
+    @draft.last_edited_via_token = nil if @draft.changed?
+    @draft.save!
+    response.headers["X-Draft-Version"] = @draft.version
     head :no_content
   end
 
@@ -83,6 +69,8 @@ class DraftsController < ApplicationController
   end
 
   def confirm
+    return render plain: CHANGED_ELSEWHERE, status: :conflict unless current_version?
+
     @recipients = Outgoing::RecipientResolver.for(@draft)
     render layout: false
   rescue Outgoing::RecipientResolver::MissingPostAddressError
@@ -100,6 +88,7 @@ class DraftsController < ApplicationController
     conflict = nil
     @draft.with_lock do
       conflict = "Draft is already being sent." unless @draft.idle?
+      conflict ||= CHANGED_ELSEWHERE unless current_version?
       next if conflict
 
       @draft.update!(
@@ -135,23 +124,12 @@ class DraftsController < ApplicationController
     end
   end
 
+  def current_version?
+    params[:version].to_s == @draft.version
+  end
+
   def draft_params
     params.require(:outgoing_draft).permit(:subject, :body)
-  end
-
-  def build_default_subject(parent)
-    base = parent.subject.to_s.sub(/\A(re|aw|fwd):\s*/i, "")
-    "Re: #{base}"
-  end
-
-  def build_quoted_body(parent, selected_text)
-    return "" if selected_text.blank?
-
-    display = parent.sender_display_alias
-    date_str = parent.created_at.strftime("%a, %d %b %Y")
-    header = "On #{date_str}, #{display.name} <#{display.email}> wrote:"
-    quoted = selected_text.strip.each_line.map { |l| "> #{l.chomp}" }.join("\n")
-    "#{header}\n#{quoted}\n\n"
   end
 
   def active_settings_section

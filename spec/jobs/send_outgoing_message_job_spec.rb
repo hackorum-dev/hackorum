@@ -199,4 +199,57 @@ RSpec.describe SendOutgoingMessageJob do
     handler_keys = described_class.rescue_handlers.map(&:first)
     expect(handler_keys).to include('Gmail::TransientError').or include(Gmail::TransientError)
   end
+  describe 'feed events' do
+    before { allow(Gmail::SendClient).to receive(:send_raw).and_return({ "id" => "g" }) }
+
+    it 'records the pending message once, and its patchset' do
+      create(:draft_attachment, outgoing_draft: draft, file_name: 'fix.patch',
+             content_type: 'text/x-diff', content: "diff --git a/x b/x\n+ok\n")
+
+      described_class.new.perform(draft.id)
+
+      msg = Message.find_by!(message_id: '<m@x>')
+      events = FeedEvent.where(message_id: msg.id).order(:id)
+      expect(events.pluck(:event_type)).to eq(%w[message.received patchset.posted])
+      expect(events.pluck(:author_person_id).uniq).to eq([ sender.person_id ])
+      expect(events.first.occurred_at).to eq(msg.created_at)
+    end
+
+    context 'when the list echo arrives' do
+      let(:builder_result) {
+        Outgoing::MessageBuilder::Result.new(
+          encoded: "raw-encoded", message_id: "echoed@x",
+          subject: "Re: hi", recipient: "to@x")
+      }
+
+      it 'records nothing more' do
+        described_class.new.perform(draft.id)
+        msg = Message.find_by!(message_id: 'echoed@x')
+        echo = <<~EML
+          From: Alice <a@b>
+          To: list@example.com
+          Subject: Re: hi
+          Message-ID: <echoed@x>
+          Date: #{Time.current.rfc2822}
+
+          hello
+        EML
+
+        expect { EmailIngestor.new.ingest_raw(echo, mailing_list: list) }.not_to change(FeedEvent, :count)
+        expect(msg.reload.state).to eq(Message::STATE_SENT)
+        expect(FeedEvent.where(message_id: msg.id).pluck(:event_type)).to eq(%w[message.received])
+      end
+    end
+
+    it 'still sends when the recorder fails' do
+      allow(FeedEvent).to receive(:insert_all).and_raise(ActiveRecord::StatementInvalid, 'boom')
+      allow(Rails.logger).to receive(:warn)
+
+      described_class.new.perform(draft.id)
+
+      expect(Message.find_by!(message_id: '<m@x>')).to be_pending
+      expect(draft.reload.status).to eq(OutgoingDraft::STATUS_SENT)
+      expect(Rails.logger).to have_received(:warn).with(/message\.received/)
+    end
+  end
 end

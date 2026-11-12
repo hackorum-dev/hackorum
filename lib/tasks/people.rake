@@ -3,6 +3,7 @@ namespace :people do
   PERSON_REFERENCES = {
     "CommitPerson" => [ :person_id ],
     "ContributorMembership" => [ :person_id ],
+    "FeedEvent" => [ :author_person_id ],
     "Mention" => [ :person_id ],
     "Message" => [ :sender_person_id ],
     "TopicParticipant" => [ :person_id ],

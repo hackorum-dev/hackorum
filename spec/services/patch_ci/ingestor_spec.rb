@@ -206,4 +206,88 @@ RSpec.describe PatchCi::Ingestor do
     expect { described_class.new(payloads: {}).ingest([ unknown ]) }
       .not_to change(PatchCiRun, :count)
   end
+  describe "feed events" do
+    def completed
+      FeedEvent.where(event_type: "ci.completed")
+    end
+
+    it "records a run once, when it finishes" do
+      branch
+      described_class.new(payloads: {}).ingest([ run(status: "queued") ])
+      described_class.new(payloads: {}).ingest([ run(status: "in_progress") ])
+      expect(completed.count).to eq(0)
+
+      2.times do
+        described_class.new(payloads: { 7 => payload(status: "success") })
+          .ingest([ run(status: "completed", conclusion: "success") ])
+      end
+      described_class.new(payloads: {}).ingest([ run(status: "completed", conclusion: "success") ])
+
+      record = PatchCiRun.find_by(github_run_id: 7)
+      event = completed.sole
+      expect(event).to have_attributes(patch_ci_run_id: record.id, patch_branch_id: branch.id,
+                                       message_id: branch.message_id,
+                                       author_person_id: branch.message.sender_person_id)
+      expect(event.occurred_at).to eq(Time.zone.parse("2026-07-26T10:15:00Z"))
+    end
+
+    it "reports a run again when its verdict is learned after an infra_error" do
+      branch
+      described_class.new(payloads: {}).ingest([ run(status: "queued") ])
+      described_class.new(payloads: {}).ingest([ run(status: "completed", conclusion: "success") ])
+      record = PatchCiRun.find_by(github_run_id: 7)
+      expect(record.status).to eq("infra_error")
+      early = completed.sole
+      expect(early).to have_attributes(first_run: true, previous_status: nil, verdict_changed: true)
+
+      ingest_success = lambda do
+        described_class.new(payloads: { 7 => payload(status: "success") })
+          .ingest([ run(status: "completed", conclusion: "success") ])
+      end
+      ingest_success.call
+
+      expect(record.reload.status).to eq("success")
+      late = completed.sole
+      expect(late).to have_attributes(patch_ci_run_id: record.id, first_run: true, previous_status: nil,
+                                      verdict_changed: true)
+      expect(late.id).to be > early.id
+      expect(FeedEvent.exists?(early.id)).to be(false)
+
+      expect { ingest_success.call }.not_to(change { completed.pluck(:id, :created_at) })
+    end
+
+    it "marks a run that repeats the verdict of the one before it on the branch" do
+      branch
+      described_class.new(payloads: { 7 => payload(status: "success") })
+        .ingest([ run(status: "completed", conclusion: "success") ])
+      PatchCiRun.find_by(github_run_id: 7).update_columns(created_at: 1.day.ago)
+      described_class.new(payloads: { 8 => payload(status: "success", run_id: 8) })
+        .ingest([ run(status: "completed", conclusion: "success", id: 8) ])
+
+      facts = completed.order(:id).pluck(:first_run, :previous_status, :verdict_changed)
+      expect(facts).to eq([ [ true, nil, true ], [ false, "success", false ] ])
+    end
+
+    it "records nothing for a run that never finishes or a stuck branch" do
+      branch.update_columns(pushed_at: 3.days.ago, ci_status: "running")
+      described_class.new(payloads: {}).ingest([ run(status: "in_progress") ])
+      PatchCi::StuckRunMarker.new.call
+
+      expect(branch.reload.ci_status).to eq("infra_error")
+      expect(FeedEvent.count).to eq(0)
+    end
+
+    it "still ingests when the recorder fails" do
+      branch
+      allow(FeedEvent).to receive(:insert_all).and_raise(ActiveRecord::StatementInvalid, "boom")
+      allow(Rails.logger).to receive(:warn)
+
+      counts = described_class.new(payloads: { 7 => payload(status: "success") })
+        .ingest([ run(status: "completed", conclusion: "success") ])
+
+      expect(counts).to eq("success" => 1)
+      expect(branch.reload.ci_status).to eq("success")
+      expect(Rails.logger).to have_received(:warn).with(/ci\.completed/)
+    end
+  end
 end

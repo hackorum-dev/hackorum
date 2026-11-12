@@ -626,4 +626,70 @@ RSpec.describe PatchBranches::ApplyOne do
         .to eq(:applied_on_master)
     end
   end
+  describe "feed events" do
+    def branch_events(message)
+      FeedEvent.where(event_type: "branch.created", message_id: message.id)
+    end
+
+    it "records an applied branch once, however often it is re-applied or probed" do
+      base = fixture.commit(subject: "base", files: { "a.txt" => "one\n" })
+      patch = generate_patch(fixture.path, base, "a.txt", "two\n", @patch_dir)
+      message = message_with_patch(patch)
+
+      _, record = apply_one.call(message.id, master_sha: base)
+
+      event = branch_events(message).sole
+      expect(event).to have_attributes(patch_branch_id: record.id, message_id: message.id,
+                                       author_person_id: message.sender_person_id)
+      expect(event.occurred_at).to eq(record.reload.attempted_at)
+
+      newer = fixture.commit(subject: "other", files: { "b.txt" => "x\n" })
+      apply_one(force: true).call(message.id, master_sha: base)
+      apply_one.call(message.id, master_sha: newer, master_only: true)
+
+      expect(branch_events(message).pluck(:id)).to eq([ event.id ])
+    end
+
+    it "records a failed branch once" do
+      old = fixture.commit(subject: "old", files: { "a.c" => "v1\n" }, date: "2026-06-01T00:00:00+00:00")
+      master_sha = fixture.commit(subject: "newer", files: { "a.c" => "v2\n" },
+                                  date: "2026-06-02T00:00:00+00:00")
+      patch = generate_patch(fixture.path, old, "a.c", "patched\n", @patch_dir)
+      message = message_with_patch(patch)
+      message.update_column(:created_at, Time.zone.parse("2026-01-01T00:00:00+00:00"))
+
+      2.times { apply_one(force: true).call(message.id, master_sha: master_sha) }
+
+      expect(PatchBranch.find_by(message_id: message.id).status).to eq("failed")
+      expect(branch_events(message).count).to eq(1)
+    end
+
+    it "records a lineage-only row only when it becomes a real branch" do
+      base = fixture.commit(subject: "base", files: { "a.txt" => "one\n" })
+      patch = generate_patch(fixture.path, base, "a.txt", "two\n", @patch_dir)
+      message = message_with_patch(patch)
+      described_class.new(repo: repo, worktree: worktree, lineage_only: true)
+                     .call(message.id, master_sha: base)
+      expect(branch_events(message).count).to eq(0)
+
+      apply_one.call(message.id, master_sha: base)
+
+      expect(PatchBranch.find_by(message_id: message.id).lineage_only).to be(false)
+      expect(branch_events(message).count).to eq(1)
+    end
+
+    it "still writes the row when the recorder fails" do
+      allow(FeedEvent).to receive(:insert_all).and_raise(ActiveRecord::StatementInvalid, "boom")
+      allow(Rails.logger).to receive(:warn)
+      base = fixture.commit(subject: "base", files: { "a.txt" => "one\n" })
+      patch = generate_patch(fixture.path, base, "a.txt", "two\n", @patch_dir)
+      message = message_with_patch(patch)
+
+      outcome, = apply_one.call(message.id, master_sha: base)
+
+      expect(outcome).to eq(:applied_on_master)
+      expect(PatchBranch.find_by(message_id: message.id).status).to eq("applied")
+      expect(Rails.logger).to have_received(:warn).with(/branch\.created/)
+    end
+  end
 end

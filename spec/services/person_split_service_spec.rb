@@ -22,6 +22,21 @@ RSpec.describe PersonSplitService do
     expect(bruce.reload.person_id).to eq(person.id)
   end
 
+  it "moves the author of the feed events of the moved messages" do
+    topic = create(:topic, creator_alias: bruce)
+    greg_msg = create(:message, topic: topic, sender_alias: greg)
+    bruce_msg = create(:message, topic: topic, sender_alias: bruce)
+    branch = create(:patch_branch, topic: topic, message: greg_msg)
+    [ greg_msg, bruce_msg ].each { |message| FeedEvents::Recorder.message_received(message) }
+    FeedEvents::Recorder.branch_created(branch)
+
+    new_person = split.person
+
+    expect(FeedEvent.where(message_id: greg_msg.id).pluck(:event_type, :author_person_id))
+      .to contain_exactly([ "message.received", new_person.id ], [ "branch.created", new_person.id ])
+    expect(FeedEvent.where(message_id: bruce_msg.id).pluck(:author_person_id)).to eq([ person.id ])
+  end
+
   it "moves topics, messages and mentions of the moved aliases" do
     topic = create(:topic, creator_alias: greg)
     greg_msg = create(:message, topic: topic, sender_alias: greg)

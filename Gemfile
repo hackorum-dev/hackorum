@@ -28,6 +28,7 @@ gem "parslet"
 
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 gem "bcrypt", "~> 3.1"
+gem "rack-attack"
 
 # OmniAuth for Google OIDC
 gem "omniauth"
@@ -74,6 +75,7 @@ group :development, :test do
   gem "shoulda-matchers"
 
   gem "webmock"
+  gem "json_schemer"
 end
 
 group :development do

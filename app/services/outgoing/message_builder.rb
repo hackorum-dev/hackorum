@@ -38,7 +38,7 @@ module Outgoing
         mail.add_part text
         attachments.each do |a|
           mail.add_file(filename: a.file_name, content: a.decoded_body,
-                        mime_type: a.content_type.presence || "application/octet-stream")
+                        mime_type: Drafts::AttachmentAdder.content_type(a.content_type))
         end
       end
 

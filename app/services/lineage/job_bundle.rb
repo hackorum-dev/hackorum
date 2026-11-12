@@ -6,11 +6,6 @@ module Lineage
   class JobBundle
     PROMPT_PATH = Rails.root.join("config/lineage/prompt.md")
     SCHEMA_PATH = Rails.root.join("config/lineage/result.schema.json")
-    QUOTE_RE = /\A>/
-    ORIGINAL_RE = /\A-----Original Message-----/
-    ATTRIBUTION_START_RE = /\A\s*On .{0,200}\s*\z/
-    ATTRIBUTION_END_RE = /\A.{0,200}wrote:\s*\z/
-    ATTRIBUTION_RE = /\A\s*On .{0,200}wrote:\s*\z/
     MODE_SECTION_RE = %r{^<!-- ([a-z ]+) -->\n(.*?)^<!-- /\1 -->\n}m
 
     def self.prompt_version = Digest::SHA256.hexdigest(File.read(PROMPT_PATH))[0, 12]
@@ -104,21 +99,8 @@ module Lineage
         ]
         header << "Patchset: patchsets/#{format('%03d', ordinal)}" if set_by_id[m.id]
         header << "Attachments: #{m.attachments.map(&:file_name).join(', ')}" if m.attachments.any?
-        File.write(File.join(mdir, format("%03d.txt", ordinal)), header.join("\n") + "\n\n" + strip_quotes(m.body))
+        File.write(File.join(mdir, format("%03d.txt", ordinal)), header.join("\n") + "\n\n" + MessageBodyText.strip_quotes(m.body))
       end
-    end
-
-    def strip_quotes(body)
-      lines = []
-      all = body.to_s.scrub.lines
-      all.each_with_index do |l, i|
-        break if l.match?(ORIGINAL_RE)
-        next if l.match?(QUOTE_RE) || l.match?(ATTRIBUTION_RE)
-        next if l.match?(ATTRIBUTION_START_RE) && all[i + 1]&.match?(ATTRIBUTION_END_RE)
-        next if i > 0 && all[i - 1].match?(ATTRIBUTION_START_RE) && l.match?(ATTRIBUTION_END_RE)
-        lines << l
-      end
-      lines.join.gsub(/\n{3,}/, "\n\n")
     end
 
     def readme(messages)

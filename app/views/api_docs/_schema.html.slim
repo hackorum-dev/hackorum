@@ -1,0 +1,7 @@
+- unless local_assigns[:typed] || (node.type_text == "object" && node.fields.any?)
+  p.api-schema-type
+    ' Type:
+    span.api-type = api_type(node.type)
+= api_notes(node)
+- if node.fields.any?
+  = render "api_docs/fields", fields: node.fields

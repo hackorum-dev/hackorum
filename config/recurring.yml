@@ -22,6 +22,9 @@ production:
   stats_daily_rebuild:
     command: "system('ruby', Rails.root.join('script', 'build_stats.rb').to_s)"
     schedule: every day at 4am
+  prune_feed_events:
+    class: PruneFeedEventsJob
+    schedule: every day at 1am
   cleanup_unverified_users:
     class: CleanupUnverifiedUsersJob
     schedule: every day at 2am

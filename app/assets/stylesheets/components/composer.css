@@ -103,6 +103,20 @@
   gap: var(--spacing-2);
 }
 
+.composer-error-banner[hidden] {
+  display: none;
+}
+
+.composer-reload {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .composer-error-banner strong {
   color: var(--color-danger);
 }

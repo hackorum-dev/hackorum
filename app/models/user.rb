@@ -19,6 +19,7 @@ class User < ApplicationRecord
   has_one :default_saved_search, through: :default_saved_search_preference, source: :saved_search
   has_many :outgoing_drafts, dependent: :destroy
   has_many :user_features, dependent: :destroy
+  has_many :api_tokens, dependent: :destroy
 
   enum :mention_restriction, { anyone: "anyone", teammates_only: "teammates_only" }, default: :anyone
 

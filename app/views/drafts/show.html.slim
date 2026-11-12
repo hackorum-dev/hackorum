@@ -20,6 +20,8 @@
           |  to
           '
           = @draft.sent_message.sent_to_address
+      - draft_api_labels(@draft).each do |label|
+        p.muted = label
 
     .message-body
       = render_message_body(@draft.body)
@@ -31,7 +33,7 @@
           li
             i.fa-solid.fa-paperclip
             '
-            = a.file_name
+            = link_to a.file_name, draft_attachment_path(@draft, a), download: a.file_name, data: { turbo: false }
             '
             span.muted = number_to_human_size(a.byte_size)
 

@@ -39,6 +39,6 @@ export default class extends Controller {
   headings() {
     return Array.from(
       document.querySelectorAll(".help-content h1, .help-content h2, .help-content h3")
-    )
+    ).filter(heading => heading.id)
   }
 }

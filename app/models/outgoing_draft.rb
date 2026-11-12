@@ -12,6 +12,8 @@ class OutgoingDraft < ApplicationRecord
   belongs_to :sender_alias, class_name: "Alias"
   belongs_to :identity
   belongs_to :sent_message, class_name: "Message", optional: true
+  belongs_to :created_via_token, class_name: "ApiToken", optional: true
+  belongs_to :last_edited_via_token, class_name: "ApiToken", optional: true
   has_many :draft_attachments, dependent: :delete_all
 
   validates :subject, presence: true
@@ -37,6 +39,9 @@ class OutgoingDraft < ApplicationRecord
   def active?  = idle? || sending?
 
   def attachment_bytes = draft_attachments.sum(:byte_size)
+
+  # changes with every edit of the text or the files
+  def version = updated_at.utc.iso8601(6)
 
   def failed? = idle? && last_send_error.present?
 

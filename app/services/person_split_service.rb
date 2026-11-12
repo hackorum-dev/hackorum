@@ -26,6 +26,7 @@ class PersonSplitService
 
       Alias.where(id: alias_ids).update_all(person_id: new_person.id)
       Message.where(sender_id: alias_ids).in_batches(of: 1000).update_all(sender_person_id: new_person.id)
+      FeedEvent.sync_authors(alias_ids)
       Topic.where(creator_id: alias_ids).update_all(creator_person_id: new_person.id)
       Mention.where(alias_id: alias_ids).update_all(person_id: new_person.id)
 

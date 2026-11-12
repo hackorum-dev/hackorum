@@ -1,0 +1,65 @@
+.help-page.api-docs
+  .help-content
+    h1 = @reference.title
+    p.api-docs-links
+      - if @reference.version
+        span.api-version
+          ' Version
+          = @reference.version
+      - if @reference.base_url
+        span
+          ' Base path
+          code = @reference.base_url
+      = link_to "OpenAPI (YAML)", "/api/v1/openapi.yaml"
+      = link_to "OpenAPI (JSON)", "/api/v1/openapi.json"
+      = link_to "Guide for agents", "/api/v1/guide.md"
+      = link_to "API help", help_path("api")
+
+    h2#contents Contents
+    nav.api-toc aria-label="Contents"
+      ul
+        li = link_to "Overview", "#overview"
+        - @reference.tags.each do |tag|
+          li
+            = link_to tag.name, "##{tag.anchor}"
+            ul
+              - tag.operations.each do |op|
+                li
+                  = link_to "##{op.anchor}" do
+                    span.api-method class="api-method-#{op.method.downcase}" = op.method
+                    code = op.path
+        - if @reference.responses.any?
+          li = link_to "Shared responses", "#responses"
+        - if @reference.schemas.any?
+          li
+            = link_to "Schemas", "#schemas"
+            ul.api-toc-schemas
+              - @reference.schemas.each do |schema|
+                li = link_to schema.name, "##{schema.anchor}"
+
+    h2#overview Overview
+    = api_markdown(@reference.description)
+
+    - @reference.tags.each do |tag|
+      section.api-tag
+        h2 id=tag.anchor = tag.name
+        = api_markdown(tag.description)
+        = render partial: "api_docs/operation", collection: tag.operations, as: :op
+
+    - if @reference.responses.any?
+      section.api-tag
+        h2#responses Shared responses
+        p Responses that many operations give. The operations name them and link here.
+        - @reference.responses.each do |shared|
+          article.api-block id=shared.anchor
+            h3 = shared.name
+            = render "api_docs/response_body", response: shared.response
+
+    - if @reference.schemas.any?
+      section.api-tag
+        h2#schemas Schemas
+        - @reference.schemas.each do |schema|
+          article.api-block id=schema.anchor
+            h3 = schema.name
+            = api_markdown(schema.node.description)
+            = render "api_docs/schema", node: schema.node

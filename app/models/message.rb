@@ -39,7 +39,10 @@ class Message < ApplicationRecord
 
   def recompute_patch_submission!
     new_value = attachments.reload.any?(&:patch_submission_candidate?)
-    update_column(:is_patch_submission, new_value) if is_patch_submission != new_value
+    return if is_patch_submission == new_value
+
+    update_column(:is_patch_submission, new_value)
+    FeedEvents::Recorder.patchset_posted(self) if new_value
   end
 
   def recompute_patch_paths!

@@ -2,6 +2,8 @@ class Activity < ApplicationRecord
   belongs_to :user
   belongs_to :subject, polymorphic: true
 
+  TYPES = %w[topic_message_received note_created note_mentioned].freeze
+
   scope :visible, -> { where(hidden: false) }
   scope :unread, -> { visible.where(read_at: nil) }
 

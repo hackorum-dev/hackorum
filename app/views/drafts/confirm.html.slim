@@ -2,6 +2,8 @@
   .modal-backdrop data-controller="send-confirmation" data-send-confirmation-cooldown-value="1500"
     .modal-dialog.confirm-modal role="dialog" aria-modal="true" aria-labelledby="confirm-title-#{@draft.id}"
       h2 id="confirm-title-#{@draft.id}" Confirm send
+      - draft_api_labels(@draft).each do |label|
+        p.confirm-via = label
 
       .confirm-row
         strong From
@@ -20,10 +22,15 @@
       - if attachments.any?
         .confirm-row
           strong Attachments
-          .confirm-value
-            = attachments.map(&:file_name).join(", ")
-            '
-            span.muted = "(#{number_to_human_size(attachments.sum(&:byte_size))})"
+          ul.confirm-value.confirm-attachments
+            - attachments.each do |a|
+              li.confirm-attachment
+                = link_to a.file_name, draft_attachment_path(@draft, a), download: a.file_name, data: { turbo: false }
+                '
+                span.muted = number_to_human_size(a.byte_size)
+      .confirm-message
+        strong Message
+        pre.confirm-body = @draft.body
 
       - unless Rails.env.production?
         .dev-warning
@@ -37,5 +44,5 @@
         = button_tag "Cancel", type: "button", class: "button-secondary",
                      data: { action: "click->send-confirmation#cancel" }
         = button_to "Send to #{pluralize(@recipients.all.size, 'recipient')}", send_now_draft_path(@draft),
-                    method: :post, class: "button-primary",
+                    method: :post, class: "button-primary", params: { version: @draft.version },
                     data: { send_confirmation_target: "submit", disabled: true }

@@ -1,0 +1,8 @@
+- contents.each do |content|
+  .api-content
+    .api-content-head
+      code.api-media = content.media_type
+      - if content.schema
+        span.api-type = api_type(content.schema.type)
+    - if content.schema
+      = render "api_docs/schema", node: content.schema, typed: true

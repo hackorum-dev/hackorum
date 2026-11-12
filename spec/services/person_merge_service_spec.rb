@@ -290,4 +290,17 @@ RSpec.describe PersonMergeService do
       expect(service.validation_error).to match(/into itself/)
     end
   end
+  describe "feed events" do
+    it "moves the author of the source person's events" do
+      source_alias = create(:alias, person: source, name: "Old Name", email: "old@example.com")
+      create(:alias, person: target, name: "Kept Name", email: "kept@example.com")
+      message = create(:message, sender_alias: source_alias)
+      FeedEvents::Recorder.message_received(message)
+      expect(FeedEvent.sole.author_person_id).to eq(source.id)
+
+      merge
+
+      expect(FeedEvent.sole.author_person_id).to eq(target.id)
+    end
+  end
 end

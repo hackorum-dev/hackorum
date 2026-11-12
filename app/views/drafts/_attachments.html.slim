@@ -1,13 +1,14 @@
 - error = local_assigns[:error]
 - attachments = draft.draft_attachments.listing.to_a
 - total = attachments.sum(&:byte_size)
-.composer-attachments id="draft-attachments-#{draft.id}" data-controller="draft-attachments" data-draft-attachments-url-value=draft_attachments_path(draft) data-draft-attachments-remaining-value=(OutgoingDraft::MAX_ATTACHMENT_BYTES - total)
+.composer-attachments id="draft-attachments-#{draft.id}" data-controller="draft-attachments" data-draft-attachments-url-value=draft_attachments_path(draft) data-draft-attachments-remaining-value=(OutgoingDraft::MAX_ATTACHMENT_BYTES - total) data-reply-composer-target="version" data-version=draft.version
   - if attachments.any?
     ul.composer-attachment-list
       - attachments.each do |a|
         li.composer-attachment
           i.fa-solid.fa-paperclip
-          span.composer-attachment-name = a.file_name
+          = link_to a.file_name, draft_attachment_path(draft, a), class: "composer-attachment-name",
+                    download: a.file_name, title: "Download #{a.file_name}", data: { turbo: false }
           span.composer-attachment-size = number_to_human_size(a.byte_size)
           = button_to draft_attachment_path(draft, a), method: :delete,
                       class: "composer-attachment-remove",

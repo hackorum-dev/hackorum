@@ -17,6 +17,12 @@ class Attachment < ApplicationRecord
     \.(?:patch|diff|diffs)(?:\.\d+)?\z
   }ix.freeze
 
+  METADATA_COLUMNS = %w[id message_id file_name content_type byte_size created_at updated_at].freeze
+
+  # everything but the body
+  scope :metadata, -> { select(*METADATA_COLUMNS.map { |name| arel_table[name] }) }
+
+  before_save :store_byte_size, if: -> { has_attribute?(:body) && (new_record? || will_save_change_to_body?) }
   after_create :mark_topic_has_attachments
   after_destroy :update_topic_has_attachments
   after_save :recompute_message_patch_submission
@@ -49,8 +55,9 @@ class Attachment < ApplicationRecord
     file_name&.ends_with?(".patch", ".diff")
   end
 
+  # nocfbot first: only a nocfbot file makes the lineage test read the body
   def patch_submission_candidate?
-    lineage_patch_candidate? && !nocfbot?
+    !nocfbot? && lineage_patch_candidate?
   end
 
   def nocfbot?
@@ -112,6 +119,10 @@ class Attachment < ApplicationRecord
   end
 
   private
+
+  def store_byte_size
+    self.byte_size = body.nil? ? 0 : Base64.decode64(body).bytesize
+  end
 
   def patch_content?
     decoded_body&.starts_with?("diff ") ||

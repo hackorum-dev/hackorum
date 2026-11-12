@@ -16,6 +16,15 @@ module Hackorum
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w[assets tasks])
 
+    require_relative "../app/middleware/api_exceptions_app"
+    config.exceptions_app = ApiExceptionsApp.new(ActionDispatch::PublicExceptions.new(Rails.public_path))
+
+    require_relative "../app/middleware/api_rate_limit_headers"
+    config.middleware.insert_before ActionDispatch::ShowExceptions, ApiRateLimitHeaders
+
+    require_relative "../app/middleware/site_method_override"
+    config.middleware.swap Rack::MethodOverride, SiteMethodOverride
+
     require_relative "../app/middleware/pending_migration_catcher"
     initializer "pending_migration_catcher.middleware", after: "active_record.migration_error" do |app|
       if app.config.active_record.migration_error

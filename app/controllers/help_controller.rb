@@ -6,6 +6,7 @@ class HelpController < ApplicationController
   PAGES = {
     "search" => "Advanced Search Guide",
     "account-linking" => "Account Linking & Multiple Emails",
+    "api" => "API",
     "privacy" => "Privacy Policy"
   }.freeze
 

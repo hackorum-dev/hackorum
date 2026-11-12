@@ -130,6 +130,7 @@ class Person < ApplicationRecord
     Topic.where(creator_person_id: old_person.id).update_all(creator_person_id: id)
     Topic.where(last_sender_person_id: old_person.id).update_all(last_sender_person_id: id)
     Message.where(sender_person_id: old_person.id).update_all(sender_person_id: id)
+    FeedEvent.where(author_person_id: old_person.id).update_all(author_person_id: id)
     Mention.where(person_id: old_person.id).update_all(person_id: id)
     moved = CommitPerson.where(person_id: old_person.id).distinct.pluck(:commit_id)
     CommitPerson.where(person_id: old_person.id).update_all(person_id: id)

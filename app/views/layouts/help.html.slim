@@ -22,5 +22,9 @@
         = link_to help_path(slug), class: help_nav_link_class(slug) do
           i.fas.fa-file-alt
           span = title
+        - if slug == "api"
+          = link_to api_docs_path, class: help_nav_link_class("api-reference") do
+            i.fas.fa-book
+            span API reference
 
 = render template: 'layouts/application'

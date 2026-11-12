@@ -275,6 +275,17 @@
   margin: var(--spacing-2) 0;
 }
 
+.settings-page .api-token-value {
+  user-select: all;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: monospace;
+  padding: var(--spacing-3);
+  background: var(--color-bg-card);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-md);
+}
+
 .settings-page .email-table {
   width: 100%;
   border-collapse: collapse;

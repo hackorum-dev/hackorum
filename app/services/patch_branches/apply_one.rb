@@ -265,7 +265,9 @@ module PatchBranches
       )
       @record.assign_attributes(base_columns(base_sha, on_master, base_source)) unless keep_base
       touch_master_apply(master_attempt, now: now) unless master_attempt == :unset
+      first_real_write = !@lineage_only && (@record.new_record? || @record.lineage_only_was)
       @record.save!
+      FeedEvents::Recorder.branch_created(@record) if first_real_write
     end
 
     # the six columns that only mean anything together: all derived from

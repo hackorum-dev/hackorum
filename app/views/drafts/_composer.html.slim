@@ -1,6 +1,6 @@
 - autoscroll = local_assigns.fetch(:autoscroll, false)
 = turbo_frame_tag "draft-#{draft.reply_to_message_id}"
-  .composer-card data-controller="reply-composer" data-reply-composer-draft-id-value=draft.id data-reply-composer-autoscroll-value=autoscroll
+  .composer-card data-controller="reply-composer" data-reply-composer-draft-id-value=draft.id data-reply-composer-autoscroll-value=autoscroll data-action="send-confirmation:conflict->reply-composer#conflict"
     .composer-meta
       span.composer-from
         i.fa-regular.fa-envelope
@@ -11,6 +11,8 @@
           | &lt;
           = draft.sender_alias.email
           | &gt;
+      - draft_api_labels(draft).each do |label|
+        span.composer-via = label
       span.composer-status data-reply-composer-target="status"
         | Saved
     = form_with model: draft, url: draft_path(draft), method: :patch, local: false, html: { data: { reply_composer_target: "form", action: "input->reply-composer#dirty blur->reply-composer#save" } } do |f|
@@ -28,6 +30,12 @@
           strong Last send failed:
           '
           = draft.last_send_error
+    .composer-error-banner hidden=true data-reply-composer-target="conflict"
+      i.fa-solid.fa-triangle-exclamation
+      div
+        span data-reply-composer-target="conflictText"
+        '
+        button.composer-reload type="button" data-action="click->reply-composer#reload" Reload draft
     .composer-actions
       = button_to "Discard", draft_path(draft), method: :delete,
                   data: { turbo_confirm: ("Discard draft?" if draft.body.present?) },

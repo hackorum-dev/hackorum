@@ -34,6 +34,17 @@ RSpec.describe 'Account deletion', type: :request do
     expect(Person.exists?(person.id)).to be false
   end
 
+  it 'drops api tokens' do
+    allow(Net::HTTP).to receive(:post_form).and_return(double(code: '200', body: ''))
+    create(:team_member, team: team, user: create(:user), role: 'admin')
+    ApiToken.issue!(user: user, name: 'x')
+
+    post settings_deletion_path, params: { confirmation: 'DELETE' }
+
+    expect(response).to redirect_to(root_path)
+    expect(ApiToken.where(user_id: user.id)).to be_empty
+  end
+
   it 'refuses when the user is the only admin of a team' do
     create(:team_member, team: team, user: create(:user), role: 'member')
 

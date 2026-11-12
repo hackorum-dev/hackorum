@@ -1,0 +1,58 @@
+- content_for :title, "Settings - API tokens"
+
+.settings-page
+  h1 API tokens
+
+  - if @raw_token
+    .settings-section
+      h2 New token
+      p.settings-hint Copy it now. It is not stored and will not be shown again.
+      .form-group
+        = label_tag :new_api_token, "New token"
+        = text_field_tag :new_api_token, @raw_token, readonly: true, autofocus: true, autocomplete: "off", spellcheck: false, name: nil, class: "api-token-value"
+
+  .settings-section
+    h2 Create a token
+    p.settings-hint
+      ' A token lets a tool or an AI agent use the hackorum API as you. It cannot send email.
+      => link_to "API description (OpenAPI)", "/api/v1/openapi.yaml"
+      => link_to "API help", help_path("api")
+      = link_to "API reference", api_docs_path
+    = form_with url: settings_api_tokens_path, method: :post, local: true, data: { turbo: false }, html: { onsubmit: "this.querySelector('[type=submit]').disabled = true" } do
+      .form-group
+        = label_tag :name, "Name"
+        = text_field_tag :name, nil, required: true, maxlength: 100, placeholder: "e.g. laptop MCP"
+      .form-group
+        = label_tag :expires_in, "Expires"
+        = select_tag :expires_in, options_for_select([ [ "Never", "" ], [ "In 30 days", "30" ], [ "In 90 days", "90" ], [ "In a year", "365" ] ])
+      = submit_tag "Create token", class: "button-primary"
+
+  .settings-section
+    h2 Your tokens
+    - if @tokens.any?
+      .email-table-wrap
+        table.email-table
+          thead
+            tr
+              th Name
+              th Created
+              th Last used
+              th Expires
+              th Actions
+          tbody
+            - @tokens.each do |token|
+              tr
+                td = token.name
+                td = l(token.created_at, format: :short)
+                td = token.last_used_at ? l(token.last_used_at, format: :short) : "Never"
+                td
+                  - if token.expires_at.nil?
+                    | Never
+                  - elsif token.expires_at.past?
+                    | Expired
+                  - else
+                    = l(token.expires_at, format: :short)
+                td
+                  = button_to "Revoke", settings_api_token_path(token), method: :delete, data: { turbo_confirm: "Revoke this token? Tools using it stop working." }, class: "button-danger"
+    - else
+      p No tokens yet.

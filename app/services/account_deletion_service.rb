@@ -35,6 +35,7 @@ class AccountDeletionService
     Identity.where(user_id: user.id).delete_all
     TeamMember.where(user_id: user.id).delete_all
     UserToken.where(user_id: user.id).delete_all
+    ApiToken.where(user_id: user.id).delete_all
     UserFeature.where(user_id: user.id).delete_all
     TopicStar.where(user_id: user.id).delete_all
     TopicIgnore.where(user_id: user.id).delete_all

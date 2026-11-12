@@ -54,7 +54,7 @@ module PatchCi
         status: "infra_error",
         payload: { "ingest_error" => "unstorable payload: #{error.message.slice(0, 200)}" }
       )
-      record.save!
+      save_and_record(record)
     rescue StandardError
       nil
     end
@@ -97,8 +97,17 @@ module PatchCi
         record.payload = { "ingest_error" => payload_error(payload, run) }
       end
 
-      record.save!
+      save_and_record(record)
       record
+    end
+
+    def save_and_record(record)
+      before = record.status_was
+      was_terminal = PatchCiRun::TERMINAL_STATUSES.include?(before)
+      record.save!
+      return unless record.terminal? && record.status != before
+
+      FeedEvents::Recorder.ci_completed(record, replace: was_terminal)
     end
 
     def already_recorded?(record)

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_11_08_120000) do
+ActiveRecord::Schema[8.0].define(version: 2026_11_12_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -69,6 +69,19 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_08_120000) do
     t.index ["user_id"], name: "index_aliases_on_user_id"
   end
 
+  create_table "api_tokens", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "name", null: false
+    t.string "token_digest", null: false
+    t.datetime "last_used_at"
+    t.datetime "expires_at"
+    t.datetime "revoked_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["token_digest"], name: "index_api_tokens_on_token_digest", unique: true
+    t.index ["user_id"], name: "index_api_tokens_on_user_id"
+  end
+
   create_table "attachments", force: :cascade do |t|
     t.bigint "message_id", null: false
     t.string "file_name", null: false
@@ -76,6 +89,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_08_120000) do
     t.text "body"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "byte_size", default: 0, null: false
     t.index ["message_id"], name: "index_attachments_on_message_id"
   end
 
@@ -264,6 +278,28 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_08_120000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["outgoing_draft_id"], name: "index_draft_attachments_on_outgoing_draft_id"
+  end
+
+  create_table "feed_events", force: :cascade do |t|
+    t.string "event_type", null: false
+    t.datetime "occurred_at", null: false
+    t.bigint "message_id"
+    t.bigint "patch_branch_id"
+    t.bigint "patch_ci_run_id"
+    t.bigint "author_person_id"
+    t.boolean "first_run"
+    t.string "previous_status"
+    t.boolean "verdict_changed"
+    t.datetime "created_at", default: -> { "(clock_timestamp() AT TIME ZONE 'UTC'::text)" }, null: false
+    t.index ["author_person_id", "id"], name: "index_feed_events_on_author_person_id_and_id"
+    t.index ["created_at"], name: "index_feed_events_on_created_at"
+    t.index ["event_type", "id"], name: "index_feed_events_on_event_type_and_id"
+    t.index ["id"], name: "index_feed_events_without_repeats", where: "(verdict_changed IS NOT FALSE)"
+    t.index ["message_id", "event_type"], name: "index_feed_events_unique_message", unique: true, where: "((patch_branch_id IS NULL) AND (patch_ci_run_id IS NULL))"
+    t.index ["message_id"], name: "index_feed_events_on_message_id"
+    t.index ["patch_branch_id", "event_type"], name: "index_feed_events_unique_branch", unique: true, where: "((patch_branch_id IS NOT NULL) AND (patch_ci_run_id IS NULL))"
+    t.index ["patch_branch_id"], name: "index_feed_events_on_patch_branch_id", where: "(patch_branch_id IS NOT NULL)"
+    t.index ["patch_ci_run_id", "event_type"], name: "index_feed_events_unique_run", unique: true, where: "(patch_ci_run_id IS NOT NULL)"
   end
 
   create_table "global_tags", force: :cascade do |t|
@@ -486,6 +522,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_08_120000) do
     t.bigint "sent_message_id"
     t.datetime "sent_at"
     t.string "rfc_message_id"
+    t.bigint "created_via_token_id"
+    t.bigint "last_edited_via_token_id"
     t.index ["identity_id"], name: "index_outgoing_drafts_on_identity_id"
     t.index ["reply_to_message_id"], name: "index_outgoing_drafts_on_reply_to_message_id"
     t.index ["sender_alias_id"], name: "index_outgoing_drafts_on_sender_alias_id"
@@ -1082,6 +1120,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_08_120000) do
   add_foreign_key "admin_email_changes", "users", column: "target_user_id"
   add_foreign_key "aliases", "people"
   add_foreign_key "aliases", "users"
+  add_foreign_key "api_tokens", "users"
   add_foreign_key "attachments", "messages"
   add_foreign_key "commit_files", "commits"
   add_foreign_key "commit_people", "commits"
@@ -1103,6 +1142,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_08_120000) do
   add_foreign_key "commitfest_patch_topics", "topics"
   add_foreign_key "contributor_memberships", "people"
   add_foreign_key "draft_attachments", "outgoing_drafts", on_delete: :cascade
+  add_foreign_key "feed_events", "messages", on_delete: :cascade
+  add_foreign_key "feed_events", "patch_branches", on_delete: :cascade
+  add_foreign_key "feed_events", "patch_ci_runs", on_delete: :cascade
   add_foreign_key "global_tags", "users", column: "created_by_id"
   add_foreign_key "identities", "users"
   add_foreign_key "mentions", "aliases"
@@ -1128,6 +1170,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_08_120000) do
   add_foreign_key "notes", "users", column: "author_id"
   add_foreign_key "notes", "users", column: "last_editor_id"
   add_foreign_key "outgoing_drafts", "aliases", column: "sender_alias_id"
+  add_foreign_key "outgoing_drafts", "api_tokens", column: "created_via_token_id", on_delete: :nullify
+  add_foreign_key "outgoing_drafts", "api_tokens", column: "last_edited_via_token_id", on_delete: :nullify
   add_foreign_key "outgoing_drafts", "identities"
   add_foreign_key "outgoing_drafts", "messages", column: "reply_to_message_id"
   add_foreign_key "outgoing_drafts", "messages", column: "sent_message_id"

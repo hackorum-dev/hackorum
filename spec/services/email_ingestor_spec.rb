@@ -625,4 +625,129 @@ RSpec.describe EmailIngestor do
       expect(msg).to be_persisted
     end
   end
+  describe "#ingest_raw feed events" do
+    let(:ingestor) { described_class.new }
+    let(:mailing_list) { create(:mailing_list) }
+
+    def raw_email(date: Time.current, id: "feed-1@example.com")
+      <<~EMAIL
+        From: Sender <sender@example.com>
+        To: list@example.com
+        Subject: A patch
+        Message-ID: <#{id}>
+        Date: #{date.rfc2822}
+        MIME-Version: 1.0
+        Content-Type: multipart/mixed; boundary="XX"
+
+        --XX
+        Content-Type: text/plain
+
+        Patch attached.
+        --XX
+        Content-Type: text/x-diff
+        Content-Disposition: attachment; filename="0001-fix.patch"
+
+        diff --git a/x b/x
+        --- a/x
+        +++ b/x
+        @@ -1 +1 @@
+        -a
+        +b
+        --XX--
+      EMAIL
+    end
+
+    def types_of(message)
+      FeedEvent.where(message_id: message.id).order(:id).pluck(:event_type)
+    end
+
+    it "records the message, then the patchset, and nothing on re-ingestion" do
+      msg = ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
+
+      expect(msg.is_patch_submission).to be(true)
+      expect(types_of(msg)).to eq(%w[message.received patchset.posted])
+      event = FeedEvent.find_by!(message_id: msg.id, event_type: "message.received")
+      expect(event).to have_attributes(author_person_id: msg.sender_person_id)
+
+      expect {
+        ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
+        ingestor.ingest_raw(raw_email, mailing_list: create(:mailing_list))
+      }.not_to change(FeedEvent, :count)
+    end
+
+    it "records both when the caller's transaction commits, the message first" do
+      msg = nil
+      Message.transaction do
+        msg = ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
+        expect(msg.is_patch_submission).to be(true)
+        expect(FeedEvent.count).to eq(0)
+      end
+
+      expect(types_of(msg)).to eq(%w[message.received patchset.posted])
+    end
+
+    it "records nothing when the caller's transaction is rolled back" do
+      Message.transaction do
+        ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
+        raise ActiveRecord::Rollback
+      end
+
+      expect(FeedEvent.count).to eq(0)
+    end
+
+    it "gives late mail the highest id and its old date" do
+      recent = ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
+      old_date = Time.zone.parse("2011-05-06 07:08:09")
+
+      late = ingestor.ingest_raw(raw_email(date: old_date, id: "feed-old@example.com"),
+                                 mailing_list: mailing_list)
+
+      late_event = FeedEvent.find_by!(message_id: late.id, event_type: "message.received")
+      expect(late_event.id).to be > FeedEvent.where(message_id: recent.id).maximum(:id)
+      expect(late_event.id).to eq(FeedEvent.where(event_type: "message.received").maximum(:id))
+      expect(late_event.occurred_at).to eq(old_date)
+      expect(late_event.created_at).to be_within(1.minute).of(Time.current)
+    end
+
+    it "follows a corrected date" do
+      msg = ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
+      fixed = Time.zone.parse("2012-01-02 03:04:05")
+
+      ingestor.ingest_raw(raw_email(date: fixed), mailing_list: mailing_list, update_existing: [ :date ])
+
+      expect(FeedEvent.where(message_id: msg.id).pluck(:occurred_at).uniq).to eq([ fixed ])
+    end
+
+    it "still ingests when the recorder fails, inside a caller's transaction too" do
+      allow(FeedEvent).to receive(:insert_all).and_raise(ActiveRecord::StatementInvalid, "boom")
+      allow(Rails.logger).to receive(:warn)
+
+      msg = nil
+      Message.transaction do
+        msg = ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
+        expect(Message.where(id: msg.id).count).to eq(1)
+      end
+
+      expect(msg.reload.is_patch_submission).to be(true)
+      expect(msg.attachments.count).to eq(1)
+      expect(FeedEvent.count).to eq(0)
+      expect(Rails.logger).to have_received(:warn).with(/message\.received/)
+      expect(Rails.logger).to have_received(:warn).with(/patchset\.posted/)
+    end
+
+    it "does not record the echo of a pending message" do
+      sender = create(:alias, email: "sender@example.com", name: "Sender")
+      topic = create(:topic, creator: sender)
+      pending = Message.create!(topic: topic, sender: sender, sender_person_id: sender.person_id,
+                                subject: "A patch", body: "Patch attached.",
+                                message_id: "feed-1@example.com", state: Message::STATE_PENDING,
+                                sent_at: 1.minute.ago, created_at: 1.minute.ago)
+      FeedEvents::Recorder.message_received(pending)
+
+      expect {
+        ingestor.ingest_raw(raw_email, mailing_list: mailing_list)
+      }.not_to change(FeedEvent, :count)
+      expect(pending.reload.state).to eq(Message::STATE_SENT)
+    end
+  end
 end

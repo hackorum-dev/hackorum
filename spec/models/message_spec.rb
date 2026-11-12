@@ -176,4 +176,44 @@ RSpec.describe Message, type: :model do
       expect(Message.sent).not_to include(pending)
     end
   end
+  describe "patchset feed event" do
+    let(:message) { create(:message) }
+
+    def posted
+      FeedEvent.where(event_type: "patchset.posted", message_id: message.id)
+    end
+
+    it "is recorded when the first patch attachment arrives, once" do
+      create(:attachment, message: message, file_name: "notes.txt", content_type: "text/plain")
+      expect(posted.count).to eq(0)
+
+      create(:attachment, message: message, file_name: "0001-x.patch")
+      create(:attachment, message: message, file_name: "0002-y.patch")
+
+      expect(posted.count).to eq(1)
+      expect(posted.sole.occurred_at).to eq(message.reload.created_at)
+    end
+
+    it "is not repeated when the flag goes away and comes back" do
+      attachment = create(:attachment, message: message, file_name: "0001-x.patch")
+      first_id = posted.sole.id
+      attachment.destroy!
+      expect(message.reload.is_patch_submission).to be(false)
+
+      create(:attachment, message: message, file_name: "0001-x.patch")
+
+      expect(message.reload.is_patch_submission).to be(true)
+      expect(posted.pluck(:id)).to eq([ first_id ])
+    end
+
+    it "does not stop the attachment from saving when the recorder fails" do
+      allow(FeedEvent).to receive(:insert_all).and_raise(ActiveRecord::StatementInvalid, "boom")
+      allow(Rails.logger).to receive(:warn)
+
+      create(:attachment, message: message, file_name: "0001-x.patch")
+
+      expect(message.reload.is_patch_submission).to be(true)
+      expect(Rails.logger).to have_received(:warn).with(/patchset\.posted/)
+    end
+  end
 end

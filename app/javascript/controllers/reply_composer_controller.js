@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static values  = { draftId: Number, autoscroll: Boolean }
-  static targets = ["form", "status", "body"]
+  static targets = ["form", "status", "body", "version", "conflict", "conflictText"]
 
   connect() {
     this.dirtyTimer = null
@@ -19,13 +19,20 @@ export default class extends Controller {
   }
 
   dirty() {
+    this.unsaved = true
     if (this.hasStatusTarget) this.statusTarget.textContent = "Editing…"
     clearTimeout(this.dirtyTimer)
     this.dirtyTimer = setTimeout(() => this.save(), 2000)
   }
 
-  async save() {
+  save() {
+    this.saving = this.store()
+    return this.saving
+  }
+
+  async store() {
     clearTimeout(this.dirtyTimer)
+    this.unsaved = false
     if (this.hasStatusTarget) this.statusTarget.textContent = "Saving…"
 
     const formData = new FormData(this.formTarget)
@@ -41,18 +48,25 @@ export default class extends Controller {
         body: formData,
         headers
       })
-      if (!this.hasStatusTarget) return
       if (res.status === 204) {
-        this.statusTarget.textContent = "Saved"
-      } else if (res.status === 409) {
+        const version = res.headers.get("X-Draft-Version")
+        if (version && this.hasVersionTarget) this.versionTarget.dataset.version = version
+        if (this.hasStatusTarget) this.statusTarget.textContent = "Saved"
+        return true
+      }
+      this.unsaved = true
+      if (!this.hasStatusTarget) return false
+      if (res.status === 409) {
         this.statusTarget.textContent = "Sending… (read-only)"
         this.disableForm()
       } else {
         this.statusTarget.textContent = "Save failed"
       }
     } catch (e) {
+      this.unsaved = true
       if (this.hasStatusTarget) this.statusTarget.textContent = "Save failed"
     }
+    return false
   }
 
   disableForm() {
@@ -66,10 +80,17 @@ export default class extends Controller {
 
   async openConfirm(event) {
     event.preventDefault()
-    const url = `/drafts/${this.draftIdValue}/confirm`
+    await this.saving
+    if (this.unsaved && !(await this.save())) return
+    const version = this.hasVersionTarget ? this.versionTarget.dataset.version : ""
+    const url = `/drafts/${this.draftIdValue}/confirm?version=${encodeURIComponent(version)}`
     try {
       const res = await fetch(url, { headers: { Accept: "text/html" } })
       const body = await res.text()
+      if (res.status === 409) {
+        this.showConflict(body)
+        return
+      }
       if (!res.ok) {
         alert(`Cannot send: ${body || res.statusText}`)
         return
@@ -80,6 +101,27 @@ export default class extends Controller {
       }
     } catch (e) {
       alert(`Cannot send: ${e.message}`)
+    }
+  }
+
+  conflict(event) {
+    this.showConflict(event.detail.message)
+  }
+
+  showConflict(text) {
+    if (!this.hasConflictTarget) return alert(`Cannot send: ${text}`)
+    this.conflictTextTarget.textContent = text
+    this.conflictTarget.hidden = false
+  }
+
+  reload() {
+    const frame = this.element.closest("turbo-frame")
+    if (!frame) return
+    const url = `/drafts/${this.draftIdValue}/edit`
+    if (frame.getAttribute("src") === url) {
+      frame.reload()
+    } else {
+      frame.src = url
     }
   }
 }

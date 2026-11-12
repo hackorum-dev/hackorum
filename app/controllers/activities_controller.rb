@@ -10,6 +10,7 @@ class ActivitiesController < ApplicationController
                     .includes(subject: [ :topic, { message: :sender } ])
                     .order(created_at: :desc)
                     .limit(100)
+    @visible_note_ids = visible_note_ids(@activities)
     @unread_count = base_scope.unread.count
   end
 
@@ -22,7 +23,12 @@ class ActivitiesController < ApplicationController
     activity = base_scope.find(params[:id])
     related_activities = base_scope.where(subject: activity.subject)
     related_activities.mark_all_as_read!
-    redirect_to path_for_subject(activity.subject)
+    subject = activity.subject
+    if subject.is_a?(Note) && !Note.active.visible_to(current_user).exists?(id: subject.id)
+      return redirect_to activities_path, notice: "This note is no longer available."
+    end
+
+    redirect_to path_for_subject(subject)
   end
 
   private
@@ -38,6 +44,13 @@ class ActivitiesController < ApplicationController
     end
   end
 
+  def visible_note_ids(activities)
+    ids = activities.select { |activity| activity.subject_type == "Note" }.map(&:subject_id)
+    return Set.new if ids.empty?
+
+    Note.active.visible_to(current_user).where(id: ids).pluck(:id).to_set
+  end
+
   def base_scope
     current_user.activities.visible
   end
@@ -47,6 +60,7 @@ class ActivitiesController < ApplicationController
 
     note_query = scope.joins("INNER JOIN notes ON notes.id = activities.subject_id AND activities.subject_type = 'Note'")
                       .where("notes.body ILIKE ?", "%#{@search_query}%")
+                      .where(notes: { id: Note.active.visible_to(current_user).select(:id) })
 
     message_query = scope.joins("INNER JOIN messages ON messages.id = activities.subject_id AND activities.subject_type = 'Message'")
                          .where("messages.body ILIKE ? OR messages.subject ILIKE ?", "%#{@search_query}%", "%#{@search_query}%")

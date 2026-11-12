@@ -13,3 +13,8 @@
           = link_to help_path(slug) do
             i.fas.fa-file-alt
             span = title
+        - if slug == "api"
+          li
+            = link_to api_docs_path do
+              i.fas.fa-book
+              span API reference

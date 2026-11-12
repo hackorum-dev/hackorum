@@ -12,6 +12,7 @@ class PersonIdPropagationJob < ApplicationJob
            .where.not(sender_person_id: new_person_id)
            .in_batches(of: 1000)
            .update_all(sender_person_id: new_person_id)
+    FeedEvent.sync_authors(alias_id)
 
     # Update mentions where this alias is mentioned
     Mention.where(alias_id: alias_id)

@@ -1,0 +1,59 @@
+article.api-block.api-op id=op.anchor
+  h3.api-op-title
+    span.api-method class="api-method-#{op.method.downcase}" = op.method
+    code.api-path = op.path
+    - if op.deprecated
+      span.api-flag deprecated
+  - if op.summary
+    p.api-op-summary = api_inline_markdown(op.summary)
+  p.api-token
+    ' Token:
+    strong = ApiDocsHelper::TOKEN_LABELS.fetch(op.token)
+  = api_markdown(op.description)
+
+  - if op.parameters.any?
+    h4 Parameters
+    .api-table-wrap
+      table.api-table
+        thead
+          tr
+            th Name
+            th In
+            th Type
+            th Description
+        tbody
+          - op.parameters.each do |param|
+            tr
+              td
+                code = param.name
+                - if param.required
+                  span.api-required required
+              td = param.location
+              td.api-type = api_type(param.schema.type)
+              td
+                = api_markdown(param.description)
+                = api_notes(param.schema)
+
+  - if op.request_body
+    h4 Request body
+    - if op.request_body.required
+      p.api-note Required.
+    = api_markdown(op.request_body.description)
+    = render "api_docs/contents", contents: op.request_body.contents
+
+  - if op.responses.any?
+    h4 Responses
+    ul.api-responses
+      - op.responses.each do |response|
+        li.api-response
+          .api-response-head
+            span.api-status class=api_status_class(response.status) = response.status
+            - if response.shared
+              = link_to response.shared.name, "##{response.shared.anchor}"
+              - response.contents.each do |content|
+                - if content.schema && content.schema.type_text != response.shared.name
+                  span.api-type = api_type(content.schema.type)
+            - else
+              span = api_inline_markdown(response.description)
+          - unless response.shared
+            = render "api_docs/response_body", response: response, described: true

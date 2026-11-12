@@ -86,6 +86,8 @@ class EmailIngestor
       return existing_message
     end
 
+    FeedEvents::Recorder.message_received(msg)
+
     associate_mailing_list(msg, mailing_list)
 
     update_default_alias_for_person(msg.sender)
@@ -141,6 +143,7 @@ class EmailIngestor
     message.update_columns(updates) if updates.any?
     message.recompute_patch_paths! if updates.key?(:body)
     resync_activity_after_date_change(message) if date_changed
+    FeedEvents::Recorder.message_redated(message) if date_changed
 
     if flipped_to_sent
       pending_age = message.sent_at ? (Time.current - message.sent_at).to_i : nil
