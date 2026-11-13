@@ -166,6 +166,136 @@ RSpec.describe TopicMergeService do
       end
     end
 
+    context "with drafts" do
+      it "moves drafts to the target topic" do
+        draft = create(:outgoing_draft, topic: source_topic)
+
+        service.call
+
+        expect(draft.reload.topic).to eq(target_topic)
+      end
+    end
+
+    context "with topic ignores" do
+      let(:user) { create(:user) }
+
+      it "moves an ignore to the target" do
+        create(:topic_ignore, user: user, topic: source_topic)
+
+        service.call
+
+        expect(TopicIgnore.where(user: user).pluck(:topic_id)).to eq([ target_topic.id ])
+      end
+
+      it "deduplicates when both topics are ignored" do
+        create(:topic_ignore, user: user, topic: source_topic)
+        create(:topic_ignore, user: user, topic: target_topic)
+
+        service.call
+
+        expect(TopicIgnore.where(user: user).pluck(:topic_id)).to eq([ target_topic.id ])
+      end
+
+      it "drops the ignore when the user stars the target" do
+        create(:topic_ignore, user: user, topic: source_topic)
+        create(:topic_star, user: user, topic: target_topic)
+
+        service.call
+
+        expect(TopicIgnore.where(user: user)).to be_empty
+      end
+    end
+
+    context "with commit links" do
+      let(:commit) { create(:commit, committed_at: 2.days.ago) }
+
+      it "moves links and refreshes the commit aggregates" do
+        create(:commit_topic, commit: commit, topic: source_topic)
+
+        service.call
+
+        expect(CommitTopic.where(commit: commit).pluck(:topic_id)).to eq([ target_topic.id ])
+        target_topic.reload
+        expect(target_topic.commit_count).to eq(1)
+        expect(target_topic.last_commit_at).to be_within(1.second).of(commit.committed_at)
+        expect(source_topic.reload.commit_count).to eq(0)
+      end
+
+      it "keeps one link per commit, preferring the trailer one" do
+        create(:commit_topic, commit: commit, topic: source_topic, source: "trailer", external_message_id: "src@x")
+        create(:commit_topic, commit: commit, topic: target_topic, source: "llm", external_message_id: nil)
+
+        service.call
+
+        links = CommitTopic.where(commit: commit)
+        expect(links.pluck(:topic_id, :source, :external_message_id)).to eq([ [ target_topic.id, "trailer", "src@x" ] ])
+        expect(target_topic.reload.commit_count).to eq(1)
+      end
+    end
+
+    context "with patch branches" do
+      def patch_message(topic, at)
+        create(:message, topic: topic, created_at: at, is_patch_submission: true)
+      end
+
+      it "moves branch rows to the target" do
+        row = create(:patch_branch, topic: source_topic, message: patch_message(source_topic, 1.day.ago))
+
+        service.call
+
+        expect(row.reload.topic).to eq(target_topic)
+      end
+
+      it "lets the pushed newest patchset retire the other current rows" do
+        old = create(:patch_branch, topic: source_topic, message: patch_message(source_topic, 3.days.ago), pushed_at: 3.days.ago)
+        newest = create(:patch_branch, topic: target_topic, message: patch_message(target_topic, 1.hour.from_now), pushed_at: Time.current)
+
+        service.call
+
+        expect(old.reload.superseded_by).to eq(newest)
+        expect(newest.reload.superseded_by).to be_nil
+      end
+
+      it "keeps both rows current while the newest patchset is unpushed" do
+        old = create(:patch_branch, topic: source_topic, message: patch_message(source_topic, 3.days.ago), pushed_at: 3.days.ago)
+        newest = create(:patch_branch, topic: target_topic, message: patch_message(target_topic, 1.hour.from_now), status: "failed")
+
+        service.call
+
+        expect([ old, newest ].map { |r| r.reload.superseded_by_id }).to eq([ nil, nil ])
+      end
+    end
+
+    context "with lineage data" do
+      it "moves runs, lineages, verdicts and pairs to the target" do
+        run = create(:patchset_run, topic: source_topic)
+        lineage = create(:patchset_lineage, patchset_run: run)
+        verdict = create(:commit_verdict, patchset_run: run)
+        pair = create(:patchset_pair, topic: source_topic)
+
+        service.call
+
+        expect([ run, lineage, verdict, pair ].map { |r| r.reload.topic_id }).to all(eq(target_topic.id))
+        expect(PatchsetRun.current_for(target_topic.id)).to eq(run)
+      end
+    end
+
+    context "without a user" do
+      it "merges when automatic" do
+        result = described_class.new(source_topic: source_topic, target_topic: target_topic,
+                                     merged_by: nil, automatic: true).call
+
+        expect(result.success?).to be true
+        expect(result.topic_merge.merged_by).to be_nil
+      end
+
+      it "refuses otherwise" do
+        result = described_class.new(source_topic: source_topic, target_topic: target_topic, merged_by: nil).call
+
+        expect(result.success?).to be false
+      end
+    end
+
     context "with topic stars" do
       let(:user1) { create(:user) }
       let(:user2) { create(:user) }

@@ -22,9 +22,14 @@ class TopicMergeService
       move_messages!
       move_notes!
       merge_stars!
+      merge_ignores!
       merge_awareness!
       merge_read_ranges!
       move_commitfest_links!
+      move_drafts!
+      move_commit_links!
+      move_patch_branches!
+      move_lineage!
       copy_mailing_lists!
       mark_source_merged!
       recalculate_target_stats!
@@ -138,6 +143,59 @@ class TopicMergeService
       else
         link.update!(topic: target_topic)
       end
+    end
+  end
+
+  def move_drafts!
+    OutgoingDraft.where(topic_id: source_topic.id).update_all(topic_id: target_topic.id)
+  end
+
+  # an ignore of the source must not hide a thread the user stars
+  def merge_ignores!
+    settled = TopicIgnore.where(topic: target_topic).pluck(:user_id) +
+              TopicStar.where(topic: target_topic).pluck(:user_id)
+    TopicIgnore.where(topic: source_topic, user_id: settled).delete_all
+    TopicIgnore.where(topic: source_topic).update_all(topic_id: target_topic.id)
+  end
+
+  def move_commit_links!
+    target_links = CommitTopic.where(topic_id: target_topic.id).index_by(&:commit_id)
+
+    CommitTopic.where(topic_id: source_topic.id).find_each do |link|
+      kept = target_links[link.commit_id]
+      if kept.nil?
+        link.update_columns(topic_id: target_topic.id)
+        next
+      end
+
+      if link.source == "trailer" && kept.source != "trailer"
+        kept.update_columns(source: link.source, external_message_id: link.external_message_id,
+                            confidence: link.confidence)
+      end
+      link.delete
+    end
+
+    Topic.refresh_commit_aggregates!([ source_topic.id, target_topic.id ])
+  end
+
+  # Rows follow their message. Same rule as the orchestrator after a push:
+  # only the newest patchset of the thread retires the others.
+  def move_patch_branches!
+    PatchBranch.where(topic_id: source_topic.id).update_all(topic_id: target_topic.id)
+
+    newest = Message.where(topic_id: target_topic.id, is_patch_submission: true)
+                    .order(created_at: :desc, id: :desc).pick(:id)
+    row = newest && PatchBranch.current.pushed.find_by(message_id: newest)
+    return unless row
+
+    PatchBranch.current.where(topic_id: target_topic.id).where.not(id: row.id)
+               .update_all(superseded_by_id: row.id)
+  end
+
+  # the lineage queue sees the moved patch mail as new and reruns the thread
+  def move_lineage!
+    [ PatchsetRun, PatchsetLineage, CommitVerdict, PatchsetPair ].each do |model|
+      model.where(topic_id: source_topic.id).update_all(topic_id: target_topic.id)
     end
   end
 

@@ -314,28 +314,8 @@ module CommitImport
       MessageIdOverrides.apply(MessageIdNormalizer.normalize(CGI.unescapeURIComponent(raw)))
     end
 
-    # commit_count and last_commit_at are both derived from commit_topics, and
-    # every writer funnels through here, so one statement keeps the pair in
-    # step. last_commit_at is the thread's landing date, which is what decides
-    # whether a later patchset is new work - see PatchCi::CommitCutoff.
     def refresh_commit_aggregates(topic_ids)
-      topic_ids = topic_ids.to_a
-      return if topic_ids.empty?
-
-      sql = ApplicationRecord.sanitize_sql_array([ <<~SQL, topic_ids ])
-        UPDATE topics SET commit_count = sub.n, last_commit_at = sub.last_at
-        FROM (
-          SELECT t.id,
-                 (SELECT COUNT(*) FROM commit_topics ct
-                   WHERE ct.topic_id = t.id AND ct.source = 'trailer') AS n,
-                 (SELECT MAX(c.committed_at) FROM commit_topics ct
-                    JOIN commits c ON c.id = ct.commit_id
-                   WHERE ct.topic_id = t.id AND ct.source = 'trailer') AS last_at
-          FROM topics t WHERE t.id IN (?)
-        ) sub
-        WHERE topics.id = sub.id
-      SQL
-      ApplicationRecord.connection.execute(sql)
+      Topic.refresh_commit_aggregates!(topic_ids)
     end
 
     # Wipes and re-adds the parsed rows per batch, committer row included.

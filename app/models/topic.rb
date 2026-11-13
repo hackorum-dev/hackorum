@@ -54,6 +54,30 @@ class Topic < ApplicationRecord
               WHERE tml.topic_id = topics.id), false)
   SQL
 
+  # commit_count and last_commit_at are both derived from commit_topics, and
+  # every writer funnels through here, so one statement keeps the pair in
+  # step. last_commit_at is the thread's landing date, which is what decides
+  # whether a later patchset is new work - see PatchCi::CommitCutoff.
+  def self.refresh_commit_aggregates!(topic_ids)
+    topic_ids = topic_ids.to_a
+    return if topic_ids.empty?
+
+    sql = sanitize_sql_array([ <<~SQL, topic_ids ])
+      UPDATE topics SET commit_count = sub.n, last_commit_at = sub.last_at
+      FROM (
+        SELECT t.id,
+               (SELECT COUNT(*) FROM commit_topics ct
+                 WHERE ct.topic_id = t.id AND ct.source = 'trailer') AS n,
+               (SELECT MAX(c.committed_at) FROM commit_topics ct
+                  JOIN commits c ON c.id = ct.commit_id
+                 WHERE ct.topic_id = t.id AND ct.source = 'trailer') AS last_at
+        FROM topics t WHERE t.id IN (?)
+      ) sub
+      WHERE topics.id = sub.id
+    SQL
+    connection.execute(sql)
+  end
+
   def self.refresh_hidden_by_default!(topic_ids)
     where(id: topic_ids)
       .where("topics.hidden_by_default <> #{HIDDEN_BY_DEFAULT_SQL}")
