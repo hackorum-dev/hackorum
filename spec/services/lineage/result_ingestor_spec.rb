@@ -111,6 +111,12 @@ RSpec.describe Lineage::ResultIngestor do
       expect(CommitPerson.parsed.where(commit_id: commit.id).count).to eq(1)
     end
 
+    it "skips a commit with a parsed co-author" do
+      create(:commit_person, commit: commit, role: "co_author", source: "parsed")
+      ingest(answer)
+      expect(llm_authors).to be_empty
+    end
+
     it "replaces its rows on re-ingest" do
       ingest(answer)
       ingest(answer(confidence: 0.95))

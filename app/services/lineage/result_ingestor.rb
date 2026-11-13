@@ -354,13 +354,14 @@ module Lineage
     end
 
     # The author the model named wins, then the sender of the source patchset
-    # (so from_discussion needs a named author); parsed rows beat both.
+    # (so from_discussion needs a named author); parsed rows beat both, and
+    # a parsed co-author counts as one.
     def attribute_authors!(judged, known)
       eligible = credited(judged).select { |v| v["source_message_id"] || v["author_message_id"] || v["author_name"] }
       return [] if eligible.empty?
 
       ids = eligible.map { |v| known[v["sha"]].id }
-      authored = CommitPerson.parsed.where(commit_id: ids, role: "author").distinct.pluck(:commit_id).to_set
+      authored = CommitPerson.parsed.where(commit_id: ids, role: %w[author co_author]).distinct.pluck(:commit_id).to_set
       wanted = eligible.flat_map { |v| [ v["source_message_id"], v["author_message_id"] ] }.compact
       messages = Message.where(id: wanted).includes(:sender).index_by(&:id)
       rows = eligible.filter_map do |v|
