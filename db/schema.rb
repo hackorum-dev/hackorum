@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_11_12_150000) do
+ActiveRecord::Schema[8.0].define(version: 2026_11_13_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -440,6 +440,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_12_150000) do
     t.index ["is_patch_submission"], name: "index_messages_on_is_patch_submission", where: "(is_patch_submission = true)"
     t.index ["message_id"], name: "index_messages_on_message_id", unique: true
     t.index ["reply_to_id"], name: "index_messages_on_reply_to_id"
+    t.index ["reply_to_message_id"], name: "index_messages_on_orphan_reply_to_message_id", where: "((reply_to_id IS NULL) AND (reply_to_message_id IS NOT NULL))"
     t.index ["sender_id"], name: "index_messages_on_sender_id"
     t.index ["sender_person_id"], name: "index_messages_on_sender_person_id"
     t.index ["state"], name: "index_messages_on_state"

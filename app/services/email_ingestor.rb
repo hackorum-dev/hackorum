@@ -100,6 +100,8 @@ class EmailIngestor
 
     MessageActivityBuilder.new(msg).process!
 
+    OrphanReplyLinker.adopt_for(msg)
+
     msg
   end
 

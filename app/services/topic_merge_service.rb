@@ -5,11 +5,12 @@ class TopicMergeService
 
   Result = Struct.new(:success?, :topic_merge, :error, keyword_init: true)
 
-  def initialize(source_topic:, target_topic:, merged_by:, merge_reason: nil)
+  def initialize(source_topic:, target_topic:, merged_by:, merge_reason: nil, automatic: false)
     @source_topic = source_topic
     @target_topic = target_topic
     @merged_by = merged_by
     @merge_reason = merge_reason
+    @automatic = automatic
   end
 
   def call
@@ -54,7 +55,7 @@ class TopicMergeService
     raise Error, "Cannot merge topic into itself" if source_topic.id == target_topic.id
     raise Error, "Source topic has already been merged" if source_topic.merged?
     raise Error, "Target topic has been merged into another topic" if target_topic.merged?
-    raise Error, "User must be an admin" unless merged_by&.admin?
+    raise Error, "User must be an admin" unless @automatic || merged_by&.admin?
   end
 
   def create_audit_record!
@@ -161,6 +162,7 @@ class TopicMergeService
   end
 
   def recalculate_target_stats!
+    target_topic.update_column(:has_attachments, true) if source_topic.has_attachments? && !target_topic.has_attachments?
     target_topic.recalculate_participants!
   end
 
