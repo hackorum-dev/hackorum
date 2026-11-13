@@ -21,7 +21,7 @@
                   = parent_id ? link_to("##{parent}", "#message-#{parent_id}", data: { turbo: false }) : "##{parent}"
                   - if tail
                     = " #{tail}"
-              span.patchset-llm title="LLM analysis: how sure it is about this step" = "LLM #{llm_percent(l[:confidence])}"
+              span.patchset-llm title="LLM analysis: how sure it is about this step" = llm_confidence_label(l[:confidence])
         span.patchset-actions
           - if (branch = patchset_branches[msg.id])
             = ci_branch_link(branch, text: "", class_name: "patchset-branch")

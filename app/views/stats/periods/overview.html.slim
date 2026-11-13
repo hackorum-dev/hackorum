@@ -108,3 +108,4 @@ ruby:
   .stats-podiums
     = render "stats/periods/podium", period: @period, title: "Committers, by commits", entries: @data[:podiums][:committers], link: stats_period_path(@period, :committers), link_label: "All committers", line: ->(e) { "#{stats_number(e[:commits])} commits" }
     = render "stats/periods/podium", period: @period, title: "Non-committers, by patches authored and reviews", entries: @data[:podiums][:contributors], link: stats_period_path(@period, :people), link_label: "All people", line: ->(e) { "#{stats_number(e[:authored])} authored, #{stats_number(e[:reviewed])} reviewed" }
+  = render "stats/footer"

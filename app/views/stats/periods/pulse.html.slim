@@ -35,3 +35,4 @@
       | release event
   .stats-strips-card style="--stats-strips-height: #{60 + @data[:strips].size * 125}px"
     = stats_chart("strips", @data, css_class: "stats-chart stats-strips", label: "#{@period.label} pulse, #{@pulse_params.gran}ly")
+  = render "stats/footer"

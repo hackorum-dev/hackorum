@@ -30,3 +30,4 @@
   .stats-trends
     - @data[:llm].each do |series|
       = render "stats/trends/card", series: series, data: @data, periods: @periods
+  = render "stats/footer"

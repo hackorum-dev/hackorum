@@ -77,3 +77,4 @@
             td = stats_pct(r[:backported], r[:commits])
   .stats-foot
     = link_to "export CSV", stats_period_path(@period, :committers, format: :csv)
+  = render "stats/footer"

@@ -1,6 +1,6 @@
 details.commit-llm
   summary.commit-llm-summary
-    span.commit-llm-confidence title="How sure the LLM analysis is about this match" = "LLM #{llm_percent(v[:confidence])}"
+    span.commit-llm-confidence title="How sure the LLM analysis is about this match" = llm_confidence_label(v[:confidence])
     span.commit-llm-verdict = verdict_words(v[:verdict])
     - if v[:change_level]
       span.commit-llm-change title=LineageHelper::CHANGE_LEVEL_TITLE = "#{v[:change_level]} changes"
@@ -21,7 +21,7 @@ details.commit-llm
             span.commit-llm-coverage class="is-#{r['coverage'].presence || 'none'}" = coverage_words(r["coverage"])
             - case r["source"]
             - when "llm"
-              span.commit-llm-src.is-llm title="Found by LLM analysis, not a Reviewed-by trailer" = r["confidence"] ? "LLM #{llm_percent(r['confidence'])}" : "LLM"
+              span.commit-llm-src.is-llm title="Found by LLM analysis, not a Reviewed-by trailer" = r["confidence"] ? llm_confidence_label(r["confidence"]) : "LLM analysis"
             - when "committer"
               span.commit-llm-src.is-committer title="Committed the patch, counted as its reviewer" committer
             - when "trailer"

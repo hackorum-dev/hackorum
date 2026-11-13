@@ -87,7 +87,4 @@ ruby:
             td = stats_pct(r[:reviewed], reviewed_total)
   .stats-foot
     = link_to "export CSV", stats_period_path(@period, :companies, format: :csv)
-  p.stats-disclaimer
-    | Affiliations come from public sources: the PostgreSQL contributors page, commit messages and email domains, conference and company pages, and public profiles. They are kept as date ranges and can be wrong or out of date. To correct or remove yours, see the
-    =< link_to "privacy policy", help_path("privacy")
-    | .
+  = render "stats/footer"

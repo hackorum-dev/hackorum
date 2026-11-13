@@ -106,7 +106,7 @@ RSpec.describe "Thread page patchset lineage", type: :request do
     expect(summary.at_css(".commit-llm-source a")["href"]).to eq("#message-#{m2.id}")
     expect(summary.at_css(".commit-llm-reviews").text).to eq("3 of 4 reviewers saw the final version")
     badge = summary.at_css(".commit-llm-confidence")
-    expect(badge.text).to eq("LLM 90%")
+    expect(badge.text).to eq("LLM analysis, 90% sure")
     expect(badge["title"]).to eq("How sure the LLM analysis is about this match")
     expect(block.at_css(".commit-llm-evidence").inner_html).to include(%(hunks from <a href="#message-#{m2.id}">#2</a> with a renamed helper))
     reviewers = block.css(".commit-llm-reviewers li")
@@ -116,7 +116,7 @@ RSpec.describe "Thread page patchset lineage", type: :request do
     expect(reviewers[0].inner_html).to include(%(looked at <a href="#message-#{m2.id}">#2</a>))
     expect(reviewers[1].at_css(".commit-llm-src").text).to eq("trailer")
     llm = reviewers[2].at_css(".commit-llm-src")
-    expect(llm.text).to eq("LLM 80%")
+    expect(llm.text).to eq("LLM analysis, 80% sure")
     expect(llm["title"]).to eq("Found by LLM analysis, not a Reviewed-by trailer")
     neil = reviewers[3].at_css(".commit-llm-src")
     expect(neil.text).to eq("committer")
@@ -146,7 +146,7 @@ RSpec.describe "Thread page patchset lineage", type: :request do
     cell = Nokogiri::HTML(response.body).css(".patchset-lineage").find { |c| c.text.include?("rebase") }
     expect(cell.at_css(".patchset-step").text.squish).to eq("rebase of #1")
     expect(cell.at_css(".patchset-step a")["href"]).to eq("#message-#{m1.id}")
-    expect(cell.at_css(".patchset-llm").text).to eq("LLM 85%")
+    expect(cell.at_css(".patchset-llm").text).to eq("LLM analysis, 85% sure")
     expect(cell.at_css(".patchset-llm")["title"]).to eq("LLM analysis: how sure it is about this step")
     expect(cell["title"]).to eq("same hunks")
   end

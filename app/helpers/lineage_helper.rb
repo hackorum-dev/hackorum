@@ -40,6 +40,10 @@ module LineageHelper
     "#{(confidence.to_f * 100).round}%"
   end
 
+  def llm_confidence_label(confidence)
+    "LLM analysis, #{llm_percent(confidence)} sure"
+  end
+
   def lineage_text(text, ordinals)
     return "" if text.blank?
 

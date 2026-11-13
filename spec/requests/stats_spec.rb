@@ -326,9 +326,10 @@ RSpec.describe "Release statistics", type: :request do
       body = response.body
       doc = Nokogiri::HTML(body)
       expect(body).to include("Alice in PG19")
-      expect(doc.at_css(".stats-head .s").text).to start_with("committer, Acme (privacy policy)")
+      expect(doc.at_css(".stats-head .s").text).to start_with("committer, Acme")
       expect(doc.at_css(".stats-head abbr")["title"]).to start_with("Affiliation from public sources")
-      expect(body).to include(help_path("privacy"))
+      expect(doc.css("a[href='#{help_path('privacy')}']").size).to eq(1)
+      expect(doc.at_css(".stats-disclaimer a")["href"]).to eq(help_path("privacy"))
       expect(body).to include("#1 of 2 committers")
       expect(body).to include("release 50%")
       expect(body).to include("Sole reviewer")

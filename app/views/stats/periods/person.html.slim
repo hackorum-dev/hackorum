@@ -22,10 +22,7 @@
         = p[:committer] ? stats_committer_badge(p[:committer_since]) : "contributor"
         - if p[:company]
           | ,
-          =< tag.abbr(p[:company], title: "Affiliation from public sources (the PostgreSQL contributors page, commit messages and email domains, conference and company pages, public profiles); it can be wrong or out of date. To correct or remove it, see the privacy policy.")
-          |  (
-          = link_to "privacy policy", help_path("privacy")
-          | )
+          =< tag.abbr(p[:company], title: "Affiliation from public sources (the PostgreSQL contributors page, commit messages and email domains, conference and company pages, public profiles); it can be wrong or out of date. To correct or remove it, see the privacy policy linked at the bottom of the page.")
         - if p[:email]
           |  ·
           =< link_to "profile", person_path(p[:email])
@@ -82,3 +79,4 @@
   h2.stats-band Pulse
   .stats-strips-card style="--stats-strips-height: #{60 + @data[:pulse][:strips].size * 125}px"
     = stats_chart("strips", @data[:pulse], css_class: "stats-chart stats-strips", label: "#{p[:name]} pulse")
+  = render "stats/footer"

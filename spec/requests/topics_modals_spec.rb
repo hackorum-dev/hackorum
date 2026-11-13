@@ -102,7 +102,7 @@ RSpec.describe "Topic detail modals", type: :request do
       blocks = Nokogiri::HTML(response.body).css("details.commit-llm")
       expect(blocks.size).to eq(1)
       expect(blocks.first.at_css(".commit-llm-verdict").text).to eq("landed as posted")
-      expect(blocks.first.at_css(".commit-llm-confidence").text).to eq("LLM 92%")
+      expect(blocks.first.at_css(".commit-llm-confidence").text).to eq("LLM analysis, 92% sure")
     end
 
     it "tags reverts strictly" do
