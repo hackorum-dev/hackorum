@@ -2,7 +2,6 @@ module Api
   module V1
     # The finished lineage run of a thread: what a model wrote about its patchsets.
     class LineageSerializer < BaseSerializer
-      FEATURE = "patchset_lineage".freeze
       STEP_COLUMNS = %i[parent_message_id step_kind confidence reason].freeze
       RUN_COLUMNS = %i[id topic_id model finished_at story].freeze
 

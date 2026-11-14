@@ -10,7 +10,6 @@ module Api
       "query_too_expensive" => 400,
       "token_required" => 401,
       "invalid_token" => 401,
-      "feature_required" => 403,
       "no_send_identity" => 403,
       "not_found" => 404,
       "method_not_allowed" => 405,

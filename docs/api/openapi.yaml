@@ -80,7 +80,6 @@ info:
     - Activities: `/me/activities` is the owner's activity list.
     - Drafts: the owner's drafts of replies can be written, read, changed
       and deleted, see below. Not sent.
-    - Lineage data, when the account has the feature for it, see below.
 
     `me` only ever holds the token owner's own state, and no response
     names teammates. In the search, the name of a team works in the state
@@ -94,14 +93,11 @@ info:
     Lineage: for some threads a language model has read the patchsets and
     the linked commits and written down how the patchsets derive from each
     other, which commits belong to the thread, who reviewed what and a short
-    story of the thread. This is only given to accounts with the
-    `patchset_lineage` feature, set per user or per team by the site
-    admins. Such a caller gets `/topics/{id}/lineage`, a `lineage` field on
-    patchsets, `link_source`, `verdict` and a `source` per credit on
+    story of the thread. It is in `/topics/{id}/lineage`, a `lineage` field
+    on patchsets, `link_source`, `verdict` and a `source` per credit on
     commits, the commits and credits a model added, and `links.lineage` on
-    a thread. For everyone else these fields are absent, not null, and the
-    responses are the same as without a token. All of it is model output
-    with a confidence, not fact: it can be wrong.
+    a thread. All of it is model output with a confidence, not fact: it can
+    be wrong.
 
     Drafts: a token owner whose account has a Gmail identity that may
     send (`send_authorized` in `/me`) can have replies prepared:
@@ -242,7 +238,6 @@ info:
     | `query_too_expensive` | 400 | A database statement ran longer than 5 seconds or needed too much memory and was stopped. Any operation can give it, a broad search is the usual cause: narrow the query |
     | `token_required` | 401 | `/me`, a path under it or `/drafts` without a token, or `starred` or `participating` on `/events` without one |
     | `invalid_token` | 401 | The token sent is invalid, expired or revoked |
-    | `feature_required` | 403 | The resource is only for accounts with a feature the caller does not have, or no token was sent |
     | `no_send_identity` | 403 | A draft was asked for and the account has no Gmail identity that may send. Connect one on the site |
     | `not_found` | 404 | No such record or path |
     | `method_not_allowed` | 405 | The HTTP method is not usable here |
@@ -282,7 +277,7 @@ tags:
   - name: Patchsets
     description: Messages that carry patches
   - name: Lineage
-    description: What a language model wrote about the patchsets and commits of a thread, for accounts with the feature
+    description: What a language model wrote about the patchsets and commits of a thread
   - name: Branches and CI
     description: The git branches hackorum builds from patchsets, and their CI runs
   - name: Events
@@ -805,8 +800,7 @@ paths:
       description: |
         Digits are an id, anything else is a slug, matched without case.
         This is the metadata of the thread, its messages, patchsets and
-        commits are under `links`. For an account with the
-        `patchset_lineage` feature `links` also has `lineage` when the
+        commits are under `links`. `links` also has `lineage` when the
         thread has lineage data.
         With a token `me` is the token owner's state
         and names the first unread message.
@@ -894,9 +888,8 @@ paths:
       summary: The patchsets of a thread, newest first
       description: |
         Every message of the thread that carries patches, ordered by
-        `created_at`, then `id`, both descending. For an account with the
-        `patchset_lineage` feature each row has `lineage`, see the
-        description of the API.
+        `created_at`, then `id`, both descending. Each row has `lineage`,
+        see the description of the API.
       parameters:
         - $ref: "#/components/parameters/topicId"
         - $ref: "#/components/parameters/limit"
@@ -949,11 +942,9 @@ paths:
         paged: `next_cursor` is always null, and `limit` and `cursor` are
         refused with 400 `invalid_parameter`.
 
-        For an account with the `patchset_lineage` feature the list also
-        has the commits a language model linked to the thread, and the
-        credits it added. Each entry then has `link_source` and `verdict`,
-        each credit a `source`. For everyone else these fields are absent
-        and nothing a model produced is in the list.
+        The list also has the commits a language model linked to the
+        thread, and the credits it added. Each entry has `link_source` and
+        `verdict`, each credit a `source`.
       parameters:
         - $ref: "#/components/parameters/topicId"
       responses:
@@ -1064,11 +1055,8 @@ paths:
         the patchset it derives from. Everything here is the output of a
         language model with a confidence, not fact.
 
-        Only for accounts with the `patchset_lineage` feature. Any other
-        caller gets 403 `feature_required`, also without a token: this is
-        not a 401, a token alone does not help. A caller with the feature
-        gets 404 when the thread has no finished run. The verdicts of the
-        same run on commits are in `/topics/{id}/commits`.
+        404 when the thread has no finished run. The verdicts of the same
+        run on commits are in `/topics/{id}/commits`.
 
         References in `text`, `reason` and `evidence` fields are tokens:
         `[msg:<id>]` is a message, read it at `/messages/{id}`;
@@ -1094,19 +1082,6 @@ paths:
           $ref: "#/components/responses/TopicMoved"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "403":
-          description: The caller's account does not have the `patchset_lineage` feature, or no token was sent (`feature_required`)
-          headers:
-            RateLimit-Limit:
-              $ref: "#/components/headers/RateLimit-Limit"
-            RateLimit-Remaining:
-              $ref: "#/components/headers/RateLimit-Remaining"
-            RateLimit-Reset:
-              $ref: "#/components/headers/RateLimit-Reset"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
         "404":
           description: No such thread, or the thread has no finished lineage run (`not_found`)
           headers:
@@ -2761,8 +2736,7 @@ components:
             lineage:
               type: string
               description: |
-                `/topics/{id}/lineage`. Only present for accounts with the
-                `patchset_lineage` feature, and only when the thread has a
+                `/topics/{id}/lineage`. Only present when the thread has a
                 finished lineage run.
     PersonTopic:
       type: object
@@ -3810,7 +3784,6 @@ components:
             - $ref: "#/components/schemas/PatchsetStep"
             - type: "null"
           description: |
-            Only present for accounts with the `patchset_lineage` feature.
             What a language model said this patchset derives from, in the
             latest finished lineage run of its thread. Null when the thread
             has no such run or the run has nothing for this message. Model
@@ -4031,7 +4004,6 @@ components:
           type: string
           enum: [trailer, llm]
           description: |
-            Only present for accounts with the `patchset_lineage` feature.
             How the entry is linked to the thread. `trailer`: a commit of
             the entry names the thread in a `Discussion:` trailer. `llm`: a
             language model linked it, which can be wrong.
@@ -4040,7 +4012,6 @@ components:
             - $ref: "#/components/schemas/CommitVerdict"
             - type: "null"
           description: |
-            Only present for accounts with the `patchset_lineage` feature.
             What the latest finished lineage run of the thread concluded
             about the entry. Null when there is no run or it has no verdict
             to show for the entry. Model output with a confidence.
@@ -4082,9 +4053,8 @@ components:
             role, in the order of the `CommitRole` values and by name inside
             a role. A committer of a patch whose commit message names
             somebody else as the author is also listed as a `reviewer`.
-            A credit without a name is left out. For accounts with the
-            `patchset_lineage` feature the list also has the credits a
-            language model added, and the committer is listed as a
+            A credit without a name is left out. The list also has the
+            credits a language model added, and the committer is listed as a
             `reviewer` also where only a model named the author.
           items:
             type: object
@@ -4107,8 +4077,7 @@ components:
                 type: string
                 enum: [parsed, committer, llm]
                 description: |
-                  Only present for accounts with the `patchset_lineage`
-                  feature. Where the credit comes from. `parsed`: the commit
+                  Where the credit comes from. `parsed`: the commit
                   message. `committer`: the committer of somebody else's
                   patch, counted as a reviewer. `llm`: a language model
                   named the person from the thread, which can be wrong. A

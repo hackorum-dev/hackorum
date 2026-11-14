@@ -22,7 +22,7 @@ RSpec.describe "API v1 guide", type: :request do
     }
   end
   let(:handled_codes) do
-    %w[rate_limited query_too_expensive invalid_cursor cursor_expired token_required feature_required conflict draft_limit]
+    %w[rate_limited query_too_expensive invalid_cursor cursor_expired token_required conflict draft_limit]
   end
 
   def query_names(template)

@@ -7,10 +7,6 @@ RSpec.describe Feature do
       expect(Feature.valid?("email_sending")).to be true
     end
 
-    it "knows the patchset_lineage feature" do
-      expect(Feature.valid?("patchset_lineage")).to be true
-    end
-
     it "returns false for unknown names" do
       expect(Feature.valid?(:bogus)).to be false
     end
@@ -39,8 +35,6 @@ RSpec.describe Feature do
       create(:team_member, team: other, user: outsider)
       create(:team_feature, team: t1, feature: "email_sending")
       create(:team_feature, team: t2, feature: "email_sending")
-      create(:team_feature, team: other, feature: "patchset_lineage")
-      create(:user_feature, user: outsider, feature: "patchset_lineage")
 
       result = Feature.access_by_user("email_sending")
 

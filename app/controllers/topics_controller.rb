@@ -107,7 +107,7 @@ class TopicsController < ApplicationController
     build_thread_outline(@messages)
     @commitfest_summary = Topics::CommitfestSummary.new(@topic)
     load_commit_summary
-    @lineage = Lineage::ThreadPresenter.new(@topic, ordinals: @message_numbers) if lineage_visible?
+    @lineage = Lineage::ThreadPresenter.new(@topic, ordinals: @message_numbers)
     # lazy object, not a load_* call like its neighbours - the view decides
     # whether anything is needed, so this must not query on its own
     @ci_status = PatchCi::TopicStatus.new(topic: @topic)
@@ -180,9 +180,9 @@ class TopicsController < ApplicationController
   def commits_details
     load_commit_summary
     @credits = Topics::CreditCounts.new(@commit_summary.groups, sources: commit_credit_sources).by_role
-    @llm_commit_shas = lineage_visible? ? Lineage::ThreadPresenter.llm_commit_shas(@topic.id) : Set.new
+    @llm_commit_shas = Lineage::ThreadPresenter.llm_commit_shas(@topic.id)
     @commit_verdicts = {}
-    if lineage_visible? && @commit_summary.any?
+    if @commit_summary.any?
       @lineage = Lineage::ThreadPresenter.new(@topic, ordinals: helpers.lineage_ordinals(@topic))
       @commit_verdicts = @lineage.verdicts_for_groups(@commit_summary) if @lineage.run
     end
@@ -195,8 +195,6 @@ class TopicsController < ApplicationController
   end
 
   def story
-    return head :not_found unless lineage_visible?
-
     load_thread_index
     @lineage = Lineage::ThreadPresenter.new(@topic, ordinals: @message_numbers)
     return head :not_found unless @lineage.run
@@ -262,7 +260,7 @@ class TopicsController < ApplicationController
     branches = PatchBranch.where(topic_id: @topic.id, lineage_only: false).pluck(:message_id, :branch_name, :pushed_at)
     @has_patch_branches = branches.any?
     @patchset_branches = branches.filter_map { |message_id, name, pushed_at| [ message_id, name ] if pushed_at }.to_h
-    @lineage_by_message = lineage_visible? ? Lineage::ThreadPresenter.new(@topic, ordinals: @message_numbers).lineage_by_message_id : {}
+    @lineage_by_message = Lineage::ThreadPresenter.new(@topic, ordinals: @message_numbers).lineage_by_message_id
     @ci_status = PatchCi::TopicStatus.new(topic: @topic)
     @run_tab = params[:tab] == "run"
 
@@ -1018,8 +1016,7 @@ class TopicsController < ApplicationController
   end
 
   def load_commit_summary
-    sources = lineage_visible? ? %w[trailer llm] : %w[trailer]
-    commits = Commit.for_topic(@topic.id, sources: sources).to_a
+    commits = Commit.for_topic(@topic.id, sources: %w[trailer llm]).to_a
     @commit_summary = Topics::CommitSummary.new(commits, credit_sources: commit_credit_sources)
   end
 

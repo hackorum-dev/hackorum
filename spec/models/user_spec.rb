@@ -217,11 +217,6 @@ RSpec.describe User, type: :model do
         expect(user.has_feature?(:email_sending)).to be true
       end
 
-      it "returns false for a different feature on the team" do
-        create(:team_feature, team: team, feature: "patchset_lineage")
-        expect(user.has_feature?(:email_sending)).to be false
-      end
-
       it "returns false when only another team has the feature" do
         create(:team_feature, team: create(:team), feature: "email_sending")
         expect(user.has_feature?(:email_sending)).to be false

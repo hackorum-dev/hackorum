@@ -264,17 +264,7 @@ RSpec.describe 'People profile', type: :request do
         CommitPerson.create!(commit: create(:commit), role: 'author', person_id: person.id, source: 'llm', confidence: 0.9)
       end
 
-      it 'leaves it out of the hero total without the feature' do
-        get person_path(person_alias.email)
-
-        expect(response.body[/credits-hero-value">([^<]+)</, 1]).to eq('1')
-      end
-
-      it 'counts it with the patchset_lineage feature' do
-        user = create(:user)
-        create(:user_feature, user: user, feature: 'patchset_lineage')
-        sign_in_as(user)
-
+      it 'counts it in the hero total' do
         get person_path(person_alias.email)
 
         expect(response.body[/credits-hero-value">([^<]+)</, 1]).to eq('2')

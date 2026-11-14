@@ -1,6 +1,5 @@
 module Stats
   class ListsController < BaseController
-    skip_before_action :require_authentication, :require_lineage_feature
     before_action :load_params
 
     def volume

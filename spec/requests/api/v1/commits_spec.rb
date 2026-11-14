@@ -4,7 +4,7 @@ RSpec.describe "API v1 topic commits", type: :request do
   let(:alice) { create(:alias, :with_sent_messages, name: "Alice A", email: "alice.a@example.org") }
   let(:topic) { create(:topic, creator_alias: alice, title: "Add a feature", slug: "add-feature") }
   let(:start) { Time.zone.parse("2026-03-01 10:00:00") }
-  let(:entry_keys) { %w[sha subject committed_at committer_name url branches people] }
+  let(:entry_keys) { %w[sha subject committed_at committer_name url branches people link_source verdict] }
 
   def body
     JSON.parse(response.body)
@@ -92,11 +92,11 @@ RSpec.describe "API v1 topic commits", type: :request do
         [ "committer", "Tom Lane" ]
       ])
       entry = data.first["people"].find { |row| row["role"] == "reviewer" && row["name"] == "Tom Lane" }
-      expect(entry.keys).to match_array(%w[role name person])
+      expect(entry.keys).to match_array(%w[role name person source])
       expect(entry["person"].keys).to match_array(%w[id name email url html_url])
       expect(entry["person"]).to include("id" => tom.id, "name" => "Tom Lane", "email" => "tgl@example.org")
       unresolved = data.first["people"].first
-      expect(unresolved).to eq("role" => "author", "name" => "Alexander Lakhin", "person" => nil)
+      expect(unresolved).to eq("role" => "author", "name" => "Alexander Lakhin", "person" => nil, "source" => "parsed")
       expect(response.body).not_to include("alexander-lakhin@example.com")
     end
 
@@ -111,51 +111,6 @@ RSpec.describe "API v1 topic commits", type: :request do
 
       expect(people(data.first)).to eq([ [ "author", "Tom Lane" ], [ "reviewer", "Tom Lane" ] ])
       expect(data.first["people"].map { |entry| entry["person"]&.fetch("id") }).to eq([ nil, tom.id ])
-    end
-
-    it "leaves out llm links and llm credits, also for a user with another feature" do
-      user = create(:user)
-      create(:user_feature, user: user, feature: "email_sending")
-      shown = commit("aaa1")
-      credit(shown, "author", "Trailer Author")
-      credit(shown, "reviewer", "Guessed Reviewer", source: "llm", confidence: 0.9)
-      guessed = link(create(:commit, sha: "bbb2", subject: "Guessed commit"), source: "llm", confidence: 0.8)
-      credit(guessed, "author", "Other Author")
-
-      get "/api/v1/topics/#{topic.id}/commits",
-          headers: { "Authorization" => "Bearer #{ApiToken.issue!(user: user, name: "laptop").last}" }
-
-      expect(response).to have_http_status(:ok)
-      expect(shas).to eq([ "aaa1" ])
-      expect(people(data.first)).to eq([ [ "author", "Trailer Author" ] ])
-      expect(response.body).not_to include("Guessed", "Other Author", "verdict", "llm")
-    end
-
-    it "lists the committer as reviewer only on a commit whose message names the author" do
-      tom = person("Tom Lane", "tgl@example.org")
-      guessed = commit("aaa1", at: start + 2.hours)
-      credit(guessed, "committer", "Tom Lane", person: tom)
-      credit(guessed, "author", "Guessed Author", source: "llm", confidence: 0.9)
-      credit(guessed, "reviewer", "Tom Lane", person: tom, source: "committer")
-      named = commit("bbb2", at: start + 1.hour)
-      credit(named, "committer", "Tom Lane", person: tom)
-      credit(named, "co_author", "Named Coauthor")
-      credit(named, "reviewer", "Tom Lane", person: tom, source: "committer")
-      master = commit("ccc3")
-      backport = commit("ddd4", cherry_picked_from_sha: "ccc3", branches: [ "REL_18_STABLE" ])
-      credit(master, "author", "Named Author")
-      credit(backport, "author", "Guessed Author", source: "llm", confidence: 0.9)
-      [ master, backport ].each { |row| credit(row, "reviewer", "Tom Lane", person: tom, source: "committer") }
-
-      get "/api/v1/topics/#{topic.id}/commits"
-
-      expect(shas).to eq(%w[aaa1 bbb2 ccc3])
-      expect(data.map { |row| people(row) }).to eq([
-        [ [ "committer", "Tom Lane" ] ],
-        [ [ "reviewer", "Tom Lane" ], [ "co_author", "Named Coauthor" ], [ "committer", "Tom Lane" ] ],
-        [ [ "author", "Named Author" ], [ "reviewer", "Tom Lane" ] ]
-      ])
-      expect(response.body).not_to include("Guessed")
     end
 
     it "names a credit without a raw name by its person and skips one that has neither" do

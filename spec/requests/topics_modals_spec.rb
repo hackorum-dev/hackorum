@@ -92,12 +92,6 @@ RSpec.describe "Topic detail modals", type: :request do
       create(:commit_verdict, patchset_run: run, commit: backport, verdict: "as_is", confidence: 0.92)
 
       get commits_details_topic_path(topic)
-      expect(response.body).not_to include("commit-llm")
-
-      user = create(:user)
-      create(:user_feature, user: user, feature: "patchset_lineage")
-      sign_in_as(user)
-      get commits_details_topic_path(topic)
 
       blocks = Nokogiri::HTML(response.body).css("details.commit-llm")
       expect(blocks.size).to eq(1)
@@ -119,18 +113,12 @@ RSpec.describe "Topic detail modals", type: :request do
       expect(tags).to contain_exactly("reverts 1 commit here", "revert")
     end
 
-    it "shows the llm share of a person's credits only with the feature" do
+    it "shows the llm share of a person's credits" do
       c1, c2 = create_list(:commit, 2)
       c1.commit_people.create!(role: "reviewer", raw_name: "Pavel Borisov")
       c2.commit_people.create!(role: "reviewer", raw_name: "Pavel Borisov", source: "llm", confidence: 0.8)
       [ c1, c2 ].each { |c| link_topic(topic, c) }
 
-      get commits_details_topic_path(topic)
-      expect(response.body).not_to include("1 LLM")
-
-      user = create(:user)
-      create(:user_feature, user: user, feature: "patchset_lineage")
-      sign_in_as(user)
       get commits_details_topic_path(topic)
       expect(response.body).to include(">1 LLM<")
     end

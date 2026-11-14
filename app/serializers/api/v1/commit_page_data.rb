@@ -2,9 +2,8 @@ module Api
   module V1
     # The credited people of commit groups, loaded once for all of them.
     class CommitPageData
-      SOURCES = [ "parsed", CommitterReviewer::SOURCE ].freeze
       # in the order a credit made of several rows names its source
-      LINEAGE_SOURCES = [ *SOURCES, "llm" ].freeze
+      SOURCES = [ "parsed", CommitterReviewer::SOURCE, "llm" ].freeze
       COLUMNS = %i[id commit_id role source raw_name raw_email person_id].freeze
 
       Credit = Struct.new(:role, :person, :rows) do
@@ -21,7 +20,7 @@ module Api
         end
 
         def source
-          LINEAGE_SOURCES.find { |source| rows.any? { |row| row.source == source } }
+          SOURCES.find { |source| rows.any? { |row| row.source == source } }
         end
 
         def same?(row)
@@ -36,7 +35,7 @@ module Api
         end
       end
 
-      # the lineage data of the thread, nil for a caller without the feature
+      # the lineage data of the thread, nil outside a thread
       attr_reader :lineage
 
       def initialize(groups, lineage: nil)
@@ -56,16 +55,8 @@ module Api
 
       def rows_by_commit
         @rows_by_commit ||= @commit_ids.empty? ? {} : CommitPerson
-          .where(commit_id: @commit_ids, source: lineage ? LINEAGE_SOURCES : SOURCES).select(COLUMNS).order(:id)
+          .where(commit_id: @commit_ids, source: SOURCES).select(COLUMNS).order(:id)
           .preload(person: PersonSerializer::PRELOAD).group_by(&:commit_id)
-          .transform_values { |rows| lineage ? rows : trailer_backed(rows) }
-      end
-
-      # a committer-as-reviewer row stands only on an author the commit message names
-      def trailer_backed(rows)
-        return rows if rows.any? { |row| row.source == "parsed" && CommitterReviewer::AUTHOR_ROLES.include?(row.role) }
-
-        rows.reject { |row| row.source == CommitterReviewer::SOURCE }
       end
 
       # a row without a person joins the one credit it matches by email or

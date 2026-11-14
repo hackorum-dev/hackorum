@@ -22,7 +22,6 @@ Never put a token into a URL, there is no query parameter for it. What a token u
 - the owner's own state in `me` on threads and messages, and the search selectors about the owner
 - the private notes the owner can see, saved searches, the activity list
 - drafts
-- lineage data, when the account has that feature
 
 A token that is invalid, expired or revoked is answered with 401 `invalid_token`, never anonymously. `/me`, the paths under it and `/drafts` need a token, without one they give 401 `token_required`.
 
@@ -42,7 +41,6 @@ A token that is invalid, expired or revoked is answered with 401 `invalid_token`
   - 400 `invalid_cursor`: the cursor is malformed or from another request. Start that list again.
   - 410 `cursor_expired`: on `/events` only, see "Following changes".
   - 401 `token_required`: this request needs a token.
-  - 403 `feature_required`: the account does not have the feature (lineage). A token alone does not help.
   - 409 `conflict`: a draft is being sent, changed since the `updated_at` you gave, or is busy. Read it again and retry.
   - 422 `draft_limit`: too many unsent drafts or attachment bytes. Ask the user to send or delete drafts.
 - `/topics/{id}` and the lists under it answer a merged thread with 301 and no body. `Location` is the same request on the thread it was merged into: follow redirects.
@@ -145,7 +143,7 @@ No operation sends, and a token does not carry that permission. A token can stil
 
 ## Lineage
 
-For some threads a language model wrote down how the patchsets derive from each other, which commits came out of the thread and who reviewed what: `GET /topics/{id}/lineage`, a `lineage` field on patchsets, `link_source` and `verdict` on commits. Only accounts with the `patchset_lineage` feature get it (see `features` in `/me`), everyone else gets 403 `feature_required` on the endpoint and no such fields elsewhere. It is model output with a confidence: treat it as a hint, not as fact.
+For some threads a language model wrote down how the patchsets derive from each other, which commits came out of the thread and who reviewed what: `GET /topics/{id}/lineage`, a `lineage` field on patchsets, `link_source` and `verdict` on commits. It is model output with a confidence: treat it as a hint, not as fact.
 
 ## Operations
 
@@ -164,7 +162,7 @@ For some threads a language model wrote down how the patchsets derive from each 
 | GET | `/topics/{id}/patchsets` | Patchsets of a thread |
 | GET | `/topics/{id}/commits` | Commits linked to a thread |
 | GET | `/topics/{id}/notes` | Notes on a thread |
-| GET | `/topics/{id}/lineage` | Lineage of a thread (feature) |
+| GET | `/topics/{id}/lineage` | Lineage of a thread |
 | GET | `/messages/lookup` | A message by Message-ID |
 | GET | `/messages/{id}` | A message by id |
 | GET | `/attachments/{id}` | Attachment, without content |

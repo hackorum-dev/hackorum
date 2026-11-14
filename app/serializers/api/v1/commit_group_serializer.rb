@@ -2,7 +2,6 @@ module Api
   module V1
     # A change with its backports, as Commit.group_backports gives it.
     class CommitGroupSerializer < BaseSerializer
-      LINK_SOURCES = %w[trailer].freeze
       # what group_backports reads; the body is left in the database
       COLUMNS = %w[id sha subject committed_at committer_name branches released_in cherry_picked_from_sha].freeze
 
@@ -32,12 +31,11 @@ module Api
       def people
         page_data.credits(record).map do |credit|
           person = credit.person && PersonSerializer.new(credit.person, context).brief
-          entry = { role: credit.role, name: person ? person[:name] : credit.name, person: person }
-          page_data.lineage ? entry.merge(source: credit.source) : entry
+          { role: credit.role, name: person ? person[:name] : credit.name, person: person, source: credit.source }
         end
       end
 
-      # only for a caller with the feature
+      # only for the commits of a thread
       def lineage
         data = page_data.lineage
         data ? { link_source: data.link_source(record), verdict: data.verdict(record) } : {}

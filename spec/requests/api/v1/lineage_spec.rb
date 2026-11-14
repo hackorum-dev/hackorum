@@ -5,10 +5,8 @@ RSpec.describe "API v1 lineage", type: :request do
   let(:tom) { create(:alias, :with_sent_messages, name: "Tom Lane", email: "tgl@example.org").person }
   let(:topic) { create(:topic, creator_alias: alice, title: "Add a feature", slug: "add-feature") }
   let(:start) { Time.zone.parse("2026-03-01 10:00:00") }
-  let(:plain) { create(:user) }
-  let(:featured) { create(:user).tap { |user| create(:user_feature, user: user, feature: "patchset_lineage") } }
-  let(:plain_headers) { bearer(plain) }
-  let(:featured_headers) { bearer(featured) }
+  let(:reader) { create(:user) }
+  let(:reader_headers) { bearer(reader) }
 
   let(:sha_a) { "a" * 40 }
   let(:sha_b) { "b" * 40 }
@@ -44,7 +42,7 @@ RSpec.describe "API v1 lineage", type: :request do
 
   # the first request of a token also stamps its use
   def warm_up
-    get "/api/v1/me", headers: featured_headers
+    get "/api/v1/me", headers: reader_headers
   end
 
   def patchset(at: start, in_topic: topic, sender: alice)
@@ -115,10 +113,10 @@ RSpec.describe "API v1 lineage", type: :request do
   end
 
   describe "GET /topics/{id}/lineage" do
-    it "gives the run, the story by line and the steps of that run only to a user with the feature" do
+    it "gives the run, the story by line and the steps of that run" do
       lineage_thread(old_step: true)
 
-      get "/api/v1/topics/#{topic.id}/lineage", headers: featured_headers
+      get "/api/v1/topics/#{topic.id}/lineage", headers: reader_headers
 
       expect(response).to have_http_status(:ok)
       expect(body.keys).to match_array(%w[run story steps])
@@ -144,7 +142,7 @@ RSpec.describe "API v1 lineage", type: :request do
     it "lists each reference of a line once, in order of appearance" do
       run.update!(story: "[commit:#{sha_c}] [msg:#{m2.id}] [commit:#{sha_a}] [msg:#{m2.id}] [commit:#{sha_c}] [msg:abc]")
 
-      get "/api/v1/topics/add-feature/lineage", headers: featured_headers
+      get "/api/v1/topics/add-feature/lineage", headers: reader_headers
 
       expect(body["story"].size).to eq(1)
       expect(body["story"].first).to include("message_ids" => [ m2.id ], "commit_shas" => [ sha_c, sha_a ])
@@ -154,38 +152,18 @@ RSpec.describe "API v1 lineage", type: :request do
     it "gives an empty story for a run without one" do
       run.update!(story: nil, model: nil)
 
-      get "/api/v1/topics/#{topic.id}/lineage", headers: featured_headers
+      get "/api/v1/topics/#{topic.id}/lineage", headers: reader_headers
 
       expect(response).to have_http_status(:ok)
       expect(body).to include("story" => [], "steps" => [])
       expect(body["run"]).to include("model" => nil)
     end
 
-    it "answers 403 feature_required without the feature, with and without a token" do
-      lineage_thread
-
-      [ {}, plain_headers ].each do |headers|
-        get "/api/v1/topics/#{topic.id}/lineage", headers: headers
-
-        expect(response).to have_http_status(:forbidden)
-        expect(error_code).to eq("feature_required")
-        expect(response.headers["WWW-Authenticate"]).to be_nil
-        expect(response.body).not_to include("posted", "first version")
-      end
-    end
-
-    it "answers 403 without the feature whether or not there is a run" do
-      get "/api/v1/topics/#{topic.id}/lineage", headers: plain_headers
-
-      expect(response).to have_http_status(:forbidden)
-      expect(error_code).to eq("feature_required")
-    end
-
-    it "answers 404 with the feature when the thread has no finished run" do
+    it "answers 404 when the thread has no finished run" do
       create(:patchset_run, topic: topic, status: "running", finished_at: nil)
       create(:patchset_run, topic: create(:topic, creator_alias: alice))
 
-      get "/api/v1/topics/#{topic.id}/lineage", headers: featured_headers
+      get "/api/v1/topics/#{topic.id}/lineage", headers: reader_headers
 
       expect(response).to have_http_status(:not_found)
       expect(error_code).to eq("not_found")
@@ -194,7 +172,7 @@ RSpec.describe "API v1 lineage", type: :request do
     it "answers 404 for an unknown thread and 301 for a merged one, whoever asks" do
       source = create(:topic, creator_alias: alice, merged_into_topic_id: topic.id)
 
-      [ {}, featured_headers ].each do |headers|
+      [ {}, reader_headers ].each do |headers|
         get "/api/v1/topics/nope/lineage", headers: headers
         expect(response).to have_http_status(:not_found)
 
@@ -204,58 +182,10 @@ RSpec.describe "API v1 lineage", type: :request do
       end
     end
 
-    it "takes the feature from a team and from an admin as from the user" do
-      lineage_thread
-      member = create(:user)
-      team = create(:team)
-      create(:team_member, team: team, user: member)
-      create(:team_feature, team: team, feature: "patchset_lineage")
-      other_team = create(:team)
-      create(:team_feature, team: other_team, feature: "patchset_lineage")
-      create(:team_member, team: create(:team), user: plain)
-      create(:user_feature, user: plain, feature: "email_sending")
-
-      [ member, create(:user, admin: true) ].each do |user|
-        get "/api/v1/topics/#{topic.id}/lineage", headers: bearer(user)
-        expect(response).to have_http_status(:ok)
-        expect(body["steps"].size).to eq(2)
-      end
-
-      get "/api/v1/topics/#{topic.id}/lineage", headers: plain_headers
-      expect(response).to have_http_status(:forbidden)
-
-      get "/api/v1/topics/#{topic.id}/commits", headers: bearer(member)
-      expect(data.map { |row| row["sha"] }).to include(sha_c)
-    end
-
-    it "answers 403 as soon as the team loses the feature, and the thread no longer links to it" do
-      lineage_thread
-      member = create(:user)
-      team = create(:team)
-      create(:team_member, team: team, user: member)
-      grant = create(:team_feature, team: team, feature: "patchset_lineage")
-      headers = bearer(member)
-
-      get "/api/v1/topics/#{topic.id}/lineage", headers: headers
-      expect(response).to have_http_status(:ok)
-      get "/api/v1/topics/#{topic.id}", headers: headers
-      expect(body["links"].keys).to include("lineage")
-
-      grant.destroy!
-
-      get "/api/v1/topics/#{topic.id}/lineage", headers: headers
-      expect(response).to have_http_status(:forbidden)
-      expect(error_code).to eq("feature_required")
-      get "/api/v1/topics/#{topic.id}", headers: headers
-      expect(body["links"].keys).to match_array(%w[messages patchsets commits])
-      get "/api/v1/topics/#{topic.id}/commits", headers: headers
-      expect(data.map(&:keys)).to all(match_array(%w[sha subject committed_at committer_name url branches people]))
-    end
-
     it "takes no query parameters" do
       run
 
-      get "/api/v1/topics/#{topic.id}/lineage?limit=5", headers: featured_headers
+      get "/api/v1/topics/#{topic.id}/lineage?limit=5", headers: reader_headers
 
       expect(response).to have_http_status(:bad_request)
       expect(error_code).to eq("invalid_parameter")
@@ -265,13 +195,13 @@ RSpec.describe "API v1 lineage", type: :request do
       run.update!(story: "one line [msg:#{m1.id}]")
       step(m1)
       warm_up
-      short = captured_queries { get "/api/v1/topics/#{topic.id}/lineage", headers: featured_headers }
+      short = captured_queries { get "/api/v1/topics/#{topic.id}/lineage", headers: reader_headers }
       expect(body["steps"].size).to eq(1)
 
       later = Array.new(4) { |i| patchset(at: start + (i + 2).hours) }
       later.each_with_index { |row, i| step(row, parent_message: ([ m1 ] + later)[i], step_kind: "minor_revision") }
       run.update!(story: ([ m1 ] + later).map { |row| "line [msg:#{row.id}] [commit:#{sha_a}]" }.join("\n\n"))
-      long = captured_queries { get "/api/v1/topics/#{topic.id}/lineage", headers: featured_headers }
+      long = captured_queries { get "/api/v1/topics/#{topic.id}/lineage", headers: reader_headers }
 
       expect(body["story"].size).to eq(5)
       expect(body["steps"].size).to eq(5)
@@ -282,71 +212,12 @@ RSpec.describe "API v1 lineage", type: :request do
     end
   end
 
-  describe "without the feature" do
-    before { lineage_thread }
-
-    def bodies(path)
-      [ {}, plain_headers, featured_headers ].map do |headers|
-        get path, headers: headers
-        expect(response).to have_http_status(:ok)
-        body
-      end
-    end
-
-    it "answers the commits of a thread as it does without a token" do
-      anonymous, without, with = bodies("/api/v1/topics/#{topic.id}/commits")
-
-      expect(without).to eq(anonymous)
-      expect(with).not_to eq(anonymous)
-      expect(anonymous["data"].map { |row| row["sha"] }).to eq([ sha_a, sha_b ])
-      expect(anonymous["data"].map(&:keys)).to all(match_array(%w[sha subject committed_at committer_name url branches people]))
-      expect(anonymous["data"].flat_map { |row| row["people"].map(&:keys) }).to all(match_array(%w[role name person]))
-      expect(anonymous["data"].map { |row| row["people"].map { |entry| entry.values_at("role", "name") } }).to eq([
-        [ [ "author", "Named Author" ], [ "reviewer", "Tom Lane" ], [ "reviewer", "Zed Reviewer" ], [ "committer", "Tom Lane" ] ],
-        [ [ "committer", "Tom Lane" ] ]
-      ])
-      expect(anonymous.to_json).not_to include("Guessed", "Other Author", "verdict", "llm", "link_source")
-    end
-
-    it "answers the patchsets of a thread as it does without a token" do
-      anonymous, without, with = bodies("/api/v1/topics/#{topic.id}/patchsets")
-
-      expect(without).to eq(anonymous)
-      expect(with).not_to eq(anonymous)
-      expect(anonymous["data"].map { |row| row["message_id"] }).to eq([ m2.id, m1.id ])
-      expect(anonymous["data"].map(&:keys)).to all(match_array(
-        %w[message_id number url html_url created_at subject sender topic files changed_paths branch download_url]
-      ))
-      expect(anonymous.to_json).not_to include("lineage", "same hunks", "rebase")
-    end
-
-    it "answers the patchsets of a person as it does without a token" do
-      anonymous, without, with = bodies("/api/v1/people/alice.a@example.org/patchsets")
-
-      expect(without).to eq(anonymous)
-      expect(with).not_to eq(anonymous)
-      expect(anonymous["data"].size).to eq(2)
-      expect(anonymous["data"].flat_map(&:keys)).not_to include("lineage")
-      expect(anonymous.to_json).not_to include("same hunks", "rebase")
-    end
-
-    it "answers the thread as it does without a token, apart from me" do
-      anonymous, without, with = bodies("/api/v1/topics/#{topic.id}")
-
-      expect(without.except("me")).to eq(anonymous.except("me"))
-      expect(with.except("me")).not_to eq(anonymous.except("me"))
-      expect(anonymous["links"].keys).to match_array(%w[messages patchsets commits])
-      expect(anonymous.to_json).not_to include("lineage")
-    end
-  end
-
   describe "the queries of the lineage data, by table" do
     let(:tables) { %w[user_features team_features patchset_runs commit_verdicts patchset_lineages] }
 
     before do
       lineage_thread
       warm_up
-      get "/api/v1/me", headers: plain_headers
     end
 
     def queries_for(path, headers)
@@ -361,30 +232,27 @@ RSpec.describe "API v1 lineage", type: :request do
     end
 
     def expect_tables(path, with:)
-      check = { "user_features" => 1, "team_features" => 1 }
-
-      expect(by_table(path, {})).to eq({}), path
-      expect(by_table(path, plain_headers)).to eq(check), path
-      expect(by_table(path, featured_headers)).to eq({ "user_features" => 1 }.merge(with)), path
+      expect(by_table(path, {})).to eq(with), path
+      expect(by_table(path, reader_headers)).to eq(with), path
     end
 
-    it "are the check, the run and its verdicts on the commits" do
+    it "are the run and its verdicts on the commits" do
       expect_tables("/api/v1/topics/#{topic.id}/commits", with: { "patchset_runs" => 1, "commit_verdicts" => 1 })
     end
 
-    it "are the check, the runs and the steps on patchsets" do
+    it "are the runs and the steps on patchsets" do
       [ "/api/v1/topics/#{topic.id}/patchsets", "/api/v1/people/alice.a@example.org/patchsets" ].each do |path|
         expect_tables(path, with: { "patchset_runs" => 1, "patchset_lineages" => 1 })
       end
     end
 
-    it "are the check and whether there is a run on the thread" do
+    it "are whether there is a run on the thread" do
       expect_tables("/api/v1/topics/#{topic.id}", with: { "patchset_runs" => 1 })
     end
 
-    it "are the check, the run and its steps on the lineage" do
-      expect(by_table("/api/v1/topics/#{topic.id}/lineage", featured_headers))
-        .to eq("user_features" => 1, "patchset_runs" => 1, "patchset_lineages" => 1)
+    it "are the run and its steps on the lineage" do
+      expect(by_table("/api/v1/topics/#{topic.id}/lineage", reader_headers))
+        .to eq("patchset_runs" => 1, "patchset_lineages" => 1)
     end
 
     it "select no raw result of a run and no commit body" do
@@ -393,25 +261,25 @@ RSpec.describe "API v1 lineage", type: :request do
       paths = %w[lineage commits patchsets].map { |name| "/api/v1/topics/#{topic.id}/#{name}" } + [ "/api/v1/topics/#{topic.id}" ]
 
       paths.each do |path|
-        queries = queries_for(path, featured_headers)
+        queries = queries_for(path, reader_headers)
 
         expect(queries.grep(/raw_result|bundle_index|"patchset_runs"\.\*/)).to eq([]), path
         expect(queries.grep(/"commits"\."body"|"commits"\.\*|commits\.\*/)).to eq([]), path
         expect(queries.grep(/"commit_verdicts"\.\*/)).to eq([]), path
         expect(response.body).not_to include("raw-result-marker", "commit-body-marker")
       end
-      expect(queries_for("/api/v1/topics/#{topic.id}/lineage", featured_headers).grep(/FROM "patchset_runs"/).sole)
+      expect(queries_for("/api/v1/topics/#{topic.id}/lineage", reader_headers).grep(/FROM "patchset_runs"/).sole)
         .to start_with('SELECT "patchset_runs"."id", "patchset_runs"."topic_id", "patchset_runs"."model", ' \
                        '"patchset_runs"."finished_at", "patchset_runs"."story" FROM')
-      expect(queries_for("/api/v1/topics/#{topic.id}/commits", featured_headers).grep(/FROM "commits"/).size).to eq(1)
+      expect(queries_for("/api/v1/topics/#{topic.id}/commits", reader_headers).grep(/FROM "commits"/).size).to eq(1)
     end
   end
 
-  describe "GET /topics/{id}/commits with the feature" do
+  describe "GET /topics/{id}/commits" do
     it "adds the llm links and credits, where each comes from, and the verdicts" do
       lineage_thread
 
-      get "/api/v1/topics/#{topic.id}/commits", headers: featured_headers
+      get "/api/v1/topics/#{topic.id}/commits", headers: reader_headers
 
       expect(response).to have_http_status(:ok)
       expect(data.map { |row| row["sha"] }).to eq([ sha_a, sha_b, sha_c ])
@@ -452,7 +320,7 @@ RSpec.describe "API v1 lineage", type: :request do
       commit(sha_c, at: start - 1.day, source: "llm")
       create(:commit_verdict, patchset_run: run, topic: topic, commit: backport, verdict: "as_is", evidence: "same")
 
-      get "/api/v1/topics/#{topic.id}/commits", headers: featured_headers
+      get "/api/v1/topics/#{topic.id}/commits", headers: reader_headers
 
       expect(data.map { |row| row.values_at("sha", "link_source") }).to eq([ [ sha_a, "trailer" ], [ sha_c, "llm" ] ])
       expect(data.first["verdict"]).to include("verdict" => "as_is", "evidence" => "same")
@@ -466,14 +334,14 @@ RSpec.describe "API v1 lineage", type: :request do
       create(:commit_verdict, patchset_run: run, topic: topic, commit: elsewhere, verdict: "not_this_thread", evidence: "evidence-marker")
       create(:commit_verdict, patchset_run: run, topic: topic, commit: overlap, verdict: "undecided", origin: "overlap")
 
-      get "/api/v1/topics/#{topic.id}/commits", headers: featured_headers
+      get "/api/v1/topics/#{topic.id}/commits", headers: reader_headers
 
       expect(data.map { |row| row["sha"] }).to eq([ sha_c, sha_b, sha_a ])
       expect(data.map { |row| row.fetch("verdict") }).to eq([ nil, nil, nil ])
       expect(response.body).not_to include("not_this_thread", "evidence-marker")
 
       CommitVerdict.where(commit: elsewhere).update_all(verdict: "partial")
-      get "/api/v1/topics/#{topic.id}/commits", headers: featured_headers
+      get "/api/v1/topics/#{topic.id}/commits", headers: reader_headers
       expect(data.second["verdict"]).to include("verdict" => "partial", "evidence" => "evidence-marker")
     end
 
@@ -494,11 +362,11 @@ RSpec.describe "API v1 lineage", type: :request do
 
       presenter = Lineage::ThreadPresenter.new(topic, ordinals: {})
       linked = Commit.for_topic(topic.id, sources: CommitTopic::SOURCES).to_a
-      summary = Topics::CommitSummary.new(linked, credit_sources: Api::V1::CommitPageData::LINEAGE_SOURCES)
+      summary = Topics::CommitSummary.new(linked, credit_sources: Api::V1::CommitPageData::SOURCES)
       shown = presenter.verdicts_for_groups(summary)
       keys = %i[verdict confidence change_level origin source_message_id evidence reviewers_final reviewers_earlier reviewers_none]
 
-      get "/api/v1/topics/#{topic.id}/commits", headers: featured_headers
+      get "/api/v1/topics/#{topic.id}/commits", headers: reader_headers
 
       expect(data.size).to eq(kinds.size + 1)
       expect(shown.size).to be_between(6, kinds.size)
@@ -525,7 +393,7 @@ RSpec.describe "API v1 lineage", type: :request do
       ]
       create(:commit_verdict, patchset_run: run, topic: topic, commit: row, reviews: stored)
 
-      get "/api/v1/topics/#{topic.id}/commits", headers: featured_headers
+      get "/api/v1/topics/#{topic.id}/commits", headers: reader_headers
 
       expect(response).to have_http_status(:ok)
       expect(data.sole["verdict"]["reviews"]).to eq([
@@ -538,7 +406,7 @@ RSpec.describe "API v1 lineage", type: :request do
     it "gives null verdicts for a thread without a run" do
       commit(sha_a)
 
-      get "/api/v1/topics/#{topic.id}/commits", headers: featured_headers
+      get "/api/v1/topics/#{topic.id}/commits", headers: reader_headers
 
       expect(data.map { |row| row.values_at("link_source", "verdict") }).to eq([ [ "trailer", nil ] ])
     end
@@ -552,11 +420,11 @@ RSpec.describe "API v1 lineage", type: :request do
       end
       decorated.call(1)
       warm_up
-      one = captured_queries { get "/api/v1/topics/#{topic.id}/commits", headers: featured_headers }
+      one = captured_queries { get "/api/v1/topics/#{topic.id}/commits", headers: reader_headers }
       expect(data.size).to eq(1)
 
       2.times { |i| decorated.call(i + 2) }
-      three = captured_queries { get "/api/v1/topics/#{topic.id}/commits", headers: featured_headers }
+      three = captured_queries { get "/api/v1/topics/#{topic.id}/commits", headers: reader_headers }
 
       expect(data.size).to eq(3)
       expect(data.map { |row| row["verdict"] }).to all(be_present)
@@ -567,12 +435,12 @@ RSpec.describe "API v1 lineage", type: :request do
     end
   end
 
-  describe "patchsets with the feature" do
+  describe "patchsets" do
     it "gives each patchset of a thread its step, null where the run has none" do
       lineage_thread(old_step: true)
       late = patchset(at: start + 2.hours)
 
-      get "/api/v1/topics/#{topic.id}/patchsets", headers: featured_headers
+      get "/api/v1/topics/#{topic.id}/patchsets", headers: reader_headers
 
       expect(response).to have_http_status(:ok)
       expect(data.map { |row| row["message_id"] }).to eq([ late.id, old_only.id, m2.id, m1.id ])
@@ -591,7 +459,7 @@ RSpec.describe "API v1 lineage", type: :request do
       patchset
       create(:patchset_run, topic: topic, status: "failed")
 
-      get "/api/v1/topics/#{topic.id}/patchsets", headers: featured_headers
+      get "/api/v1/topics/#{topic.id}/patchsets", headers: reader_headers
 
       expect(data.map { |row| row.fetch("lineage") }).to eq([ nil ])
     end
@@ -606,7 +474,7 @@ RSpec.describe "API v1 lineage", type: :request do
       step(there, in_run: current, step_kind: "major_rework", reason: "new approach")
       bare = patchset(at: start + 2.days, in_topic: create(:topic, creator_alias: alice))
 
-      get "/api/v1/people/alice.a@example.org/patchsets", headers: featured_headers
+      get "/api/v1/people/alice.a@example.org/patchsets", headers: reader_headers
 
       expect(data.map { |row| row["message_id"] }).to eq([ bare.id, there.id, m2.id, m1.id ])
       expect(data.map { |row| row["lineage"]&.fetch("step_kind") }).to eq([ nil, "major_rework", "rebase", "new_series" ])
@@ -617,8 +485,8 @@ RSpec.describe "API v1 lineage", type: :request do
     it "runs the same queries for one step and for four, on a thread and over the threads of a person" do
       step(m1)
       warm_up
-      thread_one = captured_queries { get "/api/v1/topics/#{topic.id}/patchsets", headers: featured_headers }
-      person_one = captured_queries { get "/api/v1/people/alice.a@example.org/patchsets", headers: featured_headers }
+      thread_one = captured_queries { get "/api/v1/topics/#{topic.id}/patchsets", headers: reader_headers }
+      person_one = captured_queries { get "/api/v1/people/alice.a@example.org/patchsets", headers: reader_headers }
       expect(data.map { |row| row["lineage"] }.compact.size).to eq(1)
 
       step(m2, parent_message: m1, step_kind: "rebase")
@@ -626,9 +494,9 @@ RSpec.describe "API v1 lineage", type: :request do
         other = create(:topic, creator_alias: alice)
         step(patchset(at: start + (i + 1).days, in_topic: other), in_run: create(:patchset_run, topic: other))
       end
-      thread_two = captured_queries { get "/api/v1/topics/#{topic.id}/patchsets", headers: featured_headers }
+      thread_two = captured_queries { get "/api/v1/topics/#{topic.id}/patchsets", headers: reader_headers }
       expect(data.map { |row| row["lineage"] }).to all(be_present)
-      person_four = captured_queries { get "/api/v1/people/alice.a@example.org/patchsets", headers: featured_headers }
+      person_four = captured_queries { get "/api/v1/people/alice.a@example.org/patchsets", headers: reader_headers }
 
       expect(data.size).to eq(4)
       expect(data.map { |row| row["lineage"] }).to all(be_present)
@@ -640,31 +508,31 @@ RSpec.describe "API v1 lineage", type: :request do
     end
   end
 
-  describe "GET /topics/{id} with the feature" do
+  describe "GET /topics/{id}" do
     it "links to the lineage when the thread has a finished run" do
       run
 
-      get "/api/v1/topics/#{topic.id}", headers: featured_headers
+      get "/api/v1/topics/#{topic.id}", headers: reader_headers
 
       expect(body["links"].keys).to match_array(%w[messages patchsets commits lineage])
       expect(body["links"]["lineage"]).to end_with("/api/v1/topics/#{topic.id}/lineage")
 
-      get URI(body["links"]["lineage"]).path, headers: featured_headers
+      get URI(body["links"]["lineage"]).path, headers: reader_headers
       expect(response).to have_http_status(:ok)
     end
 
     it "has no lineage link without a finished run" do
       create(:patchset_run, topic: topic, status: "queued", finished_at: nil)
 
-      get "/api/v1/topics/#{topic.id}", headers: featured_headers
+      get "/api/v1/topics/#{topic.id}", headers: reader_headers
 
       expect(body["links"].keys).to match_array(%w[messages patchsets commits])
     end
 
-    it "does not check the feature on a list" do
+    it "does not look up runs on a list" do
       run
       warm_up
-      list = captured_queries { get "/api/v1/topics", headers: featured_headers }
+      list = captured_queries { get "/api/v1/topics", headers: reader_headers }
 
       expect(list.grep(/"user_features"|"team_features"|"patchset_runs"/)).to be_empty
     end

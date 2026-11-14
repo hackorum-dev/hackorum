@@ -2,14 +2,9 @@ module Api
   module V1
     # What patchset rows need besides the messages, loaded once for all of them.
     class PatchsetPageData
-      def initialize(messages, lineage: false)
+      def initialize(messages)
         @ids = messages.map(&:id)
         @topic_ids = messages.map(&:topic_id).uniq
-        @lineage = lineage
-      end
-
-      def lineage?
-        @lineage
       end
 
       # the row of the current lineage run of the thread, nil without one

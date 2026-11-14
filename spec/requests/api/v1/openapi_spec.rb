@@ -334,7 +334,7 @@ RSpec.describe "API v1 OpenAPI document", type: :request do
       expect(verdict.dig("reviews", "items", "properties", "coverage", "enum")).to match_array(CommitVerdict::COVERAGES)
       expect(group.dig("link_source", "enum")).to match_array(CommitTopic::SOURCES)
       expect(group.dig("people", "items", "properties", "source", "enum")).to match_array(CommitPerson::SOURCES)
-      expect(Api::V1::CommitPageData::LINEAGE_SOURCES).to match_array(CommitPerson::SOURCES)
+      expect(Api::V1::CommitPageData::SOURCES).to match_array(CommitPerson::SOURCES)
     end
 
     it "keeps the lineage fields optional, so that they can be absent" do

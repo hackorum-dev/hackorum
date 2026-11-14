@@ -7,7 +7,7 @@ RSpec.describe "API v1 patchsets", type: :request do
   let(:start) { Time.zone.parse("2026-03-01 10:00:00") }
 
   let(:patchset_keys) do
-    %w[message_id number url html_url created_at subject sender topic files changed_paths branch download_url]
+    %w[message_id number url html_url created_at subject sender topic files changed_paths branch download_url lineage]
   end
   let(:attachment_keys) { %w[id message_id file_name content_type byte_size is_patch url content_url] }
 

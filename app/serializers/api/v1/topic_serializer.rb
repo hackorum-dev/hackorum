@@ -77,7 +77,7 @@ module Api
 
       def link_names
         names = %i[messages patchsets commits]
-        lineage = context.feature?(LineageSerializer::FEATURE) && PatchsetRun.done.exists?(topic_id: record.id)
+        lineage = PatchsetRun.done.exists?(topic_id: record.id)
         lineage ? names + %i[lineage] : names
       end
 

@@ -3,7 +3,7 @@ class ApplicationController < ActionController::Base
 
   around_action :track_page_load_time
   rescue_from ActiveRecord::RecordNotFound, with: :render_404
-  helper_method :current_user, :user_signed_in?, :current_admin?, :lineage_visible?
+  helper_method :current_user, :user_signed_in?, :current_admin?
   helper_method :activity_unread_count
   before_action :authorize_mini_profiler
 
@@ -33,14 +33,8 @@ class ApplicationController < ActionController::Base
     current_user&.admin?
   end
 
-  def lineage_visible?
-    return @lineage_visible if defined?(@lineage_visible)
-
-    @lineage_visible = user_signed_in? && current_user.has_feature?(:patchset_lineage)
-  end
-
   def commit_credit_sources
-    lineage_visible? ? %w[parsed committer llm] : %w[parsed committer]
+    %w[parsed committer llm]
   end
 
   def require_authentication

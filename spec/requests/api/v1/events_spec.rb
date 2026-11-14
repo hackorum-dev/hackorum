@@ -12,7 +12,7 @@ RSpec.describe "API v1 events", type: :request do
        is_patch_submission body attachments me]
   end
   let(:patchset_keys) do
-    %w[message_id number url html_url created_at subject sender topic files changed_paths branch download_url]
+    %w[message_id number url html_url created_at subject sender topic files changed_paths branch download_url lineage]
   end
   let(:branch_keys) do
     %w[id url html_url branch_name topic message_id status failure_stage failure_reason conflict_files
@@ -373,7 +373,6 @@ RSpec.describe "API v1 events", type: :request do
 
     context "with a token" do
       let(:user) { create(:user) }
-      let(:featured) { create(:user).tap { |owner| create(:user_feature, user: owner, feature: "patchset_lineage") } }
 
       def without_me(value)
         case value
@@ -396,23 +395,16 @@ RSpec.describe "API v1 events", type: :request do
         expect(data.first["message"]["me"]).to eq("read" => true)
         expect(without_me(body)).to eq(without_me(anonymous))
       end
+    end
 
-      it "gives the lineage step of a patchset only with the feature" do
-        posted, = patch_events
-        run = create(:patchset_run, topic: topic)
-        create(:patchset_lineage, patchset_run: run, topic: topic, message: posted.message, reason: "same hunks")
+    it "gives the lineage step of a patchset" do
+      posted, = patch_events
+      run = create(:patchset_run, topic: topic)
+      create(:patchset_lineage, patchset_run: run, topic: topic, message: posted.message, reason: "same hunks")
 
-        get "/api/v1/events", headers: bearer(featured)
-        expect(data.first["patchset"]["lineage"]).to include("reason" => "same hunks")
-
-        get "/api/v1/events", headers: bearer(user)
-        with_token = response.body
-        get "/api/v1/events"
-        [ with_token, response.body ].each do |text|
-          expect(text).not_to include("lineage", "same hunks")
-        end
-        expect(data.first["patchset"].keys).to match_array(patchset_keys)
-      end
+      get "/api/v1/events"
+      expect(data.first["patchset"]["lineage"]).to include("reason" => "same hunks")
+      expect(data.first["patchset"].keys).to match_array(patchset_keys)
     end
 
     it "runs the same queries for one event of each type and for three, never reads a payload and does not write" do

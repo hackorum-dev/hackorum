@@ -443,16 +443,15 @@ RSpec.describe "API v1 per-user thread state", type: :request do
       expect(body["me"]).to include("status" => "new", "unread_count" => 0, "first_unread_message_id" => nil)
     end
 
-    it "adds six queries with a token, and two for the features of the account" do
+    it "adds six queries with a token" do
       topic = thread
       headers
       anonymous = captured_queries { get "/api/v1/topics/#{topic.id}" }
       signed_in = captured_queries { get "/api/v1/topics/#{topic.id}", headers: headers }
 
       token_queries = signed_in.grep(/api_tokens|FROM "users"/).size
-      feature_queries = signed_in.grep(/"user_features"|"team_features"/).size
-      expect(feature_queries).to eq(2)
-      expect(signed_in.size - token_queries - feature_queries - anonymous.size).to eq(6)
+      expect(signed_in.grep(/"user_features"|"team_features"/)).to be_empty
+      expect(signed_in.size - token_queries - anonymous.size).to eq(6)
     end
   end
 

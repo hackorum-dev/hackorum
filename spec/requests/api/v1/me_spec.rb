@@ -53,7 +53,7 @@ RSpec.describe "API v1 /me", type: :request do
   it "returns the token's user" do
     al = create(:alias, user: user, person: user.person, name: "Alice A", email: "alice@example.com", verified_at: Time.current)
     user.person.update!(default_alias_id: al.id)
-    create(:user_feature, user: user, feature: "patchset_lineage")
+    create(:user_feature, user: user, feature: "email_sending")
 
     get "/api/v1/me", headers: headers
 
@@ -64,7 +64,7 @@ RSpec.describe "API v1 /me", type: :request do
     expect(body["person"]["html_url"]).to end_with("/person/alice@example.com")
     expect(body["person"]["url"]).to end_with("/api/v1/people/alice%40example.com")
     expect(body["emails"]).to eq([ "alice@example.com" ])
-    expect(body["features"]).to eq([ "patchset_lineage" ])
+    expect(body["features"]).to eq([ "email_sending" ])
     expect(body["send_authorized"]).to be(false)
     expect(body["token"]).to include("name" => "laptop", "expires_at" => nil)
   end

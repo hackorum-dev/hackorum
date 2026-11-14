@@ -7,44 +7,17 @@ RSpec.describe "Release statistics", type: :request do
 
   before { travel_to(now) }
 
-  def enable_feature
-    UserFeature.create!(user: user, feature: "patchset_lineage")
-  end
-
-  it "redirects signed-out visitors to sign in" do
+  it "is public and linked from the nav for signed-out visitors" do
     get "/stats"
-    expect(response).to redirect_to(new_session_path)
-  end
-
-  it "hides the tree without the feature" do
-    sign_in_as(user)
-    get "/stats"
-    expect(response).to have_http_status(:not_found)
+    expect(response).to have_http_status(:ok)
     get "/stats/releases/19"
-    expect(response).to have_http_status(:not_found)
-    get "/stats/releases/19/pulse"
-    expect(response).to have_http_status(:not_found)
-    get "/stats/releases/19/people"
-    expect(response).to have_http_status(:not_found)
-    get "/stats/releases/19/companies"
-    expect(response).to have_http_status(:not_found)
-    get "/stats/releases/19/committers"
-    expect(response).to have_http_status(:not_found)
-    get "/stats/releases/19/person/alice@example.com"
-    expect(response).to have_http_status(:not_found)
-    get "/stats/trends/years"
-    expect(response).to have_http_status(:not_found)
-    get "/stats/years/2026"
-    expect(response).to have_http_status(:not_found)
-    get "/stats/cycles/2025"
-    expect(response).to have_http_status(:not_found)
+    expect(response).to have_http_status(:ok)
     get topics_path
-    expect(response.body).not_to include('href="/stats"')
+    expect(response.body).to include('href="/stats"')
   end
 
-  context "with the feature" do
+  context "signed in" do
     before do
-      enable_feature
       sign_in_as(user)
     end
 

@@ -133,22 +133,10 @@ RSpec.describe 'Team commit activity', type: :request do
       )
     end
 
-    it 'ignores llm-sourced credits' do
+    it 'lists llm-sourced credits marked LLM' do
       other = create(:commit, subject: 'Guessed authorship', branches: [ 'master' ],
                               committed_at: Time.zone.local(2024, 5, 11, 11))
       create(:commit_person, commit: other, person: member.person, role: 'author', source: 'llm', confidence: 0.9)
-
-      get team_commits_path('commit-team')
-
-      expect(response.body).to include('Widen the executor check')
-      expect(response.body).not_to include('Guessed authorship')
-    end
-
-    it 'lists llm-sourced credits marked LLM for a member with the patchset_lineage feature' do
-      other = create(:commit, subject: 'Guessed authorship', branches: [ 'master' ],
-                              committed_at: Time.zone.local(2024, 5, 11, 11))
-      create(:commit_person, commit: other, person: member.person, role: 'author', source: 'llm', confidence: 0.9)
-      create(:user_feature, user: member, feature: 'patchset_lineage')
 
       get team_commits_path('commit-team')
 

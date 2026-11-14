@@ -36,30 +36,7 @@ RSpec.describe "Thread page patchset lineage", type: :request do
     trailer_commit.commit_people.create!(role: "reviewer", raw_name: "Tess Committer", raw_email: "tess@example.com", source: "committer")
   end
 
-  it "hides lineage without the feature" do
-    get story_topic_path(topic)
-    expect(response).to have_http_status(:not_found)
-
-    get commits_details_topic_path(topic)
-    expect(response.body).not_to include("Land the thing")
-    expect(response.body).not_to include("Guessed Reviewer")
-    expect(response.body).not_to include("Guessed Author")
-    expect(response.body).not_to include("commit-credit-llm")
-    expect(response.body).not_to include("commit-llm")
-    expect(response.body).to include("Tess Committer")
-    expect(response.body).to include('<span class="commit-credit-committer" title="Committed the patch, counted as its reviewer">committer</span>')
-
-    get topic_path(topic)
-    expect(response.body).not_to include("Patch story")
-
-    get patchsets_details_topic_path(topic)
-    expect(response.body).not_to include("rebase")
-  end
-
   it "groups the story into chapters for long threads" do
-    user = create(:user)
-    create(:user_feature, user: user, feature: "patchset_lineage")
-    sign_in_as(user)
     old = create(:message, topic: topic, created_at: 400.days.ago)
     59.times { |i| create(:message, topic: topic, created_at: 300.days.ago + i.hours) }
     run.update!(story: "early [msg:#{old.id}]\n\nlater [msg:#{m2.id}] in [commit:#{'d' * 40}]\n")
@@ -75,11 +52,7 @@ RSpec.describe "Thread page patchset lineage", type: :request do
     expect(doc.at_css(".modal-side")).to be_nil
   end
 
-  it "shows lineage, verdicts and the LLM badges with the feature" do
-    user = create(:user)
-    create(:user_feature, user: user, feature: "patchset_lineage")
-    sign_in_as(user)
-
+  it "shows lineage, verdicts and the LLM badges" do
     get story_topic_path(topic)
     expect(response.body).to include("model-written")
     expect(response.body).to include("run #{run.id}")

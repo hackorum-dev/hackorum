@@ -10,8 +10,7 @@ module Api
       end
 
       def self.brief_list(records, context, **extras)
-        page_data = PatchsetPageData.new(records, lineage: context.feature?(LineageSerializer::FEATURE))
-        super(records, context, page_data: page_data, **extras)
+        super(records, context, page_data: PatchsetPageData.new(records), **extras)
       end
 
       def brief
@@ -38,10 +37,7 @@ module Api
         @page_data ||= extras[:page_data] || PatchsetPageData.new([ record ])
       end
 
-      # only for a caller with the feature
       def lineage
-        return {} unless page_data.lineage?
-
         step = page_data.step(record.id)
         { lineage: step && LineageSerializer.step(step) }
       end

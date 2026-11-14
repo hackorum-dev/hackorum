@@ -54,7 +54,7 @@ Send it in the `Authorization` header:
 curl -H "Authorization: Bearer hko_..." "https://hackorum.dev/api/v1/me"
 ```
 
-`/me` tells which account and token the request runs as. The requests under `/me` and `/drafts` need a token, and so do the `starred` and `participating` filters of `/events`. The lineage data needs a token of an account with that feature. Everything else works without one. What a token changes:
+`/me` tells which account and token the request runs as. The requests under `/me` and `/drafts` need a token, and so do the `starred` and `participating` filters of `/events`. Everything else works without one. What a token changes:
 
 - The rate limit is higher, 600 requests per minute instead of 60.
 - Threads come with your own state in `me`: starred, ignored, how much you have read, how many notes you can see. Messages say in `me` whether you read them.
@@ -63,7 +63,6 @@ curl -H "Authorization: Bearer hko_..." "https://hackorum.dev/api/v1/me"
 - You can list your saved searches and run them, and read your activity list.
 - The feed can be narrowed to the threads you starred or wrote in.
 - You can write, change and delete drafts of replies, and attach files to them, if your account has a Gmail address connected for sending.
-- If your account has the lineage feature, you also get the lineage data: how the patchsets of a thread derive from each other and which commits came out of it, written by a language model. It can be wrong, and without the feature these fields are simply not there.
 
 `me` only ever holds your own state, and no response names your teammates. In the search, the name of a team you are in works in the state selectors (`starred:myteam`, `unread:myteam`) as it does on the site: it searches the state of the members taken together. Reading through the API does not mark anything as seen. Drafts are the only thing a token can change.
 
@@ -98,7 +97,7 @@ The paths below are relative to `/api/v1`.
 | The notes on a thread | `GET /topics/{id}/notes` |
 | Your saved searches, and the threads of one | `GET /me/saved_searches`, then the `topics_url` of an entry |
 | What happened in the threads you starred, and notes that mention you | `GET /me/activities`, add `unread=true` for the new entries |
-| How the patchsets of a thread derive from each other (lineage feature) | `GET /topics/{id}/lineage` |
+| How the patchsets of a thread derive from each other | `GET /topics/{id}/lineage` |
 | Your drafts, the sent ones too | `GET /drafts`, add `state=in_progress` for the unsent ones |
 | Prepare a reply to a message | `POST /drafts`, see [Drafts](#drafts) |
 | Attach a patch to a draft | `POST /drafts/{id}/attachments` |

@@ -39,19 +39,7 @@ RSpec.describe 'Person commit activity', type: :request do
       expect(response.body).to include('Commits in 2024')
     end
 
-    it 'ignores llm-sourced credits, in the list and the year selector' do
-      other = create(:commit, subject: 'Guessed authorship', branches: [ 'master' ],
-                              committed_at: Time.zone.local(2023, 5, 11, 11))
-      create(:commit_person, commit: other, person: person, role: 'author', source: 'llm', confidence: 0.9)
-
-      get person_commits_path('commits@example.com')
-
-      expect(response.body).to include('Fix ruleutils.c dumping')
-      expect(response.body).not_to include('Guessed authorship')
-      expect(response.body).not_to include('>2023<')
-    end
-
-    it 'lists committer-sourced reviews marked committer without any feature' do
+    it 'lists committer-sourced reviews marked committer' do
       other = create(:commit, subject: 'Committed for someone', branches: [ 'master' ],
                               committed_at: Time.zone.local(2023, 5, 13, 11))
       create(:commit_person, commit: other, person: person, role: 'reviewer', source: 'committer')
@@ -66,55 +54,46 @@ RSpec.describe 'Person commit activity', type: :request do
       expect(box.at_css('.summary-box-sub').text).to eq('1 as committer')
     end
 
-    context 'with the patchset_lineage feature' do
-      let(:user) { create(:user) }
+    it 'lists llm-sourced credits marked LLM, in the list and the year selector' do
+      other = create(:commit, subject: 'Guessed authorship', branches: [ 'master' ],
+                              committed_at: Time.zone.local(2023, 5, 11, 11))
+      create(:commit_person, commit: other, person: person, role: 'author', source: 'llm', confidence: 0.9)
 
-      before do
-        create(:user_feature, user: user, feature: 'patchset_lineage')
-        sign_in_as(user)
-      end
+      get person_commits_path('commits@example.com', year: 2023)
 
-      it 'lists llm-sourced credits marked LLM, in the list and the year selector' do
-        other = create(:commit, subject: 'Guessed authorship', branches: [ 'master' ],
-                                committed_at: Time.zone.local(2023, 5, 11, 11))
-        create(:commit_person, commit: other, person: person, role: 'author', source: 'llm', confidence: 0.9)
+      expect(response.body).to include('Guessed authorship')
+      expect(response.body).to include('>2023<')
 
-        get person_commits_path('commits@example.com', year: 2023)
+      doc = Nokogiri::HTML(response.body)
+      row = doc.css('table.commit-activity-table tbody tr').find { |tr| tr.text.include?('Guessed authorship') }
+      marker = row.at_css('td:first-child .activity-tag + .commit-credit-llm')
+      expect(marker.text).to eq('LLM')
+      expect(marker['title']).to eq('Credited by LLM analysis, not a commit trailer')
+      expect(marker.previous_element.text).to match(/author/i)
+      expect(row.css('td:nth-child(2) .commit-credit-llm')).to be_empty
+    end
 
-        expect(response.body).to include('Guessed authorship')
-        expect(response.body).to include('>2023<')
+    it 'marks only the llm role when the viewer also has a parsed role' do
+      other = create(:commit, subject: 'Mixed credit', branches: [ 'master' ],
+                              committed_at: Time.zone.local(2023, 5, 12, 11))
+      create(:commit_person, commit: other, person: person, role: 'committer')
+      create(:commit_person, commit: other, person: person, role: 'author', source: 'llm', confidence: 0.9)
 
-        doc = Nokogiri::HTML(response.body)
-        row = doc.css('table.commit-activity-table tbody tr').find { |tr| tr.text.include?('Guessed authorship') }
-        marker = row.at_css('td:first-child .activity-tag + .commit-credit-llm')
-        expect(marker.text).to eq('LLM')
-        expect(marker['title']).to eq('Credited by LLM analysis, not a commit trailer')
-        expect(marker.previous_element.text).to match(/author/i)
-        expect(row.css('td:nth-child(2) .commit-credit-llm')).to be_empty
-      end
+      get person_commits_path('commits@example.com', year: 2023)
 
-      it 'marks only the llm role when the viewer also has a parsed role' do
-        other = create(:commit, subject: 'Mixed credit', branches: [ 'master' ],
-                                committed_at: Time.zone.local(2023, 5, 12, 11))
-        create(:commit_person, commit: other, person: person, role: 'committer')
-        create(:commit_person, commit: other, person: person, role: 'author', source: 'llm', confidence: 0.9)
+      row = Nokogiri::HTML(response.body).css('table.commit-activity-table tbody tr').find { |tr| tr.text.include?('Mixed credit') }
+      tags = row.css('td:first-child .activity-tag')
+      marked = tags.select { |t| t.next_element&.matches?('.commit-credit-llm') }
+      expect(marked.map { |t| t.text.downcase }).to eq([ 'author' ])
+      expect(tags.map { |t| t.text.downcase }).to include('committer')
+      expect(row.css('.commit-credit-llm').size).to eq(1)
+    end
 
-        get person_commits_path('commits@example.com', year: 2023)
+    it 'leaves parsed credits unmarked' do
+      get person_commits_path('commits@example.com')
 
-        row = Nokogiri::HTML(response.body).css('table.commit-activity-table tbody tr').find { |tr| tr.text.include?('Mixed credit') }
-        tags = row.css('td:first-child .activity-tag')
-        marked = tags.select { |t| t.next_element&.matches?('.commit-credit-llm') }
-        expect(marked.map { |t| t.text.downcase }).to eq([ 'author' ])
-        expect(tags.map { |t| t.text.downcase }).to include('committer')
-        expect(row.css('.commit-credit-llm').size).to eq(1)
-      end
-
-      it 'leaves parsed credits unmarked' do
-        get person_commits_path('commits@example.com')
-
-        expect(response.body).to include('Fix ruleutils.c dumping')
-        expect(response.body).not_to include('commit-credit-llm')
-      end
+      expect(response.body).to include('Fix ruleutils.c dumping')
+      expect(response.body).not_to include('commit-credit-llm')
     end
 
     it 'lists only years with commit credits in the year selector' do
