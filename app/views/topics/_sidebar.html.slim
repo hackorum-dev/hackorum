@@ -22,10 +22,10 @@
           span.filters-card-label Mailing lists
         ul.filters-list
           li
-            = link_to "All lists", topics_path, class: [("is-active" unless active_list)]
+            = link_to "All lists", topics_path, class: ("is-active" unless active_list)
           - @all_mailing_lists.each do |ml|
             li
-              = link_to ml.display_name, search_topics_path(q: "list:#{ml.display_name}"), class: [("is-active" if active_list == ml.display_name)]
+              = link_to ml.display_name, search_topics_path(q: "list:#{ml.display_name}"), class: ("is-active" if active_list == ml.display_name)
 
     - if @saved_searches.present?
       - active_ss_id = params[:saved_search_id]&.to_i
@@ -41,7 +41,7 @@
             ul.filters-list
               - global_searches.each do |ss|
                 li
-                  = link_to ss.name, search_topics_path(saved_search_id: ss.id), class: [("is-active" if active_ss_id == ss.id)]
+                  = link_to ss.name, search_topics_path(saved_search_id: ss.id), class: ("is-active" if active_ss_id == ss.id)
                   = button_to settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: true), method: :post, form_class: "filters-list-action", title: "Hide this search", data: { turbo_confirm: "Hide this search?" } do
                     i.fa-solid.fa-eye-slash aria-hidden="true"
 
@@ -55,7 +55,7 @@
               ul.filters-list
                 - all_user.each do |ss|
                   li
-                    = link_to ss.name, search_topics_path(saved_search_id: ss.id), class: [("is-active" if active_ss_id == ss.id)]
+                    = link_to ss.name, search_topics_path(saved_search_id: ss.id), class: ("is-active" if active_ss_id == ss.id)
                     - if ss.user_id == current_user.id
                       = button_to settings_saved_search_path(ss), method: :delete, form_class: "filters-list-action", title: "Delete this search", data: { turbo_confirm: "Delete this search?" } do
                         i.fa-solid.fa-trash-can aria-hidden="true"
@@ -74,7 +74,7 @@
                 ul.filters-list
                   - all_team.each do |ss|
                     li
-                      = link_to ss.name, search_topics_path(saved_search_id: ss.id, team_id: team.id), class: [("is-active" if active_ss_id == ss.id && (!ss.scope_team? || active_team_id == team.id))]
+                      = link_to ss.name, search_topics_path(saved_search_id: ss.id, team_id: team.id), class: ("is-active" if active_ss_id == ss.id && (!ss.scope_team? || active_team_id == team.id))
                       = button_to settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: true), method: :post, form_class: "filters-list-action", title: "Hide this search", data: { turbo_confirm: "Hide this search?" } do
                         i.fa-solid.fa-eye-slash aria-hidden="true"
 
