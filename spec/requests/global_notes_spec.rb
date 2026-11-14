@@ -34,7 +34,10 @@ RSpec.describe "Global notes", type: :request do
       create(:global_tag, name: "gone").retire!
 
       get topics_path
-      expect(response.body).to include("Global tags", "#needs-review (1)", "#unused-tag (0)", 'title="Waiting for review"')
+      card = Nokogiri::HTML(response.body).css(".filters-card").find { |n| n.at_css(".filters-card-label")&.text&.start_with?("Global tags") }
+      tags = card.css(".filters-tag").to_h { |t| [ t.at_css(".filters-tag-name").text, t.at_css(".filters-tag-count").text ] }
+      expect(tags).to include("#needs-review" => "1", "#unused-tag" => "0")
+      expect(response.body).to include('title="Waiting for review"')
       expect(response.body).not_to include("#gone")
     end
 
@@ -71,7 +74,7 @@ RSpec.describe "Global notes", type: :request do
       sign_in_as(bob)
 
       get topics_path
-      section = Nokogiri::HTML(response.body).css(".sidebar-section").find { |n| n.at_css("h3")&.text&.strip == "My tags" }
+      section = Nokogiri::HTML(response.body).css(".filters-card").find { |n| n.at_css(".filters-card-label")&.text&.start_with?("My tags") }
       expect(section.text).to include("#mine")
       expect(section.text).not_to include("#needs-review")
     end
