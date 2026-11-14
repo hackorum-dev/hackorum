@@ -202,6 +202,11 @@ tasks:
     cmds:
       - '{{.COMPOSE}} exec web bundle exec ruby script/build_stats.rb {{.GRANULARITY | default "all"}}'
 
+  list-stats:
+    desc: 'Rebuild mailing list stats'
+    cmds:
+      - '{{.COMPOSE}} exec web bundle exec ruby script/build_list_stats.rb'
+
   orchestrator:
     desc: 'Run the CI orchestrator (needs HACKORUM_GITHUB_TOKEN, e.g. export HACKORUM_GITHUB_TOKEN=$(gh auth token), and HACKORUM_SSH_KEY - path to the push deploy key, exported or set in .env.development). Flags after --, e.g. task orchestrator -- --once --dry-run, or -- --max-pushes 5. First cycle of a non-dry run also fires the hourly maintenance pass: full upstream fetch plus a commit import into the dev DB; -- --once --dry-run skips it.'
     interactive: true

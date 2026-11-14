@@ -110,3 +110,42 @@ dots above them.
 
 cycle-trend.png: a master line along the bottom with four branches forking
 up one after another, each ending in a lighter bar, each higher than the last.
+
+## Mailing list cards
+
+Generated 2026-11-14 (codex-cli 0.167.0, same method, stdin from
+/dev/null). One run, one prompt. Originals were 1774x887.
+
+These came back with loose specks of noise around the shapes, so before the
+post-processing rule above they get one extra step: keep only connected
+regions of alpha > 128 larger than 0.2 percent of the image, grow that mask
+by 3 pixels to keep the anti-aliased edges, and clear alpha everywhere
+else.
+
+Prompt:
+
+Use your built-in image generation tool (image_gen) for this, do not draw
+with a script. Generate three illustrations for a statistics index page and
+save them in this directory as lists.png, newcomers.png and regulars.png.
+Style: flat vector illustration, mostly indigo (#4f46e5) and light indigo
+(#a5b4fc) with at most one accent tone, soft shapes, no text, no gradients,
+no outlines, fully transparent background (PNG with alpha), 2:1 landscape.
+The drawing must be about 2:1 and fill the frame, about 90 percent of the
+height and 85 percent of the width. The subjects: lists.png shows a stack
+of envelopes or message cards flowing into a row of stacked bars of varying
+height, like mail traffic turning into a chart. newcomers.png shows a small
+group of person silhouettes (simple round head and rounded body) standing
+in a row, with one new figure stepping in from the side, slightly lighter,
+approaching the group. regulars.png shows a podium-like ranking: a row of
+rounded columns of different heights, each topped with a simple round
+person head, with the tallest ones in the middle. Copy the generated files
+into this directory under those names, unmodified, and report the paths
+when done.
+
+lists.png: three envelopes, an arrow, four stacked bars of rising height.
+
+newcomers.png: four dark figures in a row and a lighter one walking in from
+the right.
+
+regulars.png: seven figures on columns, tallest in the middle, alternating
+indigo tones.

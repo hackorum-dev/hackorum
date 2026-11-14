@@ -28,6 +28,12 @@ export default class extends Controller {
     this.generation++
     this.observer?.disconnect()
     this.sizeObserver?.disconnect()
+    if (this.pinClick) document.removeEventListener("click", this.pinClick)
+    if (this.pinHover) {
+      document.removeEventListener("mouseover", this.pinHover)
+      document.removeEventListener("mouseout", this.pinHover)
+    }
+    this.pinClick = this.pinHover = null
     this.chart?.dispose()
     this.chart = null
   }
@@ -48,12 +54,84 @@ export default class extends Controller {
     this.element.textContent = ""
     this.chart = echarts.init(this.element, null, { renderer: "svg" })
     try {
-      this.chart.setOption(builder(this.dataValue, palette(), this.element))
+      if (this.kindValue === "bump") this.initPins()
+      this.chart.setOption(builder(this.dataValue, { ...palette(), pins: this.pins }, this.element))
+      if (this.kindValue === "bump") this.wirePins()
       const paths = this.dataValue.paths
-      if (paths) this.chart.on("click", (e) => { const url = paths[e.dataIndex]; if (url) window.Turbo ? window.Turbo.visit(url) : window.location.assign(url) })
+      if (paths) this.chart.on("click", (e) => { const url = paths[Array.isArray(e.value) ? e.value[0] : e.dataIndex]; if (url) window.Turbo ? window.Turbo.visit(url) : window.location.assign(url) })
     } catch (e) {
       this.fail()
     }
+  }
+
+  // bump: click a line, or an element with data-stats-pin, to pin a person
+  wirePins() {
+    this.chart.on("click", (e) => {
+      const id = e.seriesId ?? this.chart.getOption().series[e.seriesIndex]?.id
+      if (id != null) this.togglePin(Number(id))
+    })
+    // hovering a line between points: show the tip of its nearest point
+    this.chart.on("mouseover", (e) => {
+      if (e.componentType !== "series" || e.dataIndex != null || !e.event) return
+      const values = this.chart.getOption().series[e.seriesIndex].data.map((d) => d?.value ?? d)
+      const [x] = this.chart.convertFromPixel({ seriesIndex: e.seriesIndex }, [e.event.offsetX, e.event.offsetY])
+      let best = -1
+      values.forEach((v, j) => { if (v != null && (best < 0 || Math.abs(j - x) < Math.abs(best - x))) best = j })
+      if (best >= 0) this.chart.dispatchAction({ type: "showTip", seriesIndex: e.seriesIndex, dataIndex: best })
+    })
+    if (!this.pinClick) {
+      this.pinClick = (e) => {
+        const el = e.target.closest("[data-stats-pin]")
+        if (!el || e.target.closest("a")) return
+        this.togglePin(Number(el.dataset.statsPin))
+      }
+      document.addEventListener("click", this.pinClick)
+      this.pinHover = (e) => {
+        const el = e.target.closest?.("[data-stats-pin]")
+        if (!el || !this.chart || el.contains(e.relatedTarget)) return
+        this.chart.dispatchAction({ type: e.type === "mouseover" ? "highlight" : "downplay", seriesId: el.dataset.statsPin })
+      }
+      document.addEventListener("mouseover", this.pinHover)
+      document.addEventListener("mouseout", this.pinHover)
+    }
+    this.markPins()
+  }
+
+  initPins() {
+    if (this.pins) return
+    this.pins = Array(PIN_SLOTS).fill(null)
+    const pinned = (this.dataValue.pinned || []).slice(0, PIN_SLOTS)
+    pinned.forEach((id, i) => { this.pins[i] = id })
+    // the defaults give way from the lowest rank up
+    this.pinOrder = [...pinned].reverse()
+  }
+
+  // a new pin takes the lowest free slot, so the others keep their colors;
+  // when all are taken it replaces the oldest
+  togglePin(id) {
+    if (!this.dataValue.lines.some((l) => l.id === id)) return
+    const at = this.pins.indexOf(id)
+    if (at >= 0) {
+      this.pins[at] = null
+      this.pinOrder = this.pinOrder.filter((x) => x !== id)
+    } else {
+      let slot = this.pins.indexOf(null)
+      if (slot < 0) slot = this.pins.indexOf(this.pinOrder.shift())
+      this.pins[slot] = id
+      this.pinOrder.push(id)
+    }
+    this.chart.setOption(BUILDERS.bump(this.dataValue, { ...palette(), pins: this.pins }), { notMerge: true })
+    this.markPins()
+  }
+
+  markPins() {
+    const p = palette()
+    document.querySelectorAll("[data-stats-pin]").forEach((el) => {
+      const at = this.pins.indexOf(Number(el.dataset.statsPin))
+      el.classList.toggle("is-pinned", at >= 0)
+      el.classList.toggle("is-pin-dull", at >= 0 && pinStyle(at, p).dull)
+      el.style.setProperty("--pin-color", at >= 0 ? pinStyle(at, p).color : "transparent")
+    })
   }
 
   fail() {
@@ -359,21 +437,23 @@ function rows(data, p, el) {
 function trend(data, p) {
   const o = base(p)
   const open = (j) => !!data.open?.[j]
-  const colors = data.lines.map((_, i) => p.slots[i % p.slots.length])
+  const colors = slotColors(data.lines, p)
+  const gray = (i) => !!data.lines[i].gray
   const fmt = (v) => v == null ? "n/a" : data.unit === "%" ? `${v}%` : `${Number(v).toLocaleString()}${data.unit ? " " + data.unit : ""}`
   o.tooltip.trigger = "axis"
   o.tooltip.formatter = (ps) => {
-    const shown = ps.filter((x) => !x.seriesId.endsWith(":open"))
+    const shown = ps.filter((x) => !x.seriesId.endsWith(":open") && !gray(x.seriesIndex / 2))
     const j = ps[0].dataIndex
     const note = open(j) ? ` <span style="color:${p.muted}">in progress${data.partial ? ", partial" : ""}</span>` : ""
     return `<b>${esc(ps[0].name)}</b>${note}` +
       shown.map((x) => `<br>${data.lines.length > 1 ? esc(x.seriesName) + ": " : ""}${esc(fmt(data.lines[x.seriesIndex / 2].values[j]))}`).join("")
   }
   if (data.lines.length > 1) {
-    o.legend = { data: data.lines.map((l) => l.label), bottom: 0, left: 0, itemWidth: 10, itemHeight: 10,
+    o.legend = { data: data.lines.filter((l) => !l.gray).map((l) => l.label), bottom: 0, left: 0, itemWidth: 10, itemHeight: 10,
                  textStyle: { color: p.muted, fontSize: 11 } }
   }
-  o.grid = { left: 4, right: 16, top: 8, bottom: data.lines.length > 1 ? 24 : 4, containLabel: true }
+  const legendChars = data.lines.filter((l) => !l.gray).reduce((n, l) => n + l.label.length + 4, 0)
+  o.grid = { left: 4, right: 16, top: 8, bottom: data.lines.length < 2 ? 4 : legendChars > 45 ? 44 : 24, containLabel: true }
   o.xAxis = { type: "category", data: data.categories, boundaryGap: false, axisTick: { show: false },
               axisLine: { lineStyle: { color: p.border } }, axisLabel: { fontSize: 10, color: p.muted, hideOverlap: true } }
   o.yAxis = { type: "value", min: 0, splitLine: { lineStyle: { color: p.border } }, axisLabel: { fontSize: 10, color: p.muted } }
@@ -385,14 +465,113 @@ function trend(data, p) {
     const tail = l.values.map((v, j) => firstOpen >= 0 && j >= firstOpen - 1 ? v : null)
     return [
       { id: `${i}:closed`, name: l.label, type: "line", connectNulls: false, symbol: "circle", symbolSize: 6, cursor,
-        lineStyle: { color: colors[i], width: 2 }, itemStyle: { color: colors[i] }, data: closed, z: 3 },
+        lineStyle: { color: colors[i], width: gray(i) ? 1 : 2 }, itemStyle: { color: colors[i] }, data: closed, z: gray(i) ? 1 : 3,
+        ...(gray(i) ? { symbol: "none" } : {}) },
       { id: `${i}:open`, name: l.label, type: "line", connectNulls: false, symbol: "emptyCircle", symbolSize: 7, cursor,
-        lineStyle: { color: colors[i], width: 2, type: "dashed", opacity: 0.6 },
+        lineStyle: { color: colors[i], width: gray(i) ? 1 : 2, type: "dashed", opacity: 0.6 },
         itemStyle: { color: colors[i], opacity: 0.6 },
-        data: tail.map((v, j) => open(j) ? v : { value: v, symbol: "none" }), z: 2 },
+        data: tail.map((v, j) => open(j) ? v : { value: v, symbol: "none" }), z: gray(i) ? 1 : 2,
+        ...(gray(i) ? { symbol: "none" } : {}) },
     ]
   })
   return o
 }
 
-const BUILDERS = { spark: bars, bars, share, histogram, strips, scatter, ranked, rows, trend }
+// stacked areas over time; gray series skip the slots
+// data: { categories: [], series: [{ label, values, gray }], unit, open: [bool], bars }
+function stack(data, p) {
+  const o = base(p)
+  const colors = slotColors(data.series, p)
+  const fmt = (v) => v == null ? "n/a" : data.unit === "%" ? `${v}%` : Number(v).toLocaleString()
+  o.tooltip.trigger = "axis"
+  o.tooltip.formatter = (ps) => {
+    const j = ps[0].dataIndex
+    const note = data.open?.[j] ? ` <span style="color:${p.muted}">in progress</span>` : ""
+    return `<b>${esc(ps[0].name)}</b>${note}` + ps.slice().reverse().map((x) => `<br>${esc(x.seriesName)}: ${esc(fmt(x.value))}`).join("")
+  }
+  o.legend = { data: data.series.map((s) => s.label), bottom: 0, left: 0, itemWidth: 10, itemHeight: 10,
+               textStyle: { color: p.muted, fontSize: 11 } }
+  o.grid = { left: 4, right: 16, top: 8, bottom: 24, containLabel: true }
+  o.xAxis = { type: "category", data: data.categories, boundaryGap: !!data.bars, axisTick: { show: false },
+              axisLine: { lineStyle: { color: p.border } }, axisLabel: { fontSize: 10, color: p.muted, hideOverlap: true } }
+  o.yAxis = { type: "value", min: 0, ...(data.unit === "%" ? { max: (v) => Math.max(100, Math.ceil(v.max)) } : {}),
+              splitLine: { lineStyle: { color: p.border } }, axisLabel: { fontSize: 10, color: p.muted } }
+  o.series = data.series.map((s, i) => data.bars ? ({
+    name: s.label, type: "bar", stack: "all", barWidth: "60%", itemStyle: { color: colors[i] }, data: s.values,
+  }) : ({
+    name: s.label, type: "line", stack: "all", symbol: "none", lineStyle: { width: 0 },
+    areaStyle: { color: colors[i], opacity: 0.85 }, itemStyle: { color: colors[i] }, data: s.values,
+  }))
+  return o
+}
+
+function fade(color, alpha) {
+  const el = document.createElement("span")
+  el.style.color = color
+  document.body.appendChild(el)
+  const rgb = getComputedStyle(el).color.match(/[\d.]+/g)
+  el.remove()
+  return rgb ? `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})` : color
+}
+
+// people x months, color by rank band; click a column to pick the month
+// data: { x: [], y: [], cells: [[x, y, band, rank, score]], paths: [] }
+function heatmap(data, p) {
+  const o = base(p)
+  const shades = [fade(p.slots[0], 0.22), fade(p.slots[0], 0.45), fade(p.slots[0], 0.7), p.slots[0]]
+  o.tooltip.formatter = (e) => `${esc(data.y[e.value[1]])}, ${esc(data.x[e.value[0]])}: rank ${e.value[3]}, score ${e.value[4]}`
+  o.grid = { left: 4, right: 8, top: 4, bottom: 4, containLabel: true }
+  o.xAxis = { type: "category", data: data.x, splitArea: { show: false }, axisTick: { show: false },
+              axisLine: { lineStyle: { color: p.border } }, axisLabel: { fontSize: 10, color: p.muted, hideOverlap: true } }
+  o.yAxis = { type: "category", data: data.y, inverse: true, axisTick: { show: false }, axisLine: { show: false },
+              axisLabel: { fontSize: 11, color: p.text, interval: 0 } }
+  o.visualMap = { show: false, type: "piecewise", dimension: 2,
+                  pieces: [1, 2, 3, 4].map((b) => ({ value: b, color: shades[b - 1] })) }
+  o.series = [{ type: "heatmap", data: data.cells, cursor: data.paths ? "pointer" : "default",
+                itemStyle: { borderColor: p.card, borderWidth: 1 } }]
+  return o
+}
+
+// rank over time, 1 on top; gaps when outside the top 20
+// data: { categories: [], lines: [{ label, values }] }
+// gray field of everyone, pinned people in color; p.pins is the pin order
+// p.pins[slot] = person id; slots 0-4 solid, 5-9 the same hues dashed
+const PIN_SLOTS = 10
+const pinStyle = (slot, p) => ({ color: p.slots[slot % p.slots.length], dull: slot >= p.slots.length })
+
+// gray field of everyone, pinned people in color, the end month's top 20 named on the right
+function bump(data, p) {
+  const o = base(p)
+  const pins = p.pins || []
+  o.tooltip.trigger = "item"
+  o.tooltip.formatter = (x) => `<b>${esc(x.seriesName)}</b><br>${esc(x.name)}: ${x.value}.`
+  o.grid = { left: 4, right: 150, top: 8, bottom: 4, containLabel: true }
+  o.xAxis = { type: "category", data: data.categories, boundaryGap: false, axisTick: { show: false },
+              axisLine: { lineStyle: { color: p.border } }, axisLabel: { fontSize: 10, color: p.muted, hideOverlap: true } }
+  o.yAxis = { type: "value", inverse: true, min: 1, max: 20, interval: 1, splitLine: { show: false },
+              axisLabel: { fontSize: 10, color: p.muted } }
+  const lastCat = data.categories.length - 1
+  const slotOf = (l) => pins.indexOf(l.id)
+  const lines = [...data.lines].sort((a, b) => (slotOf(a) >= 0) - (slotOf(b) >= 0))
+  o.series = lines.map((l) => {
+    const slot = slotOf(l)
+    const st = slot < 0 ? null : pinStyle(slot, p)
+    const color = st ? st.color : p.gray2
+    const last = l.values.reduce((acc, v, j) => v == null ? acc : j, -1)
+    const named = st || last === lastCat
+    const label = { show: true, position: "right", formatter: () => l.label, fontSize: 10,
+                    color: st ? p.text : p.muted, fontWeight: st && !st.dull ? "bold" : "normal" }
+    return { name: l.label, id: String(l.id), type: "line", connectNulls: false, symbol: "circle",
+             symbolSize: st ? 5 : 4, z: st ? 3 : 1,
+             lineStyle: { color, width: st ? (st.dull ? 2 : 2.5) : 1, type: st?.dull ? [ 5, 3 ] : "solid", opacity: st?.dull ? 0.8 : 1 },
+             itemStyle: { color },
+             triggerLineEvent: true, cursor: "pointer",
+             emphasis: { focus: "series", lineStyle: { width: 3, color: st ? color : p.text }, itemStyle: { color: st ? color : p.text },
+                         label: { color: p.text, fontWeight: "bold" } },
+             blur: { lineStyle: { opacity: 0.2 }, itemStyle: { opacity: 0.2 }, label: { opacity: 0.4 } },
+             data: l.values.map((v, j) => named && j === last ? { value: v, label } : v) }
+  })
+  return o
+}
+
+const BUILDERS = { spark: bars, bars, share, histogram, strips, scatter, ranked, rows, trend, stack, heatmap, bump }

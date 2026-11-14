@@ -1,0 +1,2 @@
+class StatsPersonFirst < ApplicationRecord
+end

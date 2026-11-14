@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_11_13_100000) do
+ActiveRecord::Schema[8.0].define(version: 2026_11_15_100100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -364,8 +364,11 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_13_100000) do
     t.string "alternate_emails", default: [], array: true
     t.string "post_address"
     t.boolean "hidden_by_default", default: false, null: false
+    t.integer "stats_bit", limit: 2
+    t.boolean "archived", default: false, null: false
     t.index ["email"], name: "index_mailing_lists_on_email", unique: true, where: "(email IS NOT NULL)"
     t.index ["identifier"], name: "index_mailing_lists_on_identifier", unique: true
+    t.index ["stats_bit"], name: "index_mailing_lists_on_stats_bit", unique: true
   end
 
   create_table "mentions", force: :cascade do |t|
@@ -798,6 +801,31 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_13_100000) do
     t.index ["interval_start"], name: "index_stats_daily_on_interval_start", unique: true
   end
 
+  create_table "stats_list_messages_by_list", id: false, force: :cascade do |t|
+    t.string "gran", null: false
+    t.date "period_start", null: false
+    t.integer "list_bit", limit: 2, null: false
+    t.integer "messages", null: false
+    t.index ["gran", "list_bit", "period_start"], name: "index_stats_list_messages_by_list_unique", unique: true
+  end
+
+  create_table "stats_list_volume", id: false, force: :cascade do |t|
+    t.string "gran", null: false
+    t.date "period_start", null: false
+    t.integer "list_mask", null: false
+    t.integer "messages", default: 0, null: false
+    t.integer "messages_committer", default: 0, null: false
+    t.integer "messages_contributor", default: 0, null: false
+    t.integer "threads_new", default: 0, null: false
+    t.integer "threads_active", default: 0, null: false
+    t.integer "people", default: 0, null: false
+    t.integer "people_committer", default: 0, null: false
+    t.integer "people_contributor", default: 0, null: false
+    t.integer "newcomers_community", default: 0, null: false
+    t.integer "newcomers_selection", default: 0, null: false
+    t.index ["gran", "list_mask", "period_start"], name: "index_stats_list_volume_on_gran_and_list_mask_and_period_start", unique: true
+  end
+
   create_table "stats_longevity_daily", force: :cascade do |t|
     t.date "interval_start", null: false
     t.date "interval_end", null: false
@@ -872,6 +900,66 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_13_100000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["interval_start"], name: "index_stats_monthly_on_interval_start", unique: true
+  end
+
+  create_table "stats_newcomers", id: false, force: :cascade do |t|
+    t.bigint "person_id", null: false
+    t.datetime "first_at", null: false
+    t.integer "first_list_mask", null: false
+    t.string "path", null: false
+    t.boolean "came_back", null: false
+    t.integer "active_month_offsets", limit: 2, default: [], null: false, array: true
+    t.integer "active_months_2y", null: false
+    t.datetime "reached_top50_at"
+    t.boolean "contributor", null: false
+    t.datetime "committer_at"
+    t.datetime "second_at"
+    t.index ["first_at"], name: "index_stats_newcomers_on_first_at"
+    t.index ["person_id"], name: "index_stats_newcomers_on_person_id", unique: true
+  end
+
+  create_table "stats_person_firsts", id: false, force: :cascade do |t|
+    t.bigint "person_id", null: false
+    t.integer "list_bit", limit: 2, null: false
+    t.datetime "first_at", null: false
+    t.bigint "first_message_id", null: false
+    t.index ["person_id", "list_bit"], name: "index_stats_person_firsts_on_person_id_and_list_bit", unique: true
+  end
+
+  create_table "stats_person_weeks", id: false, force: :cascade do |t|
+    t.date "week", null: false
+    t.bigint "person_id", null: false
+    t.integer "list_bit", limit: 2, null: false
+    t.integer "messages", null: false
+    t.integer "threads", null: false
+    t.integer "active_days", null: false
+    t.integer "patch_mails", null: false
+    t.integer "threads_started", null: false
+    t.index ["person_id", "week"], name: "index_stats_person_weeks_on_person_id_and_week"
+    t.index ["week", "person_id", "list_bit"], name: "index_stats_person_weeks_on_week_and_person_id_and_list_bit", unique: true
+  end
+
+  create_table "stats_regulars_monthly", id: false, force: :cascade do |t|
+    t.date "month", null: false
+    t.integer "list_mask", null: false
+    t.bigint "person_id", null: false
+    t.float "score_messages", null: false
+    t.float "score_threads", null: false
+    t.float "score_days", null: false
+    t.integer "rank_messages", null: false
+    t.integer "rank_threads", null: false
+    t.integer "rank_days", null: false
+    t.index ["list_mask", "month", "person_id"], name: "index_stats_regulars_monthly_unique", unique: true
+    t.index ["list_mask", "person_id"], name: "index_stats_regulars_monthly_on_list_mask_and_person_id"
+  end
+
+  create_table "stats_regulars_totals", id: false, force: :cascade do |t|
+    t.date "month", null: false
+    t.integer "list_mask", null: false
+    t.float "total_messages", null: false
+    t.float "total_threads", null: false
+    t.float "total_days", null: false
+    t.index ["list_mask", "month"], name: "index_stats_regulars_totals_on_list_mask_and_month", unique: true
   end
 
   create_table "stats_retention_milestones", force: :cascade do |t|

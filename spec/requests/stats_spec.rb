@@ -54,10 +54,15 @@ RSpec.describe "Release statistics", type: :request do
       doc = Nokogiri::HTML(response.body)
       cards = doc.css("a.stats-card")
       expect(cards.map { |c| c.at_css("h2").text }).to eq([ "By release", "By year", "By development cycle",
-                                                             "Release over release", "Year over year", "Cycle over cycle" ])
+                                                             "Release over release", "Year over year", "Cycle over cycle",
+                                                             "Mailing list traffic", "Newcomers", "Regulars" ])
       expect(cards.map { |c| c["href"] }).to eq([ "/stats/releases/19", "/stats/years/2026", "/stats/cycles/2026",
-                                                  "/stats/trends/releases", "/stats/trends/years", "/stats/trends/cycles" ])
-      expect(cards.map { |c| c.at_css("img.stats-card-art")["src"] }).to all(match(%r{/assets/stats/(release|year|cycle)(-trend)?-\w+\.png}))
+                                                  "/stats/trends/releases", "/stats/trends/years", "/stats/trends/cycles",
+                                                  "/stats/lists", "/stats/lists/newcomers", "/stats/lists/regulars" ])
+      expect(doc.css("h2.stats-row-title").map(&:text)).to eq([ "One period", "Over time", "Mailing lists" ])
+      arts = cards.filter_map { |c| c.at_css("img.stats-card-art") }
+      expect(arts.map { |i| i["src"] }).to all(match(%r{/assets/stats/((release|year|cycle)(-trend)?|lists|newcomers|regulars)-\w+\.png}))
+      expect(arts.size).to eq(9)
       expect(response.body).not_to include("PG19 and how")
       expect(response.body).to include("counted from the previous GA to its own GA")
       expect(response.body).to include("January to December")

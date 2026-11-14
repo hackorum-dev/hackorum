@@ -33,6 +33,12 @@
     small.form-hint Threads only on hidden lists are left out of the default topic list and reports. Search still finds them.
 
   .form-group
+    = f.label :archived do
+      = f.check_box :archived
+      '  Archived
+    small.form-hint An inactive list kept for its history. Left out of the default statistics selection.
+
+  .form-group
     = f.label :description
     = f.text_area :description, placeholder: "Optional description", rows: 3, class: "form-input"
 

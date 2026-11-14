@@ -3,6 +3,8 @@
 .stats-page
   h1 Statistics
   p.stats-intro Numbers about PostgreSQL development, read from the lists and the git history.
+  h2.stats-row-title One period
+  p.stats-row-intro Everything about one release, one calendar year or one development cycle.
   .stats-cards
     - release = @releases.find { |r| !r.in_development? } || @releases.first
     - if release
@@ -16,6 +18,7 @@
         text: "The same numbers for one run of master: from the day the previous major branched off to the day the next one did."
 
   h2.stats-row-title Over time
+  p.stats-row-intro How the releases, years and cycles compare.
   .stats-cards
     = render "stats/index/card", href: stats_trend_path("releases"), image: "stats/release-trend.png", title: "Release over release",
       text: "How the releases compare: who writes the code, who commits it, how much of it is discussed and reviewed, PG11 to now."
@@ -23,4 +26,14 @@
       text: "The same comparison year by year, from 2017."
     = render "stats/index/card", href: stats_trend_path("cycles"), image: "stats/cycle-trend.png", title: "Cycle over cycle",
       text: "The same comparison for each run of master, from the 2017/18 cycle."
+
+  h2.stats-row-title Mailing lists
+  p.stats-row-intro The lists themselves, from 1997 to now, for any set of lists.
+  .stats-cards
+    = render "stats/index/card", href: stats_lists_path, image: "stats/lists.png", title: "Mailing list traffic",
+      text: "Messages, threads, people and newcomers over time, and who writes them: committers, contributors, everyone else."
+    = render "stats/index/card", href: stats_lists_newcomers_path, image: "stats/newcomers.png", title: "Newcomers",
+      text: "Who arrives on the lists, how they start (a patch, a new thread, a reply) and how many of them stay and become regulars."
+    = render "stats/index/card", href: stats_lists_regulars_path, image: "stats/regulars.png", title: "Regulars",
+      text: "Who the most active people are each month, and how that changes over time."
   = render "stats/footer"

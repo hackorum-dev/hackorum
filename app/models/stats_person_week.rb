@@ -1,0 +1,2 @@
+class StatsPersonWeek < ApplicationRecord
+end

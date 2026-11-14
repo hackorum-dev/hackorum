@@ -54,7 +54,7 @@ class Admin::MailingListsController < Admin::BaseController
   end
 
   def mailing_list_params
-    permitted = params.require(:mailing_list).permit(:identifier, :display_name, :email, :description, :alternate_emails, :post_address, :hidden_by_default)
+    permitted = params.require(:mailing_list).permit(:identifier, :display_name, :email, :description, :alternate_emails, :post_address, :hidden_by_default, :archived)
     if permitted[:alternate_emails].is_a?(String)
       permitted[:alternate_emails] = permitted[:alternate_emails].split(/[\r\n,]+/).map(&:strip).reject(&:blank?)
     end

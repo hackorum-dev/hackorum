@@ -1,0 +1,95 @@
+- content_for :title, "Mailing list regulars"
+- labels = { "messages" => "messages", "threads" => "threads", "days" => "active days" }
+- q = @params.tab_query.merge(score: @data[:score])
+- heat = @data[:heatmap]
+- heat_paths = heat[:x].map { |m| stats_lists_regulars_path(q.merge(at: m, from: @params.from.strftime("%Y-%m"), to: @params.to.strftime("%Y-%m"))) }
+.stats-page
+  = render "stats/lists/header"
+  .stats-chips
+    span.stats-range score
+    .stats-seg
+      - labels.each do |key, label|
+        = link_to label, stats_lists_regulars_path(@params.to_query.merge(score: key, at: @at).compact), class: "stats-seg-item#{' is-active' if key == @data[:score]}"
+  p.stats-note = "Each person's #{labels[@data[:score]]} per calendar month, ranked per month."
+  p.stats-note committers from their first commit; contributors from the current contributors list
+  - if @data[:approximate]
+    p.stats-note This combination of lists is computed on request from per-list numbers; counts are summed per list, so a cross-posted message or thread counts once per list.
+
+  h2.stats-band
+    | Who is in the top 20
+    span.pop click a month to see its table
+  .stats-card.is-lists
+    - if heat[:y].empty?
+      .s nobody in this range
+    - else
+      .stats-scroll
+        = stats_chart("heatmap", heat.merge(paths: heat_paths), label: "Top 20 by month", height: [ 40 + 16 * heat[:y].size, 1600 ].min)
+      .s stronger color: rank 1-5, then 6-10, 11-20, 21-50
+      - if heat[:capped]
+        .s showing the 80 highest ranked
+
+  - at_i = @data[:months].index(@data[:at])
+  - nav = ->(i) { i && i >= 0 && i < @data[:months].size ? heat_paths[i] + "#top20" : nil }
+  h2.stats-band#top20
+    = "Top 20 in #{@data[:at]}"
+    span.stats-month-nav
+      - [ [ "previous month", nav.(at_i && at_i - 1) ], [ "next month", nav.(at_i && at_i + 1) ] ].each do |label, href|
+        - if href
+          = link_to label, href, class: "stats-month-step"
+        - else
+          span.stats-month-step.is-disabled = label
+  - if @data[:table].empty?
+    p.stats-note nobody this month
+  - else
+    .stats-table-wrap
+      table.stats-table
+        thead
+          tr
+            th rank
+            th.txt name
+            th.txt
+            th = labels[@data[:score]]
+            th.txt last 24 months
+            th a year earlier
+        tbody
+          - @data[:table].each do |r|
+            tr data-stats-pin=(r[:person_id] if @data[:bump])
+              td = r[:rank]
+              td.txt = r[:email] ? link_to(r[:name], person_path(r[:email])) : r[:name]
+              td.txt
+                - if r[:tag]
+                  span class="stats-tag is-#{r[:tag]}" = r[:tag]
+              td = r[:score]
+              td.txt = stats_chart("spark", { categories: (1..24).map(&:to_s), values: r[:spark], unit: labels[@data[:score]] }, css_class: "stats-spark", label: "#{labels[@data[:score]]} per month")
+              td
+                - if r[:year_ago].nil?
+                  | new
+                - elsif r[:year_ago] > r[:rank]
+                  = "▲ #{r[:year_ago] - r[:rank]}"
+                - elsif r[:year_ago] < r[:rank]
+                  = "▼ #{r[:rank] - r[:year_ago]}"
+                - else
+                  | =
+
+  - if @data[:bump]
+    h2.stats-band
+      | Rank over time
+      span.pop = "ranked by the last #{@data[:bump][:window]} months combined; click a line, a name or a table row to color it"
+    .stats-card.is-lists
+      .stats-scroll
+        = stats_chart("bump", @data[:bump], label: "Rank over time", height: 420)
+      - gone = @data[:bump][:lines].select { |l| l[:values].last.nil? && l[:best] <= @data[:bump][:top] }.sort_by { |l| [ l[:best], l[:best_at] ] }
+      - if gone.any?
+        .stats-bump-more
+          span.s = "in the top #{@data[:bump][:top]} earlier, not in the top 20 at the end:"
+          - gone.each do |l|
+            button.stats-bump-name type="button" data-stats-pin=l[:id] title="best rank #{l[:best]} in #{l[:best_at]}"
+              = l[:label]
+              span.s = " ##{l[:best]}"
+
+  h2.stats-band
+    | How concentrated
+    span.pop share of all activity held by the top 10 and the next 40
+  .stats-card.is-lists
+    = stats_chart("stack", @data[:concentration].merge(unit: "%"), label: "Concentration")
+  = render "stats/footer"

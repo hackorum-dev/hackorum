@@ -1,0 +1,2 @@
+class StatsRegularsTotal < ApplicationRecord
+end

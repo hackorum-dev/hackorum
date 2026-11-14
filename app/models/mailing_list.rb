@@ -7,6 +7,7 @@ class MailingList < ApplicationRecord
   validates :identifier, presence: true, uniqueness: true
   validates :display_name, presence: true
 
+  before_create :assign_stats_bit
   after_update :refresh_topic_visibility, if: :saved_change_to_hidden_by_default?
 
   def all_emails
@@ -21,7 +22,16 @@ class MailingList < ApplicationRecord
     index
   end
 
+  def stats_default? = !hidden_by_default && !archived
+
   private
+
+  def assign_stats_bit
+    return if stats_bit
+
+    used = MailingList.where.not(stats_bit: nil).pluck(:stats_bit)
+    self.stats_bit = (0..).find { |b| !used.include?(b) }
+  end
 
   def refresh_topic_visibility
     Topic.refresh_hidden_by_default!(topic_mailing_lists.select(:topic_id))

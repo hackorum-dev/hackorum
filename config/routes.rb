@@ -196,6 +196,9 @@ Rails.application.routes.draw do
   namespace :stats do
     root "index#show"
     get "trends/:segment", to: "trends#show", as: :trend, constraints: { segment: /releases|years|cycles/ }
+    get "lists", to: "lists#volume", as: :lists
+    get "lists/newcomers", to: "lists#newcomers", as: :lists_newcomers
+    get "lists/regulars", to: "lists#regulars", as: :lists_regulars
     # one controller per period kind; the kind is a route default, the key
     # is the major, the year, or the cycle's start year
     { "releases" => [ "release", /\d+/ ], "years" => [ "year", /\d{4}/ ], "cycles" => [ "cycle", /\d{4}/ ] }.each do |segment, (kind, pattern)|

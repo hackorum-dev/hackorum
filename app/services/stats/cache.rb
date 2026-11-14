@@ -30,6 +30,20 @@ module Stats
       Rails.cache.delete(trend_key(kind))
     end
 
+    # list pages always end in an open period
+    def self.fetch_lists(tab, key, &block)
+      return yield unless enabled?
+
+      Rails.cache.fetch(lists_key(tab, key), expires_in: OPEN_TTL, race_condition_ttl: 1.minute, &block)
+    end
+
+    def self.delete_lists(tab, key)
+      Rails.cache.delete(lists_key(tab, key))
+    end
+
+    def self.lists_key(tab, key) = [ "stats", VERSION, "lists", tab.to_s, *key ]
+    private_class_method :lists_key
+
     def self.trend_key(kind) = [ "stats", VERSION, "trend", kind.to_s ]
     private_class_method :trend_key
 

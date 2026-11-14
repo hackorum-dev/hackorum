@@ -1,5 +1,8 @@
-/ href: where the card leads; image: asset path; title, text
+/ href: where the card leads; image: asset path or nil; title, text
 = link_to href, class: "stats-card" do
-  = image_tag image, class: "stats-card-art", alt: ""
+  - if image
+    = image_tag image, class: "stats-card-art", alt: ""
+  - else
+    .stats-card-art
   h2 = title
   p = text

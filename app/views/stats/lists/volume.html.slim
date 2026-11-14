@@ -1,0 +1,43 @@
+- content_for :title, "Mailing lists over time"
+- base = { categories: @data[:categories], open: @data[:open] }
+- tiles = { messages: "Messages", threads_new: "New threads", people: "People", newcomers_community: "Newcomers", newcomers_selection: "New to these lists" }
+
+.stats-page
+  = render "stats/lists/header"
+  .stats-lists-tiles
+    - tiles.each do |key, label|
+      - tile = @data[:tiles][key]
+      .stats-lists-tile
+        .label = label
+        .value = number_with_delimiter(tile[:value])
+        - if tile[:change]
+          .delta = "#{format('%+d', tile[:change])}% vs the range before"
+
+  h2.stats-band
+    | Who writes
+    span.pop committers from their first commit; contributors from the current contributors list
+  .stats-lists-grid
+    .stats-card.is-lists
+      .t Messages
+      = stats_chart("stack", base.merge(series: @data[:messages]), label: "Messages by sender group")
+    .stats-card.is-lists
+      .t People
+      = stats_chart("stack", base.merge(series: @data[:people]), label: "People by sender group")
+
+  h2.stats-band Threads and newcomers
+  .stats-lists-grid
+    .stats-card.is-lists
+      .t Threads
+      = stats_chart("trend", base.merge(lines: @data[:threads], unit: ""), label: "Threads")
+    .stats-card.is-lists
+      .t Newcomers
+      .s new to the community: first message on any list; new to these lists: first message on the selected ones
+      = stats_chart("trend", base.merge(lines: @data[:newcomers], unit: ""), label: "Newcomers")
+
+  - if @params.lists.size > 1
+    h2.stats-band
+      | Between the lists
+      span.pop a cross-posted message counts in each of its lists
+    .stats-card.is-lists
+      = stats_chart("stack", base.merge(series: @data[:by_list], unit: "%"), label: "Share of messages per list")
+  = render "stats/footer"

@@ -1,0 +1,3 @@
+label.stats-pill-toggle
+  = check_box_tag "lists[]", list.identifier, @params.lists.include?(list), id: nil, class: "stats-pill-input", data: { action: "change->debounced-submit#submit" }
+  span = list.identifier.delete_prefix("pgsql-")

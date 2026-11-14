@@ -1,0 +1,89 @@
+- content_for :title, "Mailing list newcomers"
+- t = @data[:tiles]
+.stats-page
+  = render "stats/lists/header"
+  .stats-lists-tiles
+    .stats-lists-tile
+      .label Newcomers
+      .value = number_with_delimiter(t[:newcomers])
+    .stats-lists-tile
+      .label Came back
+      .value = "#{t[:came_back]}%"
+      .delta posted again after 30 days
+    .stats-lists-tile
+      .label Became active
+      .value = "#{t[:became_active]}%"
+      .delta 6+ active months in 2 years
+    .stats-lists-tile
+      .label Reached top 50
+      .value = "#{t[:top50]}%"
+      .delta within 2 years
+    .stats-lists-tile
+      .label Days to 2nd message
+      .value = t[:median_days_to_second] || "n/a"
+      .delta median
+  p.stats-note = "People whose first message on any list is in the range and on the selected lists, grouped by #{@data[:gran]} of their first message. Recent groups have had less time; their points are dashed or cut."
+  p.stats-note committers from their first commit; contributors from the current contributors list
+
+  h2.stats-band Do they stay
+  .stats-lists-grid
+    .stats-card.is-lists
+      .t Active n months later
+      .s share of each group posting in that month; the latest four groups in color
+      = stats_chart("trend", @data[:retention].merge(unit: "%"), label: "Retention by month")
+    .stats-card.is-lists
+      .t Outcomes by group
+      .s dashed: the group is less than two years old
+      = stats_chart("trend", @data[:outcomes].merge(unit: "%"), label: "Outcomes by group")
+
+  h2.stats-band How they start
+  .stats-lists-grid
+    .stats-card.is-lists
+      .t First 90 days
+      = stats_chart("stack", @data[:paths], label: "First path")
+    .stats-card.is-lists
+      .t Start and outcome
+      .stats-table-wrap
+        table.stats-table
+          thead
+            tr
+              th.txt first 90 days
+              th people
+              th came back
+              th became active
+              th top 50
+          tbody
+            - @data[:path_table].each do |r|
+              tr
+                td.txt = r[:label]
+                td = number_with_delimiter(r[:size])
+                td = "#{r[:came_back]}%"
+                td = "#{r[:became_active]}%"
+                td = "#{r[:top50]}%"
+
+  h2.stats-band
+    | Fast risers
+    span.pop newcomers of the last 12 months already in the top 50
+  - if @data[:risers].empty?
+    p.stats-note nobody yet
+  - else
+    .stats-table-wrap
+      table.stats-table
+        thead
+          tr
+            th.txt name
+            th.txt first message
+            th.txt lists
+            th.txt first 90 days
+            th weeks to top 50
+            th.txt last 12 months
+        tbody
+          - @data[:risers].each do |r|
+            tr
+              td.txt = r[:email] ? link_to(r[:name], person_path(r[:email])) : r[:name]
+              td.txt = r[:first_at].iso8601
+              td.txt = r[:lists].map { |l| l.delete_prefix("pgsql-") }.join(", ")
+              td.txt = r[:path]
+              td = r[:weeks_to_top50]
+              td.txt = stats_chart("spark", { categories: (1..12).map(&:to_s), values: r[:spark], unit: "messages" }, css_class: "stats-spark", label: "messages per month")
+  = render "stats/footer"

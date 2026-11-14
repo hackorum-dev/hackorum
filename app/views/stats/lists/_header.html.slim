@@ -1,0 +1,51 @@
+- tabs = [ [ "Volume", :stats_lists_path, "volume" ], [ "Newcomers", :stats_lists_newcomers_path, "newcomers" ], [ "Regulars", :stats_lists_regulars_path, "regulars" ] ]
+- keep = @keep_query || {}
+- main_lists, other_lists = @params.all_lists.partition(&:stats_default?)
+
+h1 Mailing lists over time
+p.stats-intro Traffic on the PostgreSQL mailing lists: messages, threads, people and newcomers, for any set of lists.
+= form_with url: request.path, method: :get, local: true, class: "stats-picker", data: { controller: "debounced-submit" } do
+  - if keep[:score]
+    = hidden_field_tag :score, keep[:score]
+  section.stats-picker-group.is-lists
+    .stats-picker-head
+      h2 Lists
+      span.stats-picker-links
+        - unless @params.default_lists?
+          = link_to "default", url_for(@params.to_query.except(:lists).merge(keep))
+        = link_to "all", url_for(@params.to_query.merge(lists: @params.all_lists.map(&:identifier).join(",")).merge(keep))
+    .stats-pills
+      - main_lists.each do |l|
+        = render "stats/lists/pill", list: l
+    - if other_lists.any?
+      .stats-pills.is-secondary
+        span.stats-pills-label Archived and notices
+        - other_lists.each do |l|
+          = render "stats/lists/pill", list: l
+  section.stats-picker-group.is-period
+    .stats-picker-head
+      h2 Period
+    .stats-picker-range
+      = month_field_tag :from, @params.from.strftime("%Y-%m"), aria: { label: "from" }, data: { action: "change->debounced-submit#submit" }
+      span aria-hidden="true" &rarr;
+      = month_field_tag :to, @params.to.strftime("%Y-%m"), aria: { label: "to" }, data: { action: "change->debounced-submit#submit" }
+    .stats-picker-links
+      = link_to "last year", url_for(@params.preset_query(1).merge(keep))
+      = link_to "3 years", url_for(@params.preset_query(3).merge(keep))
+      = link_to "10 years", url_for(@params.preset_query(10).merge(keep))
+      = link_to "all", url_for(@params.preset_query(nil).merge(keep))
+  section.stats-picker-group.is-gran
+    .stats-picker-head
+      h2 Granularity
+    .stats-seg.stats-seg-radio role="radiogroup" aria-label="granularity"
+      - Stats::ListsParams::GRANS.each do |g|
+        - disabled = g == "week" && !@params.week_allowed?
+        label class=[ "stats-seg-item", ("is-active" if g == @params.gran), ("is-disabled" if disabled) ].compact.join(" ") title=(disabled ? "weeks only for ranges up to 3 years" : nil)
+          = radio_button_tag :gran, g, g == @params.gran, disabled: disabled, class: "stats-pill-input", data: { action: "change->debounced-submit#submit" }
+          = g
+  .stats-picker-submit
+    = submit_tag "Show", name: nil, class: "button"
+nav.stats-tabs
+  - tabs.each do |label, helper, action|
+    - next unless respond_to?(helper)
+    = link_to label, public_send(helper, @params.tab_query), class: [ "stats-tab", ("is-active" if action_name == action) ].compact.join(" ")
