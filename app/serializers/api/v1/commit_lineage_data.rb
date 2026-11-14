@@ -12,7 +12,7 @@ module Api
 
       # the verdicts a thread shows, as Lineage::ThreadPresenter#shown_on_thread? has it
       def self.shown?(verdict)
-        verdict.committed? || (verdict.verdict == "undecided" && verdict.origin == "trailer")
+        verdict.committed? || verdict.verdict == "other_thread" || (verdict.verdict == "undecided" && verdict.origin == "trailer")
       end
 
       def initialize(topic, commits)

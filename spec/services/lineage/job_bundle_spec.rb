@@ -106,36 +106,59 @@ RSpec.describe Lineage::JobBundle do
     end
   end
 
-  it "renders the shipped prompt without markers in all modes" do
+  def shipped_readme(mode, patchsets)
     topic = create(:topic)
     run = create(:patchset_run, topic: topic, status: "running")
+    Dir.mktmpdir do |dir|
+      described_class.new(run: run, topic: topic, patchsets: patchsets, candidates: [], pairs: [],
+                          branches: {}, previous: nil, mode: mode, base_run: (run if mode == "update"),
+                          new_patchset_ids: []).write(dir)
+      return File.read(File.join(dir, "README.md"))
+    end
+  end
+
+  def patchset
+    message = create(:message, is_patch_submission: true)
+    Lineage::PatchsetEnumerator::Patchset.new(message: message, ordinal: 1, dir: "/x", files: [], parsed: nil,
+                                              parse_error: nil, nocfbot: false)
+  end
+
+  it "renders the shipped prompt without markers in all modes" do
     judging = %w[trailer full discussion update]
     PatchsetRun::MODES.each do |mode|
-      Dir.mktmpdir do |dir|
-        described_class.new(run: run, topic: topic, patchsets: [], candidates: [], pairs: [],
-                            branches: {}, previous: nil, mode: mode).write(dir)
-        readme = File.read(File.join(dir, "README.md"))
-        expect(readme).not_to include("<!--")
-        expect(readme.scan(/\{\{\w+\}\}/).uniq).to eq([ "{{repo_path}}" ])
-        expect(readme.include?("## Task 1: lineage")).to be(mode != "discussion")
-        expect(readme.include?("## This is an update run")).to be(mode == "update")
-        expect(readme.include?("## This thread has no patchsets")).to be(mode == "discussion")
-        expect(readme.include?("Task 2b")).to be(mode == "full")
-        expect(readme.include?("## Task 2: commit verdicts")).to be(judging.include?(mode))
-        expect(readme.include?("## Task 3: review coverage")).to be(judging.include?(mode))
-        expect(readme.include?("## Task 3b")).to be(judging.include?(mode))
-        expect(readme.include?("`suggested_reviews`")).to be(judging.include?(mode))
-        expect(readme.include?("take that as given")).to be(%w[trailer discussion update].include?(mode))
-        expect(readme.include?("re-derive, do not copy")).to be(mode != "update")
-        expect(readme.include?("`verdicts` and `extra_commits` must be `[]`")).to be(mode == "lineage")
-        expect(readme.include?("For every patchset say")).to be(%w[trailer full lineage].include?(mode))
-        expect(readme.include?("For every patchset with `new: true`")).to be(mode == "update")
-        expect(readme.include?("The first patchset is `new_series`")).to be(%w[trailer full lineage].include?(mode))
-        expect(readme.include?("- A patchset with `parse_error`")).to be(mode != "update")
-        expect(readme.include?("- A new patchset with `parse_error`")).to be(mode == "update")
-        expect(readme.include?("against the last patchset of the thread")).to be(%w[trailer full update].include?(mode))
-      end
+      readme = shipped_readme(mode, mode == "discussion" ? [] : [ patchset ])
+      expect(readme).not_to include("<!--")
+      expect(readme.scan(/\{\{\w+\}\}/).uniq).to eq([ "{{repo_path}}" ])
+      expect(readme.include?("## Task 1: lineage")).to be(mode != "discussion")
+      expect(readme.include?("## This is an update run")).to be(mode == "update")
+      expect(readme.include?("## This thread has no patchsets")).to be(mode == "discussion")
+      expect(readme.include?("Task 2b")).to be(mode == "full")
+      expect(readme.include?("## Task 2: commit verdicts")).to be(judging.include?(mode))
+      expect(readme.include?("## Task 3: review coverage")).to be(judging.include?(mode))
+      expect(readme.include?("## Task 3b")).to be(judging.include?(mode))
+      expect(readme.include?("`suggested_reviews`")).to be(judging.include?(mode))
+      expect(readme.include?("take that as given")).to be(%w[trailer discussion update].include?(mode))
+      expect(readme.include?("re-derive, do not copy")).to be(mode != "update")
+      expect(readme.include?("`verdicts` and `extra_commits` must be `[]`")).to be(mode == "lineage")
+      expect(readme.include?("For every patchset say")).to be(%w[trailer full lineage].include?(mode))
+      expect(readme.include?("For every patchset with `new: true`")).to be(mode == "update")
+      expect(readme.include?("The first patchset is `new_series`")).to be(%w[trailer full lineage].include?(mode))
+      expect(readme.include?("- A patchset with `parse_error`")).to be(mode != "update")
+      expect(readme.include?("- A new patchset with `parse_error`")).to be(mode == "update")
+      expect(readme.include?("other_thread")).to be(%w[trailer discussion update].include?(mode))
+      expect(readme.include?("other_threads")).to be(%w[trailer discussion update].include?(mode))
+      expect(readme.include?("`recheck: true`")).to be(mode == "update")
+      expect(readme.include?("[topic:<id>]")).to be(true)
+      expect(readme.include?("against the last patchset of")).to be(%w[trailer full update].include?(mode))
     end
+  end
+
+  it "renders an update without patchsets as an update of a discussion" do
+    readme = shipped_readme("update", [])
+    expect(readme).not_to include("<!--")
+    expect(readme).to include("## This is an update run", "## This thread has no patchsets", "## Task 2: commit verdicts",
+                              "`recheck: true`", "- A new patchset with `parse_error`")
+    expect(readme).not_to include("## Task 1: lineage", "against the last patchset of", "re-derive, do not copy")
   end
 
   it "ships a valid result schema" do

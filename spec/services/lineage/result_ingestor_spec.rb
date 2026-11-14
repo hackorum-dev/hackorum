@@ -738,6 +738,155 @@ RSpec.describe Lineage::ResultIngestor do
     end
   end
 
+  describe "other_thread" do
+    it "clears source and author, links nothing, credits nothing" do
+      data = answer(verdict: "other_thread", confidence: 0.95)
+      data["verdicts"][0].merge!("author_name" => "X", "author_message_id" => m1.id, "change_level" => "light")
+      ingest(data)
+      v = run.reload.verdicts.sole
+      expect(run.status).to eq("done")
+      expect([ v.verdict, v.source_message_id, v.author_name, v.change_level ]).to eq([ "other_thread", nil, nil, nil ])
+      expect(run.error).to include("other_thread")
+      expect(CommitTopic.llm.where(commit: commit)).to be_empty
+      expect(CommitPerson.llm.where(commit: commit)).to be_empty
+    end
+  end
+
+  describe "credits across threads" do
+    let(:other) { create(:topic) }
+    let(:other_patch) do
+      create(:message, topic: other, is_patch_submission: true, sender: m2.sender, sender_person_id: m2.sender_person_id, created_at: 1.hour.ago)
+    end
+
+    def other_verdict(verdict: "partial", run: create(:patchset_run, topic: other), **attrs)
+      create(:commit_verdict, patchset_run: run, commit: commit, verdict: verdict, source_message: verdict == "other_thread" ? nil : other_patch,
+                              change_level: CommitVerdict::COMMITTED.include?(verdict) && verdict != "as_is" ? "light" : nil, **attrs)
+    end
+
+    def partial = answer(verdict: "partial").tap { |d| d["verdicts"][0]["change_level"] = "light" }
+    def authors = CommitPerson.llm.where(commit: commit, role: "author")
+
+    def ingest_other
+      other_run = create(:patchset_run, topic: other, status: "running", started_at: 1.minute.ago, finished_at: nil)
+      data = { "lineage" => [ { "message_id" => other_patch.id, "parent_message_id" => nil, "step_kind" => "new_series", "confidence" => 0.9, "reason" => "r" } ],
+               "verdicts" => [ { "sha" => commit.sha, "verdict" => "partial", "change_level" => "light", "source_message_id" => other_patch.id,
+                                 "confidence" => 0.9, "evidence" => "e" } ],
+               "story" => [ "s" ] }
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "r.json"), JSON.dump(data))
+        described_class.new(run: other_run, index: { "patchsets" => [ { "message_id" => other_patch.id } ], "candidates" => [ { "sha" => commit.sha } ] })
+                       .call(File.join(dir, "r.json"))
+      end
+    end
+
+    it "writes one author row when two threads credit the same sender" do
+      ingest_other
+      ingest(partial)
+      expect(authors.pluck(:person_id, :topic_id)).to eq([ [ m2.sender_person_id, other.id ] ])
+    end
+
+    it "keeps the other thread's credit when this one flips to other_thread" do
+      ingest(partial)
+      ingest_other
+      ingest(answer(verdict: "other_thread"))
+      expect(authors.pluck(:person_id, :topic_id)).to eq([ [ m2.sender_person_id, other.id ] ])
+    end
+
+    it "reads only the other thread's current run" do
+      other_verdict(run: create(:patchset_run, topic: other, created_at: 2.days.ago))
+      other_verdict(verdict: "other_thread", run: create(:patchset_run, topic: other, created_at: 1.day.ago))
+      ingest(answer(verdict: "other_thread"))
+      expect(authors).to be_empty
+    end
+
+    it "does not credit an author of one thread as reviewer via the other" do
+      other_verdict(reviews: [ { "reviewer" => "Patch Sender", "reviewer_message_id" => m2.id, "source" => "llm",
+                                 "coverage" => "final", "reviewed_message_ids" => [], "confidence" => 0.9 } ])
+      ingest(partial)
+      expect(CommitPerson.llm.where(commit: commit).pluck(:role)).to eq([ "author" ])
+    end
+
+    it "drops stale and unscoped rows of the commit" do
+      CommitPerson.create!(commit: commit, role: "author", raw_name: "Other", source: "llm", topic: other)
+      CommitPerson.create!(commit: commit, role: "author", raw_name: "Old", source: "llm")
+      ingest(answer)
+      expect(CommitPerson.llm.where(commit: commit).pluck(:person_id, :topic_id)).to eq([ [ m2.sender_person_id, topic.id ] ])
+    end
+  end
+
+  describe "rechecks" do
+    let(:other) { create(:topic) }
+    let(:other_run) { create(:patchset_run, topic: other, bundle_index: { "candidates" => [ { "sha" => commit.sha, "other_threads" => [] } ] }) }
+
+    before do
+      create(:commit_topic, commit: commit, topic: other)
+      create(:commit_verdict, patchset_run: other_run, commit: commit, verdict: "as_is")
+    end
+
+    it "opens a recheck when the partner did not see this verdict" do
+      ingest(answer)
+      expect(LineageRecheck.open.pluck(:topic_id, :commit_id, :requested_by_run_id)).to eq([ [ other.id, commit.id, run.id ] ])
+    end
+
+    it "does not duplicate an open recheck" do
+      2.times { ingest(answer) }
+      expect(LineageRecheck.count).to eq(1)
+    end
+
+    it "opens one when the partner saw a different verdict" do
+      other_run.update!(bundle_index: { "candidates" => [ { "sha" => commit.sha, "other_threads" =>
+        [ { "topic_id" => topic.id, "verdict" => "as_is", "source_message_id" => m1.id } ] } ] })
+      ingest(answer)
+      expect(LineageRecheck.open.count).to eq(1)
+    end
+
+    it "does not when the partner saw the same verdict" do
+      other_run.update!(bundle_index: { "candidates" => [ { "sha" => commit.sha, "other_threads" =>
+        [ { "topic_id" => topic.id, "verdict" => "as_is", "source_message_id" => m2.id } ] } ] })
+      ingest(answer)
+      expect(LineageRecheck.count).to eq(0)
+    end
+
+    it "matches the partner verdict on a backport through the candidate's backports" do
+      backport = create(:commit, cherry_picked_from_sha: commit.sha)
+      create(:commit_topic, commit: backport, topic: other)
+      CommitVerdict.where(patchset_run: other_run).update_all(commit_id: backport.id)
+      other_run.update!(bundle_index: { "candidates" => [ { "sha" => commit.sha, "backports" => [ backport.sha ], "other_threads" =>
+        [ { "topic_id" => topic.id, "verdict" => "as_is", "source_message_id" => m2.id } ] } ] })
+      ingest(answer)
+      expect(LineageRecheck.count).to eq(0)
+      other_run.update!(bundle_index: { "candidates" => [ { "sha" => commit.sha, "backports" => [ backport.sha ], "other_threads" => [] } ] })
+      ingest(answer)
+      expect(LineageRecheck.open.pluck(:topic_id, :commit_id)).to eq([ [ other.id, backport.id ] ])
+    end
+
+    it "ignores partners without a trailer link or with a non-committed verdict" do
+      CommitTopic.where(topic: other).delete_all
+      ingest(answer)
+      expect(LineageRecheck.count).to eq(0)
+      create(:commit_topic, commit: commit, topic: other)
+      CommitVerdict.where(patchset_run: other_run).update_all(verdict: "not_this_thread")
+      ingest(answer)
+      expect(LineageRecheck.count).to eq(0)
+    end
+
+    it "opens rechecks without linking" do
+      ingest(answer, link: false)
+      expect(LineageRecheck.open.count).to eq(1)
+    end
+
+    it "does not for other_thread" do
+      ingest(answer(verdict: "other_thread"))
+      expect(LineageRecheck.count).to eq(0)
+    end
+
+    it "does not from a run with recheck candidates" do
+      index["candidates"][0]["recheck"] = true
+      ingest(answer)
+      expect(LineageRecheck.count).to eq(0)
+    end
+  end
+
   describe "update mode" do
     let(:old_commit) { create(:commit) }
     let(:old_extra) { create(:commit) }
@@ -848,6 +997,18 @@ RSpec.describe Lineage::ResultIngestor do
       expect(run.reload.verdicts.count).to eq(3)
     end
 
+    it "replaces the base verdict for a recheck candidate and closes the recheck" do
+      create(:commit_verdict, patchset_run: base, commit: commit, verdict: "as_is")
+      base.update!(raw_result: base.raw_result.merge("verdicts" => [ { "sha" => old_commit.sha }, { "sha" => commit.sha, "verdict" => "as_is" } ]))
+      index["candidates"][0]["recheck"] = true
+      recheck = LineageRecheck.create!(topic: topic, commit: commit)
+      ingest(update_answer(verdict: "other_thread"), mode: "update")
+      expect(run.reload.status).to eq("done")
+      expect(run.verdicts.where(commit: commit).pluck(:verdict)).to eq([ "other_thread" ])
+      expect(run.raw_result["verdicts"].select { |v| v["sha"] == commit.sha }.map { |v| v["verdict"] }).to eq([ "other_thread" ])
+      expect(recheck.reload.done_at).to be_present
+    end
+
     it "rejects a missing candidate verdict" do
       data = update_answer.merge("verdicts" => [])
       expect { ingest(data, mode: "update") }.to raise_error(described_class::Error, /verdict missing for #{commit.sha}/)
@@ -913,6 +1074,20 @@ RSpec.describe Lineage::ResultIngestor do
                                                           "coverage" => "final", "note" => "n", "confidence" => 0.9 } ])
       ingest(data, mode: "discussion")
       expect(run.reload.verdicts.sole.reviews.first).to include("reviewer" => "Sug", "reviewed_message_ids" => [])
+    end
+
+    it "is as lenient in an update run without patchsets" do
+      base = create(:patchset_run, topic: topic, status: "done", mode: "discussion",
+                                   raw_result: { "lineage" => [], "verdicts" => [], "extra_commits" => [], "story" => [ "old" ] })
+      index["base_run_id"] = base.id
+      data = discussion_answer("source_message_id" => fix.id,
+                               "reviews" => [ { "reviewer" => "Rev", "reviewed_message_ids" => [ fix.id ], "coverage" => "final", "note" => "n" } ])
+      ingest(data, mode: "update")
+      v = run.reload.verdicts.sole
+      expect(v).to have_attributes(source_message_id: nil, author_message_id: fix.id)
+      expect(v.reviews.first["reviewed_message_ids"]).to eq([])
+      index["patchsets"] = [ { "message_id" => m1.id, "new" => false } ]
+      expect { ingest(data, mode: "update") }.to raise_error(described_class::Error, /unknown source_message_id/)
     end
 
     it "validates lineage normally when the bundle has patchsets" do

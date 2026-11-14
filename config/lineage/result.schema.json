@@ -27,7 +27,7 @@
         "required": ["sha", "verdict", "source_message_id", "author_name", "author_message_id", "confidence", "evidence", "change_level", "reviews", "suggested_reviews"],
         "properties": {
           "sha": { "type": "string" },
-          "verdict": { "type": "string", "enum": ["as_is", "modified", "partial", "from_discussion", "not_this_thread", "undecided"] },
+          "verdict": { "type": "string", "enum": ["as_is", "modified", "partial", "from_discussion", "other_thread", "not_this_thread", "undecided"] },
           "source_message_id": { "type": ["integer", "null"] },
           "author_name": { "type": ["string", "null"] },
           "author_message_id": { "type": ["integer", "null"] },

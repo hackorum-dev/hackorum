@@ -197,6 +197,10 @@ class TopicMergeService
     [ PatchsetRun, PatchsetLineage, CommitVerdict, PatchsetPair ].each do |model|
       model.where(topic_id: source_topic.id).update_all(topic_id: target_topic.id)
     end
+    CommitPerson.llm.where(topic_id: source_topic.id).update_all(topic_id: target_topic.id)
+    LineageRecheck.open.where(topic_id: source_topic.id,
+                              commit_id: LineageRecheck.open.where(topic_id: target_topic.id).select(:commit_id)).delete_all
+    LineageRecheck.where(topic_id: source_topic.id).update_all(topic_id: target_topic.id)
   end
 
   def copy_mailing_lists!

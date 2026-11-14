@@ -3912,13 +3912,14 @@ components:
       properties:
         verdict:
           type: string
-          enum: [as_is, modified, partial, from_discussion, undecided]
+          enum: [as_is, modified, partial, from_discussion, other_thread, undecided]
           description: |
             The model's judgement. `as_is`: a posted patchset landed as
             posted. `modified`: a posted patchset was changed before the
             commit. `partial`: the commit is part of a posted patchset.
             `from_discussion`: written from the discussion, no posted patch
-            matches. `undecided`: the model could not tell.
+            matches. `other_thread`: the commit landed from a patch posted
+            on another thread. `undecided`: the model could not tell.
         confidence:
           type: number
           minimum: 0

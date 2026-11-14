@@ -9,6 +9,12 @@ RSpec.describe CommitVerdict do
     expect(others).to all(satisfy { |v| !v.committed? })
   end
 
+  it "knows other_thread and does not count it as committed" do
+    v = build(:commit_verdict, verdict: "other_thread")
+    expect(v).to be_valid
+    expect(v.committed?).to be(false)
+  end
+
   it "defaults origin to trailer and rejects unknown origins" do
     expect(build(:commit_verdict).origin).to eq("trailer")
     expect(build(:commit_verdict, origin: "extra")).to be_valid

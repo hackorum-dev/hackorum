@@ -103,6 +103,11 @@ module Lineage
       when "update" then Updates.new_commits(run.topic, base)
       else []
       end.map { |c| { commit: c, origin: "trailer", overlap: nil } }
+      if run.mode == "update"
+        known = candidates.map { |c| c[:commit].id }.to_set
+        candidates += Updates.recheck_commits(run.topic).reject { |c| known.include?(c.id) }
+                             .map { |c| { commit: c, origin: "trailer", overlap: nil, recheck: true } }
+      end
       index = BundleWriter.new(run: run, topic: run.topic, candidates: candidates, mode: run.mode, base_run: base).call(dir.to_s)
       system("tar", "-czf", part.to_s, "-C", dir.to_s, ".", exception: true)
       PatchsetRun.transaction do

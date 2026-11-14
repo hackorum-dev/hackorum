@@ -35,8 +35,9 @@ RSpec.describe Lineage::BundleWriter do
       expect(index["patch_mail_ids"]).to eq([ m1.id, m2.id ])
       expect(index["candidates"]).to eq([
         { "sha" => commit.sha, "origin" => "trailer", "backports" => [ backport.sha ], "reviewers" => [ "Rev One", "The Boss" ],
-          "committer_reviewers" => [ "The Boss" ] },
-        { "sha" => linked.sha, "origin" => "previous", "backports" => [], "reviewers" => [], "committer_reviewers" => [] } ])
+          "committer_reviewers" => [ "The Boss" ], "other_threads" => [] },
+        { "sha" => linked.sha, "origin" => "previous", "backports" => [], "reviewers" => [], "committer_reviewers" => [],
+          "other_threads" => [] } ])
 
       disk = JSON.parse(File.read(File.join(dir, "index.json")))
       expect(disk["patchsets"].first["branch"]).to include("status" => "applied", "base_sha" => "c" * 40)
@@ -48,6 +49,39 @@ RSpec.describe Lineage::BundleWriter do
       expect(Dir.exist?(File.join(dir, "commits"))).to be(false)
       expect(File.read(File.join(dir, "README.md"))).to include("{{repo_path}}")
       expect(PatchsetPair.where(topic_id: topic.id).count).to eq(1)
+    end
+  end
+
+  it "adds other threads to trailer candidates" do
+    commit = create(:commit)
+    other = create(:topic).tap { |t| create(:message, topic: t, is_patch_submission: true) }
+    create(:commit_topic, commit: commit, topic: other, source: "trailer")
+    Dir.mktmpdir do |dir|
+      index = described_class.new(run: run, topic: topic, candidates: [ { commit: commit, origin: "trailer", overlap: nil } ],
+                                  mode: "trailer", branches: ->(_) { {} }).call(dir)
+      expect(index["candidates"].sole["other_threads"]).to eq([ { "topic_id" => other.id, "verdict" => nil, "source_message_id" => nil } ])
+      full = JSON.parse(File.read(File.join(dir, "index.json")))
+      expect(full["candidates"].sole["other_threads"].sole).to include("topic_id" => other.id, "patchset_count" => 1)
+    end
+  end
+
+  it "omits other threads in lineage mode" do
+    commit = create(:commit)
+    Dir.mktmpdir do |dir|
+      index = described_class.new(run: run, topic: topic, candidates: [ { commit: commit, origin: "trailer", overlap: nil } ],
+                                  mode: "lineage", branches: ->(_) { {} }).call(dir)
+      expect(index["candidates"].sole).not_to have_key("other_threads")
+    end
+  end
+
+  it "marks recheck candidates" do
+    commit = create(:commit)
+    base = create(:patchset_run, topic: topic, status: "done", mode: "trailer", through_message: m1, raw_result: { "story" => [ "s" ] })
+    Dir.mktmpdir do |dir|
+      index = described_class.new(run: run, topic: topic, candidates: [ { commit: commit, origin: "trailer", overlap: nil, recheck: true } ],
+                                  mode: "update", base_run: base, branches: ->(_) { {} }).call(dir)
+      expect(index["candidates"].sole["recheck"]).to be(true)
+      expect(JSON.parse(File.read(File.join(dir, "index.json")))["candidates"].sole["recheck"]).to be(true)
     end
   end
 

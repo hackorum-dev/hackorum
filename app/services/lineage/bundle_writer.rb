@@ -1,6 +1,8 @@
 module Lineage
   # database half of a bundle; returns the index the ingestor needs
   class BundleWriter
+    OTHER_THREAD_MODES = %w[trailer discussion update].freeze
+
     def initialize(run:, topic:, candidates:, mode:, branches: nil, base_run: nil)
       @run = run
       @topic = topic
@@ -18,7 +20,7 @@ module Lineage
       fresh = @base_run && Updates.new_patchset_ids(@base_run, patchsets.map(&:message))
       pairs = TriangleBuilder.new(@topic, patchsets).call
       pairs = pairs.select { |p| fresh.include?(p[:later_message_id]) || fresh.include?(p[:earlier_message_id]) } if fresh
-      entries = with_reviewers(fold_backports(all_candidates))
+      entries = with_other_threads(with_reviewers(fold_backports(all_candidates)))
       previous = (@base_run || PatchsetRun.current_for(@topic.id))&.raw_result&.except("update")
       last_id = JobBundle.new(run: @run, topic: @topic, patchsets: patchsets, candidates: entries, pairs: pairs,
                               branches: branches, previous: previous, mode: @mode, base_run: @base_run,
@@ -31,6 +33,8 @@ module Lineage
                   { "sha" => c[:commit].sha, "origin" => c[:origin],
                     "backports" => c[:backports].map(&:sha), "reviewers" => c[:reviewers],
                     "committer_reviewers" => c[:committer_reviewers] }
+                    .merge(c.key?(:other_threads) ? { "other_threads" => compact_threads(c[:other_threads]) } : {})
+                    .merge(c[:recheck] ? { "recheck" => true } : {})
                 },
                 "patch_mail_ids" => patch_mail_ids }
       index.merge!("base_run_id" => @base_run.id, "since_message_id" => @base_run.through_message_id) if @base_run
@@ -67,8 +71,23 @@ module Lineage
       groups.map do |sha, members|
         canonical = by_sha[sha]
         origin = members.any? { |m| m[:origin] == "trailer" } ? "trailer" : canonical[:origin]
-        canonical.merge(origin: origin, backports: members.map { |m| m[:commit] } - [ canonical[:commit] ])
+        canonical.merge(origin: origin, backports: members.map { |m| m[:commit] } - [ canonical[:commit] ],
+                        recheck: members.any? { |m| m[:recheck] })
+                 .tap { |h| h.delete(:recheck) unless h[:recheck] }
       end
+    end
+
+    def with_other_threads(candidates)
+      return candidates unless OTHER_THREAD_MODES.include?(@mode)
+
+      found = OtherThreads.new(@topic).call(candidates.map { |c| c[:commit] },
+                                            backports: candidates.to_h { |c| [ c[:commit].id, c[:backports] ] })
+      candidates.map { |c| c.merge(other_threads: found.fetch(c[:commit].id, [])) }
+    end
+
+    def compact_threads(list)
+      list.map { |t| { "topic_id" => t["topic_id"], "verdict" => t.dig("verdict", "verdict"),
+                       "source_message_id" => t.dig("verdict", "source_message_id") } }
     end
 
     def with_reviewers(candidates)

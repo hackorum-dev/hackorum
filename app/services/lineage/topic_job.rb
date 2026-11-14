@@ -59,7 +59,7 @@ module Lineage
         ->(patchsets) { BranchApplier.new(repo_path: @repo_path, worktrees_dir: @worktrees_dir, worktree_name: @worktree_name).call(patchsets) }
       end
       index = BundleWriter.new(run: run, topic: @topic, candidates: @candidates, mode: @mode, branches: branches).call(job_dir)
-      run.update!(through_message_id: index["through_message_id"])
+      run.update!(through_message_id: index["through_message_id"], bundle_index: index)
       BundleCompleter.new(repo_path: @repo_path).call(job_dir)
       index
     end

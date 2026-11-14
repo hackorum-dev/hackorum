@@ -7,6 +7,7 @@ module Lineage
     BaseGone = Class.new(StandardError)
 
     LEVELLED = %w[modified partial].freeze
+    NO_SOURCE = %w[other_thread].freeze
     SUGGESTED_COVERAGES = %w[final earlier].freeze
     NOT_ASSESSED = { "reviewed_message_ids" => [], "coverage" => "none", "note" => "not assessed", "source" => "trailer" }.freeze
 
@@ -16,14 +17,12 @@ module Lineage
       @threshold = link_threshold
       @link = link
       @mode = mode
-      @suggestions = {}
     end
 
     def call(result_path)
       data = parse(result_path)
       base_run if update?
       @notes = []
-      @suggestions = {}
       validate!(data)
       extras = dedupe_extras(data)
       found = Commit.where(sha: extras.map { |v| v["sha"] }).index_by(&:sha)
@@ -47,13 +46,13 @@ module Lineage
         if @link && judged.any?
           previously_linked = update? ? [] : CommitTopic.llm.where(topic_id: @run.topic_id).pluck(:commit_id)
           link!(judged, known)
-          CommitPerson.llm.where(commit_id: judged.map { |v| known[v["sha"]].id } | previously_linked).delete_all
-          authors = attribute_authors!(judged, known)
-          attribute_reviewers!(judged, known, authors)
+          rebuild_credits!(judged.map { |v| known[v["sha"]].id } | previously_linked)
           ids = judged.map { |v| known[v["sha"]].id }
           CommitterReviewer.sync!(ids | previously_linked)
           CommitterReviews.mirror(@run.verdicts.where(commit_id: ids))
         end
+        close_rechecks!(known)
+        open_rechecks!(judged, known) unless recheck_shas.any?
       end
       @run
     rescue Error => e
@@ -79,7 +78,8 @@ module Lineage
     def message_ids = @message_ids ||= @run.topic.chronological_message_ids
     def topic_message_ids = @topic_message_ids ||= message_ids.to_set
     def update? = @mode == "update"
-    def discussion? = @mode == "discussion"
+    def discussion? = @mode == "discussion" || (update? && patchset_ids.empty?)
+    def recheck_shas = @recheck_shas ||= candidates.select { |_, c| c["recheck"] }.keys.to_set
     def new_patchset_ids = @new_patchset_ids ||= @index["patchsets"].select { |p| p["new"] }.map { |p| p["message_id"] }.to_set
 
     def base_run
@@ -98,7 +98,8 @@ module Lineage
       return [ [], [] ] unless update?
 
       lineages = base_run.lineages.to_a
-      verdicts = base_run.verdicts.to_a
+      recheck_ids = recheck_shas.filter_map { |s| known[s]&.id }.to_set
+      verdicts = base_run.verdicts.reject { |v| recheck_ids.include?(v.commit_id) }
       taken = lineages.map(&:message_id).to_set
       data["lineage"] = data["lineage"].reject do |l|
         taken.include?(l["message_id"]).tap { |hit| @notes << "lineage for #{l['message_id']} dropped: carried from base run" if hit }
@@ -118,7 +119,7 @@ module Lineage
     def merged(data)
       prev = base_run.raw_result || {}
       data.merge("lineage" => Array(prev["lineage"]) + data["lineage"],
-                 "verdicts" => Array(prev["verdicts"]) + data["verdicts"],
+                 "verdicts" => Array(prev["verdicts"]).reject { |v| recheck_shas.include?(v["sha"]) } + data["verdicts"],
                  "extra_commits" => Array(prev["extra_commits"]),
                  "update" => data.except("update"))
     end
@@ -179,6 +180,11 @@ module Lineage
     end
 
     def check_verdict!(v, what)
+      if NO_SOURCE.include?(v["verdict"])
+        cleared = %w[source_message_id author_name author_message_id change_level].select { |k| v[k] }
+        cleared.each { |k| v[k] = nil }
+        @notes << "#{cleared.join(', ')} cleared for other_thread #{what}" if cleared.any?
+      end
       src = v["source_message_id"]
       if discussion? && src && !patchset_ids.include?(src) && topic_message_ids.include?(src)
         v["source_message_id"] = nil
@@ -328,7 +334,7 @@ module Lineage
         return []
       end
 
-      @suggestions[v["sha"]] = list.uniq { |r| r["reviewer"].squish.downcase }.map do |r|
+      list.uniq { |r| r["reviewer"].squish.downcase }.map do |r|
         { "reviewer" => r["reviewer"].squish, "reviewed_message_ids" => r["reviewed_message_ids"].uniq, "coverage" => r["coverage"],
           "note" => normalize(r["note"]), "source" => "llm", "reviewer_message_id" => r["reviewer_message_id"],
           "confidence" => r["confidence"].to_f }
@@ -353,53 +359,63 @@ module Lineage
       CommitTopic.llm.where(topic_id: @run.topic_id).where.not(commit_id: ids).delete_all unless update?
     end
 
+    # Credits come from every thread's current verdict; one row per person
+    # and role, author beats reviewer, first thread by rank writes it.
+    def rebuild_credits!(commit_ids)
+      CommitPerson.llm.where(commit_id: commit_ids).delete_all
+      verdicts = current_verdicts(commit_ids)
+      return if verdicts.empty?
+
+      parsed = CommitPerson.parsed.where(commit_id: commit_ids).to_a.group_by(&:commit_id)
+      wanted = verdicts.flat_map { |v| [ v.source_message_id, v.author_message_id ] + llm_suggestions(v).map { |r| r["reviewer_message_id"] } }
+      messages = Message.where(id: wanted.compact.uniq).includes(:sender).index_by(&:id)
+      rows = verdicts.group_by(&:commit_id).flat_map do |commit_id, list|
+        credits_for(commit_id, list, parsed.fetch(commit_id, []), messages)
+      end
+      CommitPerson.insert_all(rows) if rows.any?
+    end
+
+    def current_verdicts(commit_ids)
+      others = CommitVerdict.where(commit_id: commit_ids).where.not(topic_id: @run.topic_id).select(:topic_id)
+      runs = PatchsetRun.done.where(topic_id: others)
+                        .select("DISTINCT ON (topic_id) id").order(:topic_id, created_at: :desc, id: :desc)
+      list = CommitVerdict.where(patchset_run_id: runs.map(&:id) << @run.id, commit_id: commit_ids,
+                                 verdict: CommitVerdict::COMMITTED, confidence: @threshold..).to_a
+      rank = ThreadRank.order(list.map(&:topic_id).uniq).each_with_index.to_h
+      list.sort_by { |v| [ rank[v.topic_id], v.id ] }
+    end
+
+    def llm_suggestions(v)
+      Array(v.reviews).select { |r| r["source"] == "llm" && r["confidence"].to_f >= @threshold }
+    end
+
     # The author the model named wins, then the sender of the source patchset
     # (so from_discussion needs a named author); parsed rows beat both, and
-    # a parsed co-author counts as one.
-    def attribute_authors!(judged, known)
-      eligible = credited(judged).select { |v| v["source_message_id"] || v["author_message_id"] || v["author_name"] }
-      return [] if eligible.empty?
+    # a parsed co-author counts as one. Reviewers: sender of
+    # reviewer_message_id, then a name match among the thread's senders, then
+    # the bare name; nobody already credited on the commit gets a second row.
+    def credits_for(commit_id, verdicts, parsed, messages)
+      authors = []
+      unless parsed.any? { |p| %w[author co_author].include?(p.role) }
+        verdicts.each do |v|
+          person = author_of(v, messages) or next
+          next if authors.any? { |a| same_person?(a, person) }
 
-      ids = eligible.map { |v| known[v["sha"]].id }
-      authored = CommitPerson.parsed.where(commit_id: ids, role: %w[author co_author]).distinct.pluck(:commit_id).to_set
-      wanted = eligible.flat_map { |v| [ v["source_message_id"], v["author_message_id"] ] }.compact
-      messages = Message.where(id: wanted).includes(:sender).index_by(&:id)
-      rows = eligible.filter_map do |v|
-        commit_id = known[v["sha"]].id
-        next if authored.include?(commit_id)
-
-        author = author_of(v, messages) or next
-        author.merge(commit_id: commit_id, role: "author", source: "llm", confidence: v["confidence"].to_f)
+          authors << person.merge(commit_id: commit_id, topic_id: v.topic_id, role: "author", source: "llm", confidence: v.confidence)
+        end
       end
-      CommitPerson.insert_all(rows) if rows.any?
-      rows
-    end
+      taken = parsed.map { |p| { person_id: p.person_id, raw_name: p.raw_name } } + authors
+      reviewers = verdicts.flat_map do |v|
+        llm_suggestions(v).filter_map do |r|
+          person = (message = messages[r["reviewer_message_id"]]) ? sender_of(message) : named_person(r["reviewer"], v.topic_id)
+          next if taken.any? { |p| same_person?(p, person) }
 
-    def credited(judged)
-      judged.select { |v| CommitVerdict::COMMITTED.include?(v["verdict"]) && v["confidence"].to_f >= @threshold }
-    end
-
-    # sender of reviewer_message_id, then a name match among the thread's
-    # senders, then the bare name; nobody already credited on the commit gets a second row
-    def attribute_reviewers!(judged, known, authors)
-      wanted = credited(judged).flat_map do |v|
-        @suggestions.fetch(v["sha"], []).select { |r| r["confidence"] >= @threshold }.map { |r| [ known[v["sha"]].id, r ] }
+          person.merge(commit_id: commit_id, topic_id: v.topic_id, role: "reviewer", source: "llm", confidence: r["confidence"].to_f)
+        end
       end
-      return if wanted.empty?
-
-      taken = CommitPerson.parsed.where(commit_id: wanted.map(&:first).uniq)
-                          .map { |p| { commit_id: p.commit_id, person_id: p.person_id, raw_name: p.raw_name } }
-                          .concat(authors).group_by { |p| p[:commit_id] }
-      messages = Message.where(id: wanted.filter_map { |_, r| r["reviewer_message_id"] }).includes(:sender).index_by(&:id)
-      rows = wanted.filter_map do |commit_id, r|
-        person = (message = messages[r["reviewer_message_id"]]) ? sender_of(message) : named_person(r["reviewer"])
-        next if taken.fetch(commit_id, []).any? { |p| same_person?(p, person) }
-
-        person.merge(commit_id: commit_id, role: "reviewer", source: "llm", confidence: r["confidence"])
-      end
-      rows = rows.group_by { |row| [ row[:commit_id], row[:person_id] || row[:raw_name].downcase ] }
-                 .values.map { |dups| dups.max_by { |row| row[:confidence] } }
-      CommitPerson.insert_all(rows) if rows.any?
+      reviewers = reviewers.group_by { |row| row[:person_id] || row[:raw_name].downcase }
+                           .values.map { |dups| dups.max_by.with_index { |row, i| [ row[:confidence], -i ] } }
+      authors + reviewers
     end
 
     def same_person?(a, b)
@@ -407,11 +423,11 @@ module Lineage
     end
 
     def author_of(v, messages)
-      if (message = messages[v["author_message_id"]])
+      if (message = messages[v.author_message_id])
         sender_of(message)
-      elsif v["author_name"].present?
-        named_person(v["author_name"])
-      elsif (message = messages[v["source_message_id"]])
+      elsif v.author_name.present?
+        named_person(v.author_name, v.topic_id)
+      elsif (message = messages[v.source_message_id])
         sender_of(message)
       end
     end
@@ -420,8 +436,8 @@ module Lineage
       { person_id: message.sender_person_id, raw_name: message.sender.name, raw_email: message.sender.email }
     end
 
-    def named_person(name)
-      matches = senders_by_name.fetch(name.strip.downcase, [])
+    def named_person(name, topic_id)
+      matches = senders_by_name(topic_id).fetch(name.strip.downcase, [])
       if matches.map(&:last).uniq.one?
         found, email, person_id = matches.first
         { person_id: person_id, raw_name: found, raw_email: email }
@@ -430,13 +446,53 @@ module Lineage
       end
     end
 
-    def senders_by_name
-      @senders_by_name ||= Message.where(topic_id: @run.topic_id).joins(:sender)
+    def senders_by_name(topic_id)
+      (@senders_by_name ||= {})[topic_id] ||= Message.where(topic_id: topic_id).joins(:sender)
         .joins("LEFT JOIN people ON people.id = messages.sender_person_id")
         .joins("LEFT JOIN aliases display ON display.id = people.default_alias_id")
         .distinct.pluck("aliases.name", "aliases.email", "display.name", "display.email", "messages.sender_person_id")
         .flat_map { |name, email, dname, demail, pid| [ [ name, email, pid ], [ dname, demail, pid ] ] }
         .select(&:first).uniq.group_by { |n, _, _| n.strip.downcase }
+    end
+
+    def close_rechecks!(known)
+      ids = recheck_shas.filter_map { |s| known[s]&.id }
+      LineageRecheck.open.where(topic_id: @run.topic_id, commit_id: ids).update_all(done_at: Time.current) if ids.any?
+    end
+
+    # a partner thread judged the same commit without seeing this verdict
+    def open_rechecks!(judged, known)
+      now = Time.current
+      rows = judged.select { |v| CommitVerdict::COMMITTED.include?(v["verdict"]) }.flat_map do |v|
+        family = family_shas(known[v["sha"]])
+        partner_verdicts(family.keys).filter_map do |pv|
+          next if saw?(pv.patchset_run, family[pv.commit_id], v)
+
+          { topic_id: pv.topic_id, commit_id: pv.commit_id, requested_by_run_id: @run.id, created_at: now }
+        end
+      end
+      rows = rows.uniq { |r| r.values_at(:topic_id, :commit_id) }
+      LineageRecheck.insert_all(rows, unique_by: :index_lineage_rechecks_open) if rows.any?
+    end
+
+    def family_shas(commit)
+      canonical = commit.cherry_picked_from_sha || commit.sha
+      Commit.where(sha: canonical).or(Commit.where(cherry_picked_from_sha: canonical)).pluck(:id, :sha).to_h
+    end
+
+    def partner_verdicts(commit_ids)
+      topics = CommitTopic.trailer.where(commit_id: commit_ids).where.not(topic_id: @run.topic_id).select(:topic_id)
+      runs = PatchsetRun.done.where(topic_id: topics)
+                        .select("DISTINCT ON (topic_id) id").order(:topic_id, created_at: :desc, id: :desc)
+      CommitVerdict.where(patchset_run_id: runs, commit_id: commit_ids, verdict: CommitVerdict::COMMITTED)
+                   .joins(:topic).merge(Topic.active).includes(:patchset_run)
+    end
+
+    def saw?(partner_run, sha, v)
+      cand = Array(partner_run.bundle_index&.dig("candidates"))
+             .find { |c| c["sha"] == sha || Array(c["backports"]).include?(sha) }
+      seen = Array(cand&.dig("other_threads")).find { |t| t["topic_id"] == @run.topic_id }
+      seen.present? && seen["verdict"] == v["verdict"] && seen["source_message_id"] == v["source_message_id"]
     end
 
     def backport_ids(judged)

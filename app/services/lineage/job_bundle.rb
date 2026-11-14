@@ -83,6 +83,8 @@ module Lineage
         "committer" => commit.committer_name, "origin" => c[:origin],
         "backports" => Array(c[:backports]).map(&:sha), "reviewers" => c[:reviewers] || [],
         "overlap" => c[:overlap]&.transform_keys(&:to_s) }
+        .merge(c.key?(:other_threads) ? { "other_threads" => c[:other_threads] } : {})
+        .merge(c[:recheck] ? { "recheck" => true } : {})
     end
 
     def write_messages(dir, messages)
@@ -114,10 +116,12 @@ module Lineage
           .gsub("{{candidate_count}}") { @candidates.size.to_s }
     end
 
+    def modes = [ @mode, @patchsets.any? ? "patches" : "nopatch" ]
+
     # outer sections first, then the ones they contained
     def resolve_modes(text)
       loop do
-        out = text.gsub(MODE_SECTION_RE) { Regexp.last_match(1).split.include?(@mode) ? Regexp.last_match(2) : "" }
+        out = text.gsub(MODE_SECTION_RE) { Regexp.last_match(1).split.intersect?(modes) ? Regexp.last_match(2) : "" }
         return out if out == text
         text = out
       end

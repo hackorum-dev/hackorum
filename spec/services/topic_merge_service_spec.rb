@@ -278,6 +278,25 @@ RSpec.describe TopicMergeService do
         expect([ run, lineage, verdict, pair ].map { |r| r.reload.topic_id }).to all(eq(target_topic.id))
         expect(PatchsetRun.current_for(target_topic.id)).to eq(run)
       end
+
+      it "moves llm credits and rechecks, dropping an open recheck the target already has" do
+        commit = create(:commit)
+        other = create(:commit)
+        llm = create(:commit_person, commit: commit, role: "author", source: "llm", topic: source_topic)
+        parsed = create(:commit_person, commit: commit, role: "author", source: "parsed", topic: nil)
+        dup = create(:lineage_recheck, topic: source_topic, commit: commit)
+        kept = create(:lineage_recheck, topic: target_topic, commit: commit)
+        moved = create(:lineage_recheck, topic: source_topic, commit: other)
+        done = create(:lineage_recheck, topic: source_topic, commit: commit, done_at: 1.day.ago)
+
+        service.call
+
+        expect(llm.reload.topic_id).to eq(target_topic.id)
+        expect(parsed.reload.topic_id).to be_nil
+        expect(LineageRecheck.exists?(dup.id)).to be(false)
+        expect([ kept, moved, done ].map { |r| r.reload.topic_id }).to all(eq(target_topic.id))
+        expect(LineageRecheck.open.where(topic: target_topic).pluck(:commit_id)).to contain_exactly(commit.id, other.id)
+      end
     end
 
     context "without a user" do

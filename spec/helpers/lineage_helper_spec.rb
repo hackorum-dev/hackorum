@@ -31,6 +31,15 @@ RSpec.describe LineageHelper, type: :helper do
     end
   end
 
+  describe "topic tokens" do
+    it "links topic tokens" do
+      html = helper.lineage_text("came from [topic:5]", {})
+      expect(html).to include(%(href="#{topic_path(5)}"))
+      expect(html).to include("thread #5")
+      expect(helper.lineage_plain("came from [topic:5]", {})).to eq("came from thread #5")
+    end
+  end
+
   describe "#lineage_plain" do
     it "replaces tokens with plain text" do
       expect(helper.lineage_plain("[msg:42] [msg:99] [commit:#{sha}] <x>", ordinals)).to eq("#7 #99 aaaaaaaaaa <x>")

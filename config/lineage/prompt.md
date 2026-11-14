@@ -22,6 +22,12 @@ Everything is in this directory. Read `index.json` first.
   run of this tool, re-judge it (update runs have none); `manual` = given by
   hand; `overlap` = a changed-file overlap guess. The last three are only
   candidates in every mode.
+<!-- trailer discussion update -->
+- A candidate whose Discussion trailers also point to other threads has a
+  non-empty `other_threads`: per thread its title, patchset table (last 20)
+  and current verdict for the commit (`verdict` null when not judged yet).
+  You cannot open those threads; this table is what you know about them.
+<!-- /trailer discussion update -->
 - `pairs.json` and `commit_scores.json`: mechanical similarity numbers for every
   (later, earlier) patchset pair and for every commit against every patchset.
   Grep them by `later_message_id` / `sha` rather than reading whole.
@@ -38,23 +44,30 @@ Everything is in this directory. Read `index.json` first.
 
 An earlier run already answered for this thread up to message
 `since_message_id`; its answer is `previous` in index.json and it stands. Do
-not re-judge it and do not repeat it. Your answer covers only what is new:
+not re-judge it, except candidates with `recheck: true` (below), and do not
+repeat it. Your answer covers only what is new:
 
 - `lineage`: one entry per patchset with `new: true`, none for the others. A
   new patchset's parent may be any patchset, old or new.
-- `verdicts`: one per candidate; every candidate is a commit `previous` has no
-  verdict for. Tasks 2, 3 and 3b apply to them as written; a new commit may
-  come from an old patchset.
+- `verdicts`: one per candidate; every candidate without `recheck` is a commit
+  `previous` has no verdict for. Tasks 2, 3 and 3b apply to them as written;
+  a new commit may come from an old patchset.
 - `story`: the whole updated story, not only the new part. Keep the entries of
   `previous.story` unless the new messages show one is wrong, rewrite the
   entries on where the thread stands, and add the new steps.
+
+Candidates with `recheck: true` were judged by `previous` without seeing
+the other threads' current verdicts. Judge them again against
+`other_threads`; your new verdict replaces the old one. Rewrite story entries
+about them as needed.
 
 Read the messages listed in `new_message_ordinals` in full. Read older
 messages only to look something up: the review rounds behind a new commit, a
 parent patchset, who someone is.
 
 <!-- /update -->
-<!-- discussion -->
+<!-- discussion update -->
+<!-- discussion nopatch -->
 ## This thread has no patchsets
 
 Nobody attached a patch here: the thread is a bug report, a question, a
@@ -65,8 +78,11 @@ index.json still lists a few patchsets, attachments marked `nocfbot`; then give
 each one a `lineage` entry: `parent_message_id` an earlier patchset or null,
 `step_kind` `fix_on_top` for a delta and `new_series` otherwise.
 
-The candidates still came out of this discussion. In Task 2 the verdict is
-normally `from_discussion`, with `source_message_id` null:
+The candidates still came out of this discussion or a linked one. When a
+candidate has a non-empty `other_threads` with a thread that has patchsets,
+the verdict is normally `other_thread`, unless the fix was posted inline
+here. Otherwise it is normally `from_discussion`, with `source_message_id`
+null:
 
 - a fix posted inline: cite that message in `evidence`, and name its sender in
   `author_name` / `author_message_id` when that is not the committer
@@ -78,8 +94,10 @@ normally `from_discussion`, with `source_message_id` null:
 In Tasks 3 and 3b, judge coverage against the inline fix or the approach
 agreed in the thread; `reviewed_message_ids` is `[]`. Keep the story short.
 
-<!-- /discussion -->
+<!-- /discussion nopatch -->
+<!-- /discussion update -->
 <!-- trailer full lineage update -->
+<!-- trailer full lineage patches -->
 ## Task 1: lineage
 
 <!-- trailer full lineage -->
@@ -105,6 +123,7 @@ The first patchset is `new_series` with a null parent.
 A later patchset may go back to any earlier one, not just the previous. Mixed
 cases: pick the dominant kind and say so in `reason`. Read the patches before the discussion, the
 discussion explains the why, the patches are the what.
+<!-- /trailer full lineage patches -->
 <!-- /trailer full lineage update -->
 
 <!-- lineage -->
@@ -127,11 +146,22 @@ separately. Verdicts:
 - `from_discussion`: the commit was made from this thread's discussion without a
   matching attached patchset (an inline patch in a message, an agreed one-liner,
   a revert decided here)
+<!-- trailer discussion update -->
+- `other_thread`: the commit came entirely from another thread in the
+  candidate's `other_threads`; this thread only reported, discussed or
+  tested it
+<!-- /trailer discussion update -->
 - `not_this_thread`: the commit does not come from any patchset here
 - `undecided`: you cannot tell with the material available
 
+<!-- full -->
 `source_message_id` names the patchset it came from, null for `from_discussion`,
 `not_this_thread` and `undecided`.
+<!-- /full -->
+<!-- trailer discussion update -->
+`source_message_id` names the patchset it came from, null for `from_discussion`,
+`other_thread`, `not_this_thread` and `undecided`.
+<!-- /trailer discussion update -->
 
 `author_name` and `author_message_id`: who wrote the committed patch, when it
 is not the person who sent the patchset message (a committer or reviewer
@@ -156,6 +186,21 @@ came from the thread without an attached patchset. Answer `not_this_thread`
 only when the trailer is clearly wrong. Candidates with any other origin are
 only candidates: judge them on the evidence, rejecting them is fine. Do not
 search the checkout for other commits; `extra_commits` must be `[]`.
+
+A commit linked to several threads came from the thread with the latest
+patchset it matches. Before claiming a candidate with a non-empty
+`other_threads`, compare: when your matching patchset is older than the
+other thread's source, or you have none and the other thread has patchsets,
+answer `other_thread` and cite the thread as `[topic:<id>]` in `evidence`.
+When the other thread has no verdict yet, compare its patchset table (dates,
+subjects, changed_paths) with the commit yourself; claim the commit when
+your matching patchset is the latest. When the committer combined work
+from this thread and another, give your part a committed verdict (normally
+`partial`) with your patchset as source, and say in `evidence` which part
+came from which thread. When you disagree with another thread's verdict,
+say so in `evidence`. `other_thread` has null `source_message_id`,
+`author_name`, `author_message_id` and `change_level`, and
+`suggested_reviews` `[]`.
 <!-- /trailer discussion update -->
 <!-- full -->
 There may be no candidates at all; for most threads of this age the job is
@@ -196,10 +241,17 @@ at, never the id of their own reply; `[]` when coverage is `none`), and
 - `none`: you find no review activity by them in this thread; "none" is a valid
   answer, do not invent reviews
 
-<!-- trailer full update -->
+<!-- full -->
 When the verdict has no source patchset (`from_discussion`, `not_this_thread`,
 `undecided`), judge coverage against the last patchset of the thread.
-<!-- /trailer full update -->
+<!-- /full -->
+<!-- trailer update -->
+<!-- trailer patches -->
+When the verdict has no source patchset (`from_discussion`, `other_thread`,
+`not_this_thread`, `undecided`), judge coverage against the last patchset of
+the thread.
+<!-- /trailer patches -->
+<!-- /trailer update -->
 A Reviewed-by trailer in PostgreSQL means the person spent time on the patch,
 not that they approved it. A reviewer who is also the candidate's `committer`
 is always `final`: committing the patch means reviewing the committed version,
@@ -239,8 +291,14 @@ follow the Task 3 definitions, with `final` and `earlier` the only values, and
 patchset entry. A person with no review activity is not listed. `confidence` is
 per entry. `note` is one sentence on what they did, with reference tokens.
 
+<!-- full -->
 `suggested_reviews` is `[]` for candidates with a non-empty `reviewers` list and
 for verdicts of `not_this_thread` or `undecided`.
+<!-- /full -->
+<!-- trailer discussion update -->
+`suggested_reviews` is `[]` for candidates with a non-empty `reviewers` list and
+for verdicts of `other_thread`, `not_this_thread` or `undecided`.
+<!-- /trailer discussion update -->
 
 <!-- /trailer full discussion update -->
 ## Task 4: story
@@ -299,10 +357,11 @@ rebases that changed nothing, unless they mark the start of a new phase.
   `reviewer_message_id` may be any message of the thread, by the id in its
   header.
 - Whenever you refer to a message write `[msg:<message_id>]`, and to a commit
-  `[commit:<full sha>]`; the UI turns these into links. Never write bare message
-  numbers or shas in reason, evidence, note or story, and cite a patchset by
-  its `[msg:<message_id>]`, not by its attachment file name. Source paths such
-  as src/backend/foo.c are fine and wanted in evidence.
+  `[commit:<full sha>]`, and to another thread `[topic:<id>]`; the UI turns
+  these into links. Never write bare message numbers or shas in reason,
+  evidence, note or story, and cite a patchset by its `[msg:<message_id>]`,
+  not by its attachment file name. Source paths such as src/backend/foo.c are
+  fine and wanted in evidence.
 <!-- trailer full lineage discussion -->
 - A patchset with `parse_error` has no metrics; still give it a lineage entry,
   judged from the message text, with low confidence if needed.

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_11_15_100200) do
+ActiveRecord::Schema[8.0].define(version: 2026_11_15_110100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -108,7 +108,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_15_100200) do
     t.bigint "person_id"
     t.string "source", default: "parsed", null: false
     t.float "confidence"
+    t.bigint "topic_id"
     t.index ["commit_id", "role"], name: "index_commit_people_on_commit_id_and_role"
+    t.index ["commit_id", "topic_id"], name: "index_commit_people_on_commit_id_and_topic_id"
     t.index ["person_id"], name: "index_commit_people_on_person_id"
   end
 
@@ -352,6 +354,18 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_15_100200) do
     t.string "last_error_class"
     t.integer "backoff_seconds"
     t.index ["mailbox_label"], name: "index_imap_sync_states_on_mailbox_label", unique: true
+  end
+
+  create_table "lineage_rechecks", force: :cascade do |t|
+    t.bigint "topic_id", null: false
+    t.bigint "commit_id", null: false
+    t.bigint "requested_by_run_id"
+    t.datetime "created_at", null: false
+    t.datetime "done_at"
+    t.index ["commit_id"], name: "index_lineage_rechecks_on_commit_id"
+    t.index ["requested_by_run_id"], name: "index_lineage_rechecks_on_requested_by_run_id"
+    t.index ["topic_id", "commit_id"], name: "index_lineage_rechecks_open", unique: true, where: "(done_at IS NULL)"
+    t.index ["topic_id"], name: "index_lineage_rechecks_on_topic_id"
   end
 
   create_table "mailing_lists", force: :cascade do |t|
@@ -1214,6 +1228,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_15_100200) do
   add_foreign_key "commit_files", "commits"
   add_foreign_key "commit_people", "commits"
   add_foreign_key "commit_people", "people"
+  add_foreign_key "commit_people", "topics"
   add_foreign_key "commit_topics", "commits"
   add_foreign_key "commit_topics", "topics"
   add_foreign_key "commit_verdicts", "commits"
@@ -1236,6 +1251,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_15_100200) do
   add_foreign_key "feed_events", "patch_ci_runs", on_delete: :cascade
   add_foreign_key "global_tags", "users", column: "created_by_id"
   add_foreign_key "identities", "users"
+  add_foreign_key "lineage_rechecks", "commits"
+  add_foreign_key "lineage_rechecks", "patchset_runs", column: "requested_by_run_id", on_delete: :nullify
+  add_foreign_key "lineage_rechecks", "topics"
   add_foreign_key "mentions", "aliases"
   add_foreign_key "mentions", "messages"
   add_foreign_key "mentions", "people"

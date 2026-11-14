@@ -7,6 +7,7 @@ class CommitPerson < ApplicationRecord
 
   belongs_to :commit
   belongs_to :person, optional: true
+  belongs_to :topic, optional: true
 
   validates :role, inclusion: { in: ROLES }
   validates :source, inclusion: { in: SOURCES }

@@ -217,6 +217,20 @@ RSpec.describe Lineage::Claims do
     end
   end
 
+  it "adds open rechecks to an update run" do
+    topic = thread(Time.zone.parse("2020-01-01"), linked: true)
+    old = Commit.joins(:commit_topics).find_by(commit_topics: { topic_id: topic.id })
+    base = create(:patchset_run, topic: topic, status: "done", mode: "trailer",
+                                 through_message: topic.messages.order(:created_at).last, raw_result: { "story" => [ "s" ] })
+    create(:commit_verdict, patchset_run: base, commit: old)
+    create(:commit_topic, topic: topic, commit: create(:commit), source: "trailer")
+    create(:lineage_recheck, topic: topic, commit: old)
+
+    run = claim_built
+    expect(run.bundle_index["candidates"].map { |c| [ c["sha"], c["recheck"] ] }).to include([ old.sha, true ])
+    expect(run.bundle_index["candidates"].size).to eq(2)
+  end
+
   it "fails the run as an ingest error when the ingestor breaks, keeping the result fields" do
     thread(Time.zone.parse("2020-01-01"))
     run = claim_built

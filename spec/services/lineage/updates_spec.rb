@@ -13,6 +13,13 @@ RSpec.describe Lineage::Updates do
 
   def link(commit) = create(:commit_topic, topic: topic, commit: commit, source: "trailer")
 
+  it "lists commits with an open recheck" do
+    c = create(:commit)
+    create(:lineage_recheck, topic: topic, commit: c)
+    create(:lineage_recheck, topic: topic, commit: create(:commit), done_at: Time.current)
+    expect(described_class.recheck_commits(topic)).to eq([ c ])
+  end
+
   it "finds trailer commits the run has no verdict for" do
     fresh = create(:commit)
     link(fresh)

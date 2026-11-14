@@ -46,7 +46,7 @@ module Lineage
     end
 
     def shown_on_thread?(verdict)
-      verdict.committed? || (verdict.verdict == "undecided" && verdict.origin == "trailer")
+      verdict.committed? || verdict.verdict == "other_thread" || (verdict.verdict == "undecided" && verdict.origin == "trailer")
     end
 
     def llm_commit_shas

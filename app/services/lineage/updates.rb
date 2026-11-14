@@ -51,6 +51,14 @@ module Lineage
       SQL
     end
 
+    def self.recheck_sql(topic_id)
+      "EXISTS (SELECT 1 FROM lineage_rechecks lr WHERE lr.topic_id = #{topic_id} AND lr.done_at IS NULL)"
+    end
+
+    def self.recheck_commits(topic)
+      Commit.where(id: LineageRecheck.open.where(topic_id: topic.id).select(:commit_id)).order(:committed_at, :id).to_a
+    end
+
     def self.new_commits(topic, run)
       Commit.from("commits c").select("c.*")
             .where("c.id IN (SELECT commit_id FROM commit_topics WHERE topic_id = ? AND source = 'trailer')", topic.id)

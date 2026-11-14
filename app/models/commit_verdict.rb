@@ -1,5 +1,5 @@
 class CommitVerdict < ApplicationRecord
-  VERDICTS = %w[as_is modified partial from_discussion not_this_thread undecided].freeze
+  VERDICTS = %w[as_is modified partial from_discussion other_thread not_this_thread undecided].freeze
   COMMITTED = %w[as_is modified partial from_discussion].freeze
   ORIGINS = %w[trailer overlap manual previous extra].freeze
   CHANGE_LEVELS = %w[light moderate significant].freeze

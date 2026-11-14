@@ -40,6 +40,10 @@ RSpec.describe Lineage::References do
     expect(normalize(text)).to eq(text)
   end
 
+  it "leaves topic tokens alone" do
+    expect(normalize("see [topic:123] and [topic:7]")).to eq("see [topic:123] and [topic:7]")
+  end
+
   it "downcases matched shas" do
     expect(normalize(sha.upcase)).to eq("[commit:#{sha}]")
   end

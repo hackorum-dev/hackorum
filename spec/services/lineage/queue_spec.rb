@@ -53,11 +53,11 @@ RSpec.describe Lineage::Queue do
     thread(first_at: Time.zone.parse("2019-01-01"), linked: true, run: "claimed").then { |t| PatchsetRun.where(topic: t).update_all(mode: "trailer", claimed_at: Time.current) }
 
     expect(described_class.counts).to eq(
-      "trailer" => { remaining: 0, claimed: 1, done: 0 },
-      "update" => { remaining: 0, claimed: 0, done: 0 },
-      "discussion" => { remaining: 0, claimed: 0, done: 0 },
-      "full" => { remaining: 0, claimed: 0, done: 1 },
-      "lineage" => { remaining: 1, claimed: 0, done: 0 })
+      "trailer" => { remaining: 0, held: 0, claimed: 1, done: 0 },
+      "update" => { remaining: 0, held: 0, claimed: 0, done: 0 },
+      "discussion" => { remaining: 0, held: 0, claimed: 0, done: 0 },
+      "full" => { remaining: 0, held: 0, claimed: 0, done: 1 },
+      "lineage" => { remaining: 1, held: 0, claimed: 0, done: 0 })
   end
 
   describe "discussion" do
@@ -205,6 +205,71 @@ RSpec.describe Lineage::Queue do
       create(:commit_verdict, patchset_run: later, commit: judged)
       create(:commit_verdict, patchset_run: later, commit: fresh)
       expect(scope).to eq([])
+    end
+  end
+
+  describe "multi-thread gate" do
+    let(:commit) { create(:commit) }
+    def link(topic) = create(:commit_topic, topic: topic, commit: commit, source: "trailer")
+    def bug_thread = create(:topic).tap { |t| create(:message, topic: t, created_at: 1.day.ago); link(t) }
+    def patch_thread(at) = create(:topic).tap { |t| create(:message, topic: t, is_patch_submission: true, created_at: at); link(t) }
+
+    it "holds a discussion thread until the patch thread judged the commit" do
+      bug = bug_thread
+      patch = patch_thread(2.days.ago)
+      expect(described_class.phase_scope("discussion")).not_to include(bug)
+      expect(described_class.phase_scope("trailer")).to include(patch)
+      run = create(:patchset_run, topic: patch, status: "done")
+      expect(described_class.phase_scope("discussion")).not_to include(bug)
+      create(:commit_verdict, patchset_run: run, commit: commit)
+      expect(described_class.phase_scope("discussion")).to include(bug)
+    end
+
+    it "ranks patch threads by latest patch mail" do
+      older = patch_thread(3.days.ago)
+      newer = patch_thread(1.day.ago)
+      expect(described_class.phase_scope("trailer").to_a).to eq([ newer ])
+      create(:commit_verdict, patchset_run: create(:patchset_run, topic: newer), commit: commit)
+      expect(described_class.phase_scope("trailer").to_a).to eq([ older ])
+    end
+
+    it "does not wait on failed, timed out or merged partners" do
+      bug = bug_thread
+      patch = patch_thread(2.days.ago)
+      run = create(:patchset_run, topic: patch, status: "failed")
+      expect(described_class.phase_scope("discussion")).to include(bug)
+      run.update!(status: "timeout")
+      expect(described_class.phase_scope("discussion")).to include(bug)
+      run.destroy!
+      patch.update!(merged_into_topic_id: create(:topic).id)
+      expect(described_class.phase_scope("discussion")).to include(bug)
+    end
+
+    it "waits on claimed partners and open rechecks" do
+      bug = bug_thread
+      patch = patch_thread(2.days.ago)
+      claimed = create(:patchset_run, topic: patch, status: "claimed", claimed_at: Time.current, created_at: 1.minute.ago)
+      expect(described_class.phase_scope("discussion")).not_to include(bug)
+      claimed.destroy!
+      run = create(:patchset_run, topic: patch, status: "done")
+      create(:commit_verdict, patchset_run: run, commit: commit)
+      recheck = create(:lineage_recheck, topic: patch, commit: commit)
+      expect(described_class.phase_scope("discussion")).not_to include(bug)
+      expect(described_class.phase_scope("update")).to include(patch)
+      expect(described_class.counts["discussion"]).to include(remaining: 0, held: 1)
+      recheck.update!(done_at: Time.current)
+      expect(described_class.phase_scope("discussion")).to include(bug)
+    end
+
+    it "does not wait on an open recheck behind a failed run" do
+      bug = bug_thread
+      patch = patch_thread(2.days.ago)
+      run = create(:patchset_run, topic: patch, status: "done", created_at: 1.hour.ago)
+      create(:commit_verdict, patchset_run: run, commit: commit)
+      create(:lineage_recheck, topic: patch, commit: commit)
+      expect(described_class.phase_scope("discussion")).not_to include(bug)
+      create(:patchset_run, topic: patch, status: "failed", created_at: 1.minute.ago)
+      expect(described_class.phase_scope("discussion")).to include(bug)
     end
   end
 end

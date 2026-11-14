@@ -160,7 +160,7 @@ RSpec.describe Lineage::TopicJob do
       expect(seen["patchsets"]).to eq([ { "message_id" => m1.id }, { "message_id" => m2.id } ])
       expect(seen["candidates"]).to eq([ { "sha" => canonical.sha, "origin" => "trailer",
                                            "backports" => [ backport.sha ], "reviewers" => [ "Alice" ],
-                                           "committer_reviewers" => [] } ])
+                                           "committer_reviewers" => [], "other_threads" => [] } ])
     end
   end
 

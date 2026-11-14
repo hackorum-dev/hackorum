@@ -1,11 +1,13 @@
 module LineageHelper
   MSG_TOKEN = /\[msg:(\d+)\]/
   COMMIT_TOKEN = /\[commit:([0-9a-f]{40})\]/
+  TOPIC_TOKEN = /\[topic:(\d+)\]/
   VERDICT_WORDS = {
     "as_is" => "landed as posted",
     "modified" => "modified before commit",
     "partial" => "part of a posted patchset",
     "from_discussion" => "written from the discussion, no matching patch",
+    "other_thread" => "committed from another thread",
     "undecided" => "undecided"
   }.freeze
   COVERAGE_WORDS = { "final" => "saw the final version", "earlier" => "saw an earlier version" }.freeze
@@ -56,6 +58,10 @@ module LineageHelper
       sha = Regexp.last_match(1)
       link_to(sha[0, 10], commit_web_url(sha), target: "_blank", rel: "noopener")
     end
+    html = html.gsub(TOPIC_TOKEN) do
+      id = Regexp.last_match(1).to_i
+      link_to("thread ##{id}", topic_path(id))
+    end
     html.html_safe
   end
 
@@ -64,6 +70,7 @@ module LineageHelper
 
     text.gsub(MSG_TOKEN) { "##{ordinals[Regexp.last_match(1).to_i] || Regexp.last_match(1)}" }
         .gsub(COMMIT_TOKEN) { Regexp.last_match(1)[0, 10] }
+        .gsub(TOPIC_TOKEN) { "thread ##{Regexp.last_match(1)}" }
   end
 
   def lineage_ordinals(topic)
