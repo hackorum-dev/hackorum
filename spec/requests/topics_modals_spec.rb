@@ -115,8 +115,8 @@ RSpec.describe "Topic detail modals", type: :request do
 
     it "shows the llm share of a person's credits" do
       c1, c2 = create_list(:commit, 2)
-      c1.commit_people.create!(role: "reviewer", raw_name: "Pavel Borisov")
-      c2.commit_people.create!(role: "reviewer", raw_name: "Pavel Borisov", source: "llm", confidence: 0.8)
+      c1.commit_people.create!(role: "author", raw_name: "Pavel Borisov")
+      c2.commit_people.create!(role: "author", raw_name: "Pavel Borisov", source: "llm", confidence: 0.8)
       [ c1, c2 ].each { |c| link_topic(topic, c) }
 
       get commits_details_topic_path(topic)

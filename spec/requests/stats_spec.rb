@@ -78,7 +78,6 @@ RSpec.describe "Release statistics", type: :request do
       expect(response.body).to include("Commits with a Commitfest entry")
       expect(response.body).to include(person_path("alice@example.com"))
       expect(response.body).to include("Of all commits, written by someone other than the committer")
-      expect(response.body).to include("1 of 3, 1 credits")
       hists = charts.select { |c| c["data-release-chart-kind-value"] == "histogram" }.map { |c| JSON.parse(c["data-release-chart-data-value"]) }
       expect(hists.map { |h| h["labels"] }).to contain_exactly(false, nil)
     end
@@ -89,7 +88,7 @@ RSpec.describe "Release statistics", type: :request do
       get "/stats/releases/19"
       expect(response.body).to include("not available")
       na = Nokogiri::HTML(response.body).css(".stats-tile.is-na")
-      expect(na.size).to eq(7)
+      expect(na.size).to eq(6)
       expect(na.map(&:text)).to all(include("not available"))
       na.each { |tile| expect(tile.css("[data-controller='release-chart']")).to be_empty }
     end
@@ -99,7 +98,7 @@ RSpec.describe "Release statistics", type: :request do
       Rails.cache.clear
       get "/stats/releases/19"
       expect(response.body).to include("not shown: the LLM covers only 50% of commits")
-      expect(Nokogiri::HTML(response.body).css(".stats-tile.is-na").size).to eq(7)
+      expect(Nokogiri::HTML(response.body).css(".stats-tile.is-na").size).to eq(6)
 
       get "/stats/releases/19/committers"
       doc = Nokogiri::HTML(response.body)

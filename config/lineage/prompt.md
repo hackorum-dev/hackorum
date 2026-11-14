@@ -266,15 +266,31 @@ A commit with an empty `reviewers` list has no Reviewed-by trailer, so name its
 reviewers yourself in `suggested_reviews`: for every candidate with an empty
 `reviewers` list and a verdict of `as_is`, `modified`, `partial` or
 `from_discussion`, and for every entry of `extra_commits`. The bar is the one
-committers use for Reviewed-by. A person counts when, in a message dated before
-the commit (`committed_at` in index.json, or the committer date in git for
-commits you found), they reported a problem in the patch, tested it and reported
-the result, said it looked good, or proposed a change the author took. A person
-the commit message itself credits as a reviewer counts too, even without a
-message in this thread; for one with no review in this thread `coverage` is
-`final`, `reviewed_message_ids` is `[]`, and `note` says where the credit comes
-from. A person does not count for pings, "needs rebase", cfbot or commitfest
-status notes, or anything written after the commit date; the patch's authors
+committers use for Reviewed-by, and it is strict: when in doubt, leave the
+person out. A person counts only when they sent a message dated after a version
+of this patch (a patchset, or the inline fix) was posted and before the commit
+(`committed_at` in index.json, or the committer date in git for commits you
+found), and that message engages with the patch itself: it reports a problem in
+its code, reports the result of testing it, or proposes a change to it that the
+author took. A person the commit message itself credits as a reviewer counts
+too, even without a message in this thread; for one with no review in this
+thread `coverage` is `final`, `reviewed_message_ids` is `[]`, and `note` says
+where the credit comes from.
+
+A person does not count for:
+- pings, "needs rebase", cfbot or commitfest status notes, or anything written
+  after the commit date;
+- a bare "+1", "sounds good", "LGTM" or other agreement that does not show
+  they read the code, and release-management approvals ("[RMT hat]");
+- reporting the bug, failure or typo the commit fixes, which is a Reported-by,
+  unless they also reviewed or tested a patch for it;
+- proposing an approach or arguing a design before any patch existed;
+- being credited in the commit message in another role: a Reported-by,
+  Tested-by, Suggested-by, Author or similar trailer, or prose such as "per
+  gripe from X", "per report from X", "per suggestion from X". Those people
+  already have their credit.
+
+The patch's authors
 (the sender of the source patchset, `author_name`, any co-author) and the
 committer are never reviewers of their own commit. Each commit gets its own
 list: in a thread with several commits, reviewing a different patch series or

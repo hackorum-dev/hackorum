@@ -49,7 +49,7 @@
           th = tag.abbr("Reviewed for others", title: "Credited as reviewer on commits by other committers; their own commits never count")
           - if d[:llm]
             th = tag.abbr("As posted", title: "Of the others' patches they committed that the LLM assessed: share committed unchanged")
-            th = tag.abbr("Sole reviewer", title: "Of the others' patches they committed that the LLM assessed: share with no reviewer credited or found besides themselves")
+            th = tag.abbr("Sole reviewer", title: "Of the others' patches they committed that the LLM assessed: share with no reviewer credited besides themselves")
           th Messages
           th Threads
           th = tag.abbr("People", title: "Distinct people they replied to or who replied to them, in #{@period.long_label} threads")

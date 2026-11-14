@@ -66,7 +66,7 @@
     - if llm
       = render "stats/periods/tile", kind: "share", v: "What the credited reviewers saw", na: rev[:coverage].values.sum.zero?, chart: [ "share", { segments: stats_share_segments([ [ "final version", rev[:coverage][:final], nil ], [ "earlier version only", rev[:coverage][:earlier], nil ], [ "not found in the thread", rev[:coverage][:none], nil, true ] ]) } ]
     - if llm && rev[:alone]
-      = render "stats/periods/tile", v: "#{rev[:alone][:value]}%", k: tag.abbr("Sole reviewer of others' patches", title: "Of the others' patches they committed that the LLM assessed: no reviewer credited or found besides themselves"), d: safe_join([ "#{rev[:alone][:count]} of #{rev[:alone][:of]} ", pill.call(rev[:alone], "%") ]), na: rev[:alone][:of].zero?
+      = render "stats/periods/tile", v: "#{rev[:alone][:value]}%", k: tag.abbr("Sole reviewer of others' patches", title: "Of the others' patches they committed that the LLM assessed: no reviewer credited besides themselves"), d: safe_join([ "#{rev[:alone][:count]} of #{rev[:alone][:of]} ", pill.call(rev[:alone], "%") ]), na: rev[:alone][:of].zero?
     = render "stats/periods/tile", v: rev[:per_commit][:value], k: "Reviewers per reviewed commit", d: pill.call(rev[:per_commit]), na: rev[:crediting][:count].zero?
   h2.stats-band Worked with
   .stats-three

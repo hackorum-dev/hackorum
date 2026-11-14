@@ -100,7 +100,6 @@ RSpec.describe Stats::Period::Overview do
       expect(reviews[:crediting]).to eq(1)
       expect(reviews[:per_commit]).to eq(mean: 1.0, median: 1)
       expect(reviews[:coverage]).to eq(final: 1, earlier: 0, none: 0)
-      expect(reviews[:uncredited_reviewed]).to eq(count: 1, of: 3, credits: 1)
     end
 
     it "knows who committed for whom" do

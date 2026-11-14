@@ -54,7 +54,7 @@ module Api
       private
 
       def rows_by_commit
-        @rows_by_commit ||= @commit_ids.empty? ? {} : CommitPerson
+        @rows_by_commit ||= @commit_ids.empty? ? {} : CommitPerson.shown
           .where(commit_id: @commit_ids, source: SOURCES).select(COLUMNS).order(:id)
           .preload(person: PersonSerializer::PRELOAD).group_by(&:commit_id)
       end

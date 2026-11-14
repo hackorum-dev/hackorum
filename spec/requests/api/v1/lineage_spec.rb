@@ -292,7 +292,7 @@ RSpec.describe "API v1 lineage", type: :request do
           [ "reviewer", "Zed Reviewer", "parsed" ], [ "committer", "Tom Lane", "parsed" ] ],
         [ [ "author", "Guessed Author", "llm" ], [ "reviewer", "Tom Lane", "committer" ],
           [ "committer", "Tom Lane", "parsed" ] ],
-        [ [ "author", "Other Author", "parsed" ], [ "reviewer", "Guessed Reviewer", "llm" ] ]
+        [ [ "author", "Other Author", "parsed" ] ]
       ])
       expect(data.flat_map { |row| row["people"].map(&:keys) }).to all(match_array(%w[role name person source]))
       expect(data.first["verdict"]).to be_nil

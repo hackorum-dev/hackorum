@@ -84,14 +84,14 @@ class ProfileStats
       if @person_ids.empty?
         0
       else
-        CommitPerson.where(source: @sources).joins(:commit).merge(Commit.on_master)
+        CommitPerson.shown.where(source: @sources).joins(:commit).merge(Commit.on_master)
                     .where(person_id: @person_ids).distinct.count(:commit_id)
       end
   end
 
   def commit_credits_by_role
     @commit_credits_by_role ||= begin
-      counts = @person_ids.empty? ? {} : CommitPerson.where(source: @sources).joins(:commit).merge(Commit.on_master)
+      counts = @person_ids.empty? ? {} : CommitPerson.shown.where(source: @sources).joins(:commit).merge(Commit.on_master)
                                                       .where(person_id: @person_ids).group(:role).count
       PROFILE_ROLE_ORDER.index_with { |role| counts[role].to_i }
     end
@@ -113,7 +113,7 @@ class ProfileStats
       if @person_ids.empty?
         0
       else
-        CommitPerson.where(source: @sources).joins(:commit).merge(Commit.backports)
+        CommitPerson.shown.where(source: @sources).joins(:commit).merge(Commit.backports)
                     .where(person_id: @person_ids, role: "author").distinct.count(:commit_id)
       end
   end

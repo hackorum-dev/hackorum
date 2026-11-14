@@ -67,14 +67,6 @@ module Stats
         { final: counts.fetch("final", 0), earlier: counts.fetch("earlier", 0), none: counts.fetch("none", 0) }
       end
 
-      def uncredited_reviewed
-        credited = credited_counts.keys.to_set
-        llm = verdict_rows.reject { |r| credited.include?(r.scope_commit_id) }
-                          .map { |r| r.reviews.count { |rv| rv["source"] == "llm" } }
-                          .select(&:positive?)
-        { count: llm.size, of: count - credited.size, credits: llm.sum }
-      end
-
       def by_others_ids
         @by_others_ids ||= CommitterReviewer.new(ids).others_commit_ids
       end
@@ -105,26 +97,13 @@ module Stats
       # source key existed
       def review_source(review) = review["source"] || "trailer"
 
-      # a credited reviewer, or any reviews row the LLM wrote, that is not the
-      # committer
+      # a credited reviewer that is not the committer
       def reviewed_by_someone_else(subset)
         committers = CommitPerson.parsed.where(commit_id: subset, role: CommitPerson::COMMITTER)
                                  .includes(person: :default_alias).index_by(&:commit_id)
-        credited = CommitPerson.parsed.where(commit_id: subset, role: "reviewer")
-                               .reject { |p| committers[p.commit_id] && CommitterReviewer.same_person?(p, committers[p.commit_id]) }
-                               .map(&:commit_id)
-        set = subset.to_set
-        seen = verdict_rows.select { |r| set.include?(r.scope_commit_id) && r.reviews.any? { |rv| others_review?(rv, committers[r.scope_commit_id]) } }
-                           .map(&:scope_commit_id)
-        (credited + seen).uniq
-      end
-
-      def others_review?(review, committer)
-        return false if review_source(review) == "committer"
-        return true unless committer && review["reviewer"].present?
-
-        names = [ committer.raw_name, committer.person&.display_name ].compact.map(&:squish)
-        names.none? { |n| n.casecmp?(review["reviewer"].squish) }
+        CommitPerson.parsed.where(commit_id: subset, role: "reviewer")
+                    .reject { |p| committers[p.commit_id] && CommitterReviewer.same_person?(p, committers[p.commit_id]) }
+                    .map(&:commit_id).uniq
       end
     end
   end

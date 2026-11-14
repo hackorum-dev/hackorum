@@ -167,8 +167,7 @@ module Stats
         {
           crediting: credited.size,
           per_commit: { mean: mean(credited.values), median: median(credited.values)&.round },
-          coverage: metrics.trailer_coverage,
-          uncredited_reviewed: metrics.uncredited_reviewed
+          coverage: metrics.trailer_coverage
         }.merge(by_others_numbers)
       end
 

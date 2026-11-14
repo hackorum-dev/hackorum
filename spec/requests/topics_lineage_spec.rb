@@ -109,8 +109,7 @@ RSpec.describe "Thread page patchset lineage", type: :request do
     credit_rows = Nokogiri::HTML(response.body).css(".commit-credit-row")
     neil = credit_rows.find { |row| row.text.include?("Neil Committer") }
     expect(neil.at_css(".commit-credit-name, .commit-credit-link").next_element["class"]).to eq("commit-credit-committer")
-    guessed = credit_rows.find { |row| row.text.include?("Guessed Reviewer") }
-    expect(guessed.at_css(".commit-credit-llm")["title"]).to eq("Credited by LLM analysis, not a commit trailer")
+    expect(credit_rows.map(&:text).join).not_to include("Guessed Reviewer")
 
     get topic_path(topic)
     expect(response.body).to include("Patch story")

@@ -39,7 +39,7 @@ class CommitActivity
     ids = Array(person_ids)
     return [] if ids.empty?
 
-    CommitPerson.where(source: sources).joins(:commit).merge(Commit.canonical)
+    CommitPerson.shown.where(source: sources).joins(:commit).merge(Commit.canonical)
                 .where(person_id: ids, role: ROLES)
                 .distinct
                 .pluck(Arel.sql("EXTRACT(YEAR FROM commits.committed_at)"))
@@ -96,7 +96,7 @@ class CommitActivity
   def load_entries
     return [] if @person_ids.empty? || @roles.empty?
 
-    credits = CommitPerson.where(source: @sources).joins(:commit).merge(Commit.canonical)
+    credits = CommitPerson.shown.where(source: @sources).joins(:commit).merge(Commit.canonical)
                           .where(person_id: @person_ids, role: @roles)
                           .where(commits: { committed_at: loaded_range })
                           .pluck("commit_people.commit_id", "commit_people.role", "commit_people.person_id", "commit_people.source")

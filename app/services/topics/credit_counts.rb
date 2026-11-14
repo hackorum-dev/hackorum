@@ -15,7 +15,7 @@ module Topics
         change_of = @groups.each_with_object({}) do |group, map|
           group[:commit_ids].each { |id| map[id] = group[:sha] }
         end
-        rows = CommitPerson.where(commit_id: change_of.keys, source: @sources)
+        rows = CommitPerson.shown.where(commit_id: change_of.keys, source: @sources)
                            .includes(person: :default_alias)
         grouped = rows.group_by(&:role)
 

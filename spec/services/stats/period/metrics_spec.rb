@@ -35,7 +35,6 @@ RSpec.describe Stats::Period::Metrics do
     m = described_class.new(scopes, [ fx.commits[:c1].id, fx.commits[:c2].id ])
     expect(m.judged_ids).to eq([ fx.commits[:c1].id ])
     expect(m.alone_ids).to eq([])
-    expect(m.uncredited_reviewed).to eq(count: 1, of: 1, credits: 1)
     expect(m.cf_commits).to eq(2)
     expect(m.with_thread).to eq(2)
     expect(m.chain_lengths).to eq([ 3 ])

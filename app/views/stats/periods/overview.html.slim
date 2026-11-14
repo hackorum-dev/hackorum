@@ -91,14 +91,11 @@ ruby:
       d: safe_join([ tag.abbr("not found in the thread", title: "The commit message credits them but the thread has no mail from them: an off-list review, or a name we could not match."),
                      " is #{stats_pct(rev[:coverage][:none], rev[:coverage].values.sum)}, #{stats_number(rev[:coverage][:none])} credits" ]),
       chart: [ "share", { segments: coverage_segments } ]
-    = render "stats/periods/tile", v: stats_pct(rev[:uncredited_reviewed][:count], rev[:uncredited_reviewed][:of]), na: !llm,
-      k: tag.abbr("Uncredited commits that were reviewed anyway", title: "Of the #{stats_number(rev[:uncredited_reviewed][:of])} commits that credit no reviewer: the LLM looked for people who, before the commit, reported a problem, tested it, approved it or proposed a change the author took. The same bar committers use for Reviewed-by. Pings, rebase requests and cfbot notes do not count."),
-      d: "#{stats_number(rev[:uncredited_reviewed][:count])} of #{stats_number(rev[:uncredited_reviewed][:of])}, #{stats_number(rev[:uncredited_reviewed][:credits])} credits"
     = render "stats/periods/tile", v: stats_pct(rev[:by_others][:count], total),
       k: tag.abbr("Of all commits, written by someone other than the committer", title: "The commit message credits an author other than the committer. The rest the committer wrote themselves."),
       d: "#{stats_number(rev[:by_others][:count])} of #{stats_number(total)}: #{stats_number(rev[:by_others][:committers])} by other committers, #{stats_number(rev[:by_others][:non_committers])} by non-committers"
     = render "stats/periods/tile", v: stats_pct(alone[:count], alone[:of]), na: !llm,
-      k: tag.abbr("Of those, reviewed by the committer alone", title: "Of the #{stats_number(alone[:of])} written by someone else that the LLM assessed: the committer is the only reviewer, nobody else is credited and the LLM found nobody else."),
+      k: tag.abbr("Of those, reviewed by the committer alone", title: "Of the #{stats_number(alone[:of])} written by someone else that the LLM assessed: the committer is the only reviewer, nobody else is credited in a Reviewed-by trailer."),
       d: "#{stats_number(alone[:count])} of #{stats_number(alone[:of])}"
     = render "stats/periods/tile", kind: "hist", na: !llm || no_lines,
       v: safe_join([ "Size of patches by others that only the committer reviewed ", tag.abbr("vs. the ones with another reviewer", title: "Lines changed in the commit. Blue: the #{stats_number(alone[:count])} commits reviewed by the committer alone. Grey: the #{stats_number(with_other)} by others that had another reviewer.") ]),

@@ -15,4 +15,6 @@ class CommitPerson < ApplicationRecord
   scope :parsed, -> { where(source: "parsed") }
   scope :llm, -> { where(source: "llm") }
   scope :committer_sourced, -> { where(source: "committer") }
+  # LLM-suggested reviewers are too noisy to show as credits
+  scope :shown, -> { where.not(source: "llm", role: "reviewer") }
 end

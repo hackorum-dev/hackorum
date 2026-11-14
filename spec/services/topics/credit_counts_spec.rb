@@ -17,13 +17,23 @@ RSpec.describe Topics::CreditCounts do
 
   it "splits llm and trailer credits for the same person" do
     c1, c2, c3 = create_list(:commit, 3)
+    c1.commit_people.create!(role: "author", raw_name: "Pavel Borisov")
+    c2.commit_people.create!(role: "author", raw_name: "Pavel Borisov", source: "llm", confidence: 0.8)
+    c3.commit_people.create!(role: "author", raw_name: "Pavel Borisov")
+    c3.commit_people.create!(role: "author", raw_name: "Pavel Borisov", source: "llm", confidence: 0.8)
+
+    entry = counts([ c1, c2, c3 ])["author"].first
+    expect([ entry.total, entry.llm, entry.llm_only? ]).to eq([ 3, 1, false ])
+  end
+
+  it "leaves out llm reviewers" do
+    c1, c2 = create_list(:commit, 2)
     c1.commit_people.create!(role: "reviewer", raw_name: "Pavel Borisov")
     c2.commit_people.create!(role: "reviewer", raw_name: "Pavel Borisov", source: "llm", confidence: 0.8)
-    c3.commit_people.create!(role: "reviewer", raw_name: "Pavel Borisov")
-    c3.commit_people.create!(role: "reviewer", raw_name: "Pavel Borisov", source: "llm", confidence: 0.8)
+    c2.commit_people.create!(role: "reviewer", raw_name: "Guessed Reviewer", source: "llm", confidence: 0.9)
 
-    entry = counts([ c1, c2, c3 ])["reviewer"].first
-    expect([ entry.total, entry.llm, entry.llm_only? ]).to eq([ 3, 1, false ])
+    reviewers = counts([ c1, c2 ])["reviewer"]
+    expect(reviewers.map { |e| [ e.name, e.total, e.llm ] }).to eq([ [ "Pavel Borisov", 1, 0 ] ])
   end
 
   it "marks model-only people" do
