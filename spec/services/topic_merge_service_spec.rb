@@ -231,6 +231,17 @@ RSpec.describe TopicMergeService do
         expect(links.pluck(:topic_id, :source, :external_message_id)).to eq([ [ target_topic.id, "trailer", "src@x" ] ])
         expect(target_topic.reload.commit_count).to eq(1)
       end
+
+      it "leaves no topic links pointing at the source" do
+        third = create(:topic)
+        [ source_topic, target_topic, third ].each { |t| create(:commit_topic, commit: commit, topic: t) }
+        TopicLinks.sync_commits!([ commit.id ])
+
+        service.call
+
+        expect(TopicLink.where(topic_id: source_topic.id).or(TopicLink.where(other_topic_id: source_topic.id))).to be_empty
+        expect(TopicLink.where(topic_id: target_topic.id, other_topic_id: third.id)).to exist
+      end
     end
 
     context "with patch branches" do

@@ -24,6 +24,12 @@
                       span.commit-revert-tag title="Subject starts with Revert and the body names #{pluralize(reverted, 'commit')} linked to this thread" = "reverts #{pluralize(reverted, 'commit')} here"
                     - else
                       span.commit-revert-tag title="Subject starts with Revert" revert
+                  - Array(@also_in[group[:sha]]).each do |o|
+                    span.commit-also-in
+                      | Also in:
+                      =< link_to o[:topic].title, topic_path(o[:topic]), target: "_top"
+                      - if o[:verdict]
+                        =< "(#{verdict_words(o[:verdict])})"
                 - if (verdict = @commit_verdicts[group[:sha]])
                   = render "topics/commit_llm", v: verdict, ordinals: @lineage.ordinals
       aside.modal-side.commit-credits-side

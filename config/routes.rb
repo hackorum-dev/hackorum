@@ -167,6 +167,7 @@ Rails.application.routes.draw do
       get :latest_patchset
       get :message_batch
       get :commits_details
+      get :related_details
       get :commitfest_details
       get :patchsets_details
       get :story

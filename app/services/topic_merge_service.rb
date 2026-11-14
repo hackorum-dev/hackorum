@@ -175,6 +175,8 @@ class TopicMergeService
       link.delete
     end
 
+    TopicLink.where(topic_id: source_topic.id).or(TopicLink.where(other_topic_id: source_topic.id)).delete_all
+    TopicLinks.sync_commits!(CommitTopic.where(topic_id: target_topic.id).pluck(:commit_id))
     Topic.refresh_commit_aggregates!([ source_topic.id, target_topic.id ])
   end
 

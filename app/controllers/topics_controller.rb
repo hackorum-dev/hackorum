@@ -1,12 +1,12 @@
 class TopicsController < ApplicationController
   include DraftSidebarLoader
 
-  before_action :set_topic, only: [ :show, :message_batch, :commits_details, :commitfest_details, :patchsets_details, :story, :timeline, :participants, :participant, :aware, :read_all, :unread_all, :star, :unstar, :ignore, :unignore, :latest_patchset, :summary, :messages ]
+  before_action :set_topic, only: [ :show, :message_batch, :commits_details, :related_details, :commitfest_details, :patchsets_details, :story, :timeline, :participants, :participant, :aware, :read_all, :unread_all, :star, :unstar, :ignore, :unignore, :latest_patchset, :summary, :messages ]
   before_action :require_authentication, only: [ :aware, :read_all, :unread_all, :star, :unstar, :ignore, :unignore, :row_states ]
 
   TOPIC_LIST_PRELOADS = [ :creator, { creator_person: :default_alias }, { last_sender_person: :default_alias } ].freeze
   ROW_STATES_LIMIT = 50
-  MERGED_REDIRECT_ACTIONS = %w[message_batch commits_details commitfest_details patchsets_details story timeline participants participant].freeze
+  MERGED_REDIRECT_ACTIONS = %w[message_batch commits_details related_details commitfest_details patchsets_details story timeline participants participant].freeze
 
   def index
     if user_signed_in? && request.path == root_path
@@ -107,6 +107,7 @@ class TopicsController < ApplicationController
     build_thread_outline(@messages)
     @commitfest_summary = Topics::CommitfestSummary.new(@topic)
     load_commit_summary
+    @related = Topics::RelatedThreads.new(@topic)
     @lineage = Lineage::ThreadPresenter.new(@topic, ordinals: @message_numbers)
     # lazy object, not a load_* call like its neighbours - the view decides
     # whether anything is needed, so this must not query on its own
@@ -186,6 +187,12 @@ class TopicsController < ApplicationController
       @lineage = Lineage::ThreadPresenter.new(@topic, ordinals: helpers.lineage_ordinals(@topic))
       @commit_verdicts = @lineage.verdicts_for_groups(@commit_summary) if @lineage.run
     end
+    @also_in = Topics::RelatedThreads.new(@topic).also_in(@commit_summary.groups)
+    render layout: false
+  end
+
+  def related_details
+    @related = Topics::RelatedThreads.new(@topic)
     render layout: false
   end
 

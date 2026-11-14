@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_11_15_110100) do
+ActiveRecord::Schema[8.0].define(version: 2026_11_15_110200) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -1095,6 +1095,19 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_15_110100) do
     t.index ["user_id"], name: "index_topic_ignores_on_user_id"
   end
 
+  create_table "topic_links", force: :cascade do |t|
+    t.bigint "topic_id", null: false
+    t.bigint "other_topic_id", null: false
+    t.string "kind", null: false
+    t.string "direction", null: false
+    t.string "ref_type", null: false
+    t.bigint "ref_id", null: false
+    t.datetime "created_at", null: false
+    t.index ["other_topic_id"], name: "index_topic_links_on_other_topic_id"
+    t.index ["ref_type", "ref_id"], name: "index_topic_links_on_ref_type_and_ref_id"
+    t.index ["topic_id", "other_topic_id", "kind", "ref_type", "ref_id"], name: "index_topic_links_unique", unique: true
+  end
+
   create_table "topic_mailing_lists", force: :cascade do |t|
     t.bigint "topic_id", null: false
     t.bigint "mailing_list_id", null: false
@@ -1312,6 +1325,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_15_110100) do
   add_foreign_key "thread_awarenesses", "users"
   add_foreign_key "topic_ignores", "topics"
   add_foreign_key "topic_ignores", "users"
+  add_foreign_key "topic_links", "topics"
+  add_foreign_key "topic_links", "topics", column: "other_topic_id"
   add_foreign_key "topic_mailing_lists", "mailing_lists"
   add_foreign_key "topic_mailing_lists", "topics"
   add_foreign_key "topic_merges", "topics", column: "source_topic_id"

@@ -1,0 +1,6 @@
+.sidebar-related-line
+  = link_to e[:topic].title, topic_path(e[:topic]), class: "sidebar-related-title", title: e[:topic].title
+  .sidebar-muted
+    = e[:label]
+    - if e[:role]
+      span.sidebar-related-role = " · #{e[:role]}"

@@ -11,6 +11,8 @@
       = render "topics/sidebar/commitfest", topic: @topic, summary: @commitfest_summary
     - if @commit_summary.any?
       = render "topics/sidebar/commits", topic: @topic, summary: @commit_summary
+    - if @related.any?
+      = render "topics/sidebar/related", topic: @topic, related: @related
     = render "topics/sidebar/participants", activity: @participant_activity, topic: @topic
     - if @notes_by_message.present?
       - note_map = @notes_by_message

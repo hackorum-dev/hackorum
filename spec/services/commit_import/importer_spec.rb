@@ -164,6 +164,18 @@ RSpec.describe CommitImport::Importer do
       expect(topic.reload.commit_count).to eq(1)
     end
 
+    it "creates commit topic links for a commit with two Discussion trailers" do
+      t1 = create(:topic)
+      t2 = create(:topic)
+      create(:message, topic: t1, message_id: "one@example.com")
+      create(:message, topic: t2, message_id: "two@example.com")
+      fixture_repo.commit(subject: "x", body: "Discussion: https://postgr.es/m/one@example.com\nDiscussion: https://postgr.es/m/two@example.com\n")
+
+      importer.run!
+
+      expect(TopicLink.where(kind: "commit").pluck(:topic_id, :other_topic_id)).to contain_exactly([ t1.id, t2.id ], [ t2.id, t1.id ])
+    end
+
     it "resolves a percent-encoded message id" do
       topic = create(:topic)
       create(:message, topic: topic, message_id: "CAD21AoA=abc@mail.gmail.com")

@@ -1,0 +1,3 @@
+= turbo_frame_tag "topic-related-modal", target: "_top"
+  - @related.entries.each do |e|
+    = render "topics/related_line", e: e

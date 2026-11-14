@@ -76,6 +76,7 @@ module CommitImport
           CommitTopic.trailer.where(commit_id: id_by_sha.values).delete_all
           touched.merge(insert_topic_links(parsed, id_by_sha, topic_map))
           update_unresolved(parsed, id_by_sha, topic_map)
+          TopicLinks.sync_commits!(id_by_sha.values)
           update_cherry_picks(parsed, id_by_sha)
           # aggregate refresh commits with the rows that produced it, in the
           # same batch transaction, so a crash later in the run cannot leave it
@@ -135,6 +136,7 @@ module CommitImport
         insert_files(records, id_by_sha)
         insert_people(records, parsed, id_by_sha)
         touched = insert_topic_links(parsed, id_by_sha, topic_map)
+        TopicLinks.sync_commits!(id_by_sha.values)
         # aggregate refresh commits with the commit_topics rows that produced
         # it, so a crash later in run! cannot leave it permanently short
         refresh_commit_aggregates(touched)
@@ -496,6 +498,7 @@ module CommitImport
           end
           CommitTopic.upsert_all(rows.uniq { |r| [ r[:commit_id], r[:topic_id] ] },
                                 unique_by: %i[commit_id topic_id])
+          TopicLinks.sync_commits!(rows.map { |r| r[:commit_id] })
           refresh_commit_aggregates(touched)
         end
       end

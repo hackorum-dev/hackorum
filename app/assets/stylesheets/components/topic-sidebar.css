@@ -126,6 +126,10 @@
 }
 .sidebar-commit-end-label { font-weight: var(--font-weight-semibold); text-transform: uppercase; color: var(--color-text-muted); }
 .sidebar-commit-subject { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-related-line { margin: var(--spacing-1) 0; }
+.sidebar-related-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-sm); }
+.sidebar-related-role { font-style: italic; }
+.commit-also-in { font-size: .85em; color: var(--color-text-muted); margin-left: var(--spacing-2); }
 
 .role-strip { display: flex; gap: 1px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--color-bg-button); }
 .role-strip-seg.role-committers, .role-cell-label.role-committers { --role: var(--color-primary-700); }

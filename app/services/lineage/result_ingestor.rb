@@ -356,7 +356,9 @@ module Lineage
         end
       end
       ids = judged.map { |v| known[v["sha"]].id } + backports.values.flatten
-      CommitTopic.llm.where(topic_id: @run.topic_id).where.not(commit_id: ids).delete_all unless update?
+      stale = update? ? [] : CommitTopic.llm.where(topic_id: @run.topic_id).where.not(commit_id: ids).pluck(:commit_id)
+      CommitTopic.llm.where(topic_id: @run.topic_id, commit_id: stale).delete_all
+      TopicLinks.sync_commits!(ids | stale)
     end
 
     # Credits come from every thread's current verdict; one row per person

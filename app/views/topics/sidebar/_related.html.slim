@@ -1,0 +1,7 @@
+section.sidebar-block
+  .sidebar-block-head
+    span.sidebar-block-label Related threads
+    - if related.entries.size > Topics::RelatedThreads::INLINE
+      = render "shared/modal_link", label: "#{related.entries.size} related ›", src: related_details_topic_path(topic), frame_id: "topic-related-modal", title: "Related threads", subtitle: pluralize(related.entries.size, "thread"), size: "lg", link_class: "sidebar-block-more"
+  - related.entries.first(Topics::RelatedThreads::INLINE).each do |e|
+    = render "topics/related_line", e: e
