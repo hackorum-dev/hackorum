@@ -1,0 +1,82 @@
+- name: Apt keyrings dir
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Docker apt key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/debian/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+
+- name: Docker apt repo
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian {{ ansible_facts['distribution_release'] }} stable"
+    filename: docker
+    state: present
+
+- name: Docker apt pin
+  ansible.builtin.copy:
+    dest: /etc/apt/preferences.d/docker
+    content: |
+      Package: docker-ce docker-ce-cli docker-ce-rootless-extras
+      Pin: version 5:{{ docker_major }}.*
+      Pin-Priority: 1001
+    mode: "0644"
+
+- name: Docker packages
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+      - python3-requests
+    state: present
+    update_cache: true
+
+- name: Daemon config
+  ansible.builtin.template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    mode: "0644"
+  notify: Restart docker
+
+- name: Docker running
+  ansible.builtin.service:
+    name: docker
+    enabled: true
+    state: started
+
+- name: Apply daemon config now
+  ansible.builtin.meta: flush_handlers
+
+- name: Deploy user in docker group
+  ansible.builtin.user:
+    name: "{{ deploy_user }}"
+    groups: docker
+    append: true
+
+- name: Prune unit files
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    mode: "0644"
+  loop: [docker-prune.service, docker-prune.timer]
+  notify: Reload systemd
+
+- name: Prune timer enabled
+  ansible.builtin.systemd:
+    name: docker-prune.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: GHCR login for root
+  community.docker.docker_login:
+    registry_url: ghcr.io
+    username: "{{ ghcr_user }}"
+    password: "{{ ghcr_pull_token }}"
+  no_log: true
+  when: ghcr_pull_token | length > 0

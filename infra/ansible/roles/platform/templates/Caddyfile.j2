@@ -1,0 +1,132 @@
+{
+	email {{ acme_email }}
+	metrics
+}
+
+(staging_guard) {
+{% if staging_basic_auth %}
+	@guarded not path /up
+	basic_auth @guarded {
+		{{ staging_basic_auth_user }} {{ staging_basic_auth_hash }}
+	}
+	header X-Robots-Tag "noindex, nofollow"
+{% endif %}
+}
+
+# prometheus/alertmanager UIs; staging_guard already covers them on staging
+(ops_guard) {
+{% if not staging_basic_auth %}
+	basic_auth {
+		{{ metrics_basic_auth_user }} {{ metrics_basic_auth_hash }}
+	}
+{% endif %}
+}
+
+(errors) {
+	handle_errors 5xx {
+		rewrite * /error.html
+		root * /etc/caddy
+		file_server
+	}
+}
+
+(access_log) {
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 250MiB
+			roll_keep 100
+		}
+	}
+}
+
+# app host: the app layer drops its snippet into sites/
+{{ app_host }} {
+	import staging_guard
+	import errors
+	import access_log
+	import sites/*.caddy
+	# fallback: no snippet -> web unresolvable -> 502 -> error page
+	reverse_proxy web:3000
+}
+
+{{ grafana_host }} {
+	import staging_guard
+	import access_log
+	handle_path /prometheus/* {
+		import ops_guard
+		reverse_proxy prometheus:9090
+	}
+	handle_path /alertmanager/* {
+		import ops_guard
+		reverse_proxy alertmanager:9093
+	}
+	@selfmetrics path /metrics /metrics/*
+	handle @selfmetrics {
+		respond 404
+	}
+	handle {
+		reverse_proxy grafana:3000 {
+			header_up -Authorization
+		}
+	}
+}
+
+# cross-host scrape endpoint, basic auth, no staging guard (the other host must reach it)
+{{ metrics_host }} {
+	basic_auth {
+		{{ metrics_basic_auth_user }} {{ metrics_basic_auth_hash }}
+	}
+	handle /node/metrics {
+		rewrite * /metrics
+		reverse_proxy host.docker.internal:9100
+	}
+	handle /cadvisor/metrics {
+		rewrite * /metrics
+		reverse_proxy cadvisor:8080
+	}
+	handle /blackbox/metrics {
+		rewrite * /metrics
+		reverse_proxy blackbox:9115
+	}
+	handle /smartctl/metrics {
+		rewrite * /metrics
+		reverse_proxy smartctl:9633
+	}
+	handle /caddy/metrics {
+		rewrite * /metrics
+		reverse_proxy localhost:9180
+	}
+	handle /prometheus/federate {
+		rewrite * /federate
+		reverse_proxy prometheus:9090
+	}
+	handle {
+		respond 404
+	}
+}
+
+# caddy metrics for prometheus on the edge network, not published
+http://:9180 {
+	metrics
+}
+{% if mailpit_enabled %}
+
+{{ mailpit_host }} {
+	import staging_guard
+	import access_log
+	reverse_proxy mailpit:8025
+}
+{% endif %}
+{% if dumps_host is defined %}
+
+{{ dumps_host }} {
+	import access_log
+	root * /dumps/public
+	file_server browse
+}
+{% endif %}
+
+# only so caddy holds a cert the mailserver can reuse
+{{ mail_host }} {
+	respond "mail host" 404
+}

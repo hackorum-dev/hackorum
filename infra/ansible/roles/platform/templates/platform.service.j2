@@ -1,0 +1,15 @@
+[Unit]
+Description=hackorum platform layer (caddy, monitoring)
+After=docker.service network-online.target
+Wants=docker.service network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+WorkingDirectory={{ platform_root }}/compose
+ExecStart=/usr/bin/docker compose -f compose.yml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose -f compose.yml down
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

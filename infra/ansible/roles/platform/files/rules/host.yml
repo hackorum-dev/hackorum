@@ -1,0 +1,75 @@
+groups:
+  - name: host
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+        labels: { severity: none }
+        annotations: { summary: "Always firing, feeds the dead-man ping" }
+
+      - alert: HostDown
+        expr: up{job=~"node|other_node"} == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations: { summary: "{{ $labels.host }} node exporter unreachable for 5m" }
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes) < 0.20
+        for: 10m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }} {{ $labels.mountpoint }} under 20% free" }
+
+      - alert: DiskFullSoon
+        expr: predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}[6h], 7*24*3600) < 0
+        for: 1h
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }} {{ $labels.mountpoint }} full within 7 days at current rate" }
+
+      - alert: FilesystemReadOnly
+        expr: node_filesystem_readonly{fstype=~"ext4|xfs|btrfs|vfat"} == 1
+        for: 5m
+        labels: { severity: critical }
+        annotations: { summary: "{{ $labels.host }} {{ $labels.mountpoint }} is read-only" }
+
+      - alert: FilesystemDeviceError
+        expr: node_filesystem_device_error{fstype=~"ext4|xfs|btrfs|vfat"} == 1
+        for: 10m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }} {{ $labels.mountpoint }} device error (disk gone?)" }
+
+      - alert: MdadmDegraded
+        expr: >-
+          (node_md_disks_required - ignoring(state) node_md_disks{state="active"}) > 0
+          or node_md_disks{state="failed"} > 0
+          or node_md_state{state="inactive"} == 1
+        for: 2m
+        labels: { severity: critical }
+        annotations: { summary: "{{ $labels.host }} {{ $labels.device }} degraded" }
+
+      - alert: SmartUnhealthy
+        expr: smartctl_device_smart_status == 0
+        for: 10m
+        labels: { severity: critical }
+        annotations: { summary: "{{ $labels.host }} {{ $labels.device }} SMART failing" }
+
+      - alert: HighSteal
+        expr: rate(node_cpu_seconds_total{mode="steal"}[5m]) > 0.10
+        for: 15m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }} cpu steal above 10% for 15m" }
+
+      - alert: HighLoad
+        expr: node_load5 / count without(cpu, mode) (node_cpu_seconds_total{mode="idle"}) > 2
+        for: 15m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }} load5 above 2x cores" }
+
+      - alert: OomKills
+        expr: increase(node_vmstat_oom_kill[15m]) > 0
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }} oom kill in the last 15m" }
+
+      - alert: MemoryLow
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.10
+        for: 10m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }} under 10% memory available" }

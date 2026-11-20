@@ -1,0 +1,8 @@
+groups:
+  - name: bulk
+    rules:
+      - alert: BulkDiskMissing
+        expr: absent(node_filesystem_avail_bytes{job="node",mountpoint="{{ bulk_root }}"})
+        for: 5m
+        labels: { severity: critical }
+        annotations: { summary: "{{ bulk_root }} is not mounted (bulk disk missing)" }

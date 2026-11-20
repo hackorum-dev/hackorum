@@ -1,0 +1,110 @@
+- name: Hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Hosts entry for hostname
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1\s'
+    line: "127.0.1.1 {{ inventory_hostname }}"
+
+- name: Hosts entries for public addresses
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^{{ item | regex_escape }}\s'
+    line: "{{ item }} {{ inventory_hostname }}"
+  loop: "{{ [ansible_facts['default_ipv4']['address'] | default(''), ansible_facts['default_ipv6']['address'] | default('')] | select | list }}"
+
+- name: Timezone
+  community.general.timezone:
+    name: "{{ timezone }}"
+
+- name: Base packages
+  ansible.builtin.apt:
+    name:
+      - unattended-upgrades
+      - apt-listchanges
+      - fail2ban
+      - python3-systemd
+      - chrony
+      - nftables
+      - curl
+      - git
+      - htop
+      - smartmontools
+      - mdadm
+      - restic
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Check deploy ssh keys
+  ansible.builtin.assert:
+    that:
+      - deploy_ssh_public_keys | length > 0
+      - deploy_ssh_public_keys | reject('match', '^(ssh-(ed25519|rsa)|ecdsa-sha2-|sk-)') | list | length == 0
+    quiet: true
+    fail_msg: deploy_ssh_public_keys must be a non-empty list of ssh public keys (exclusive authorized_key would lock you out)
+
+- name: Deploy authorized keys
+  ansible.posix.authorized_key:
+    user: "{{ deploy_user }}"
+    key: "{{ deploy_ssh_public_keys | join('\n') }}"
+    exclusive: true
+
+- name: Sshd hardening drop-in
+  ansible.builtin.template:
+    src: sshd_hackorum.conf.j2
+    dest: /etc/ssh/sshd_config.d/10-hackorum.conf
+    mode: "0644"
+    validate: sshd -t -f %s
+  notify: Restart sshd
+
+- name: Apply sshd restart now
+  ansible.builtin.meta: flush_handlers
+
+- name: Unattended upgrades config
+  ansible.builtin.template:
+    src: 50unattended-upgrades.j2
+    dest: /etc/apt/apt.conf.d/50unattended-upgrades
+    mode: "0644"
+
+- name: Enable periodic upgrades
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    mode: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::AutocleanInterval "7";
+
+- name: Fail2ban sshd jail
+  ansible.builtin.template:
+    src: jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    mode: "0644"
+  notify: Restart fail2ban
+
+- name: Services enabled
+  ansible.builtin.service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: [chrony, fail2ban]
+
+- name: Bulk disk mount
+  ansible.posix.mount:
+    src: "{{ bulk_device }}"
+    path: "{{ bulk_root }}"
+    fstype: ext4
+    opts: defaults,noatime,nofail,errors=remount-ro,x-systemd.device-timeout=10s
+    state: mounted
+  when: bulk_device is defined
+
+- name: Bulk root directory
+  ansible.builtin.file:
+    path: "{{ bulk_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"

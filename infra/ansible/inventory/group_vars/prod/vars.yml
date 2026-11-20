@@ -1,0 +1,13 @@
+env_name: prod
+app_host: hackorum.dev
+mail_host: mail.hackorum.dev
+mail_domain: hackorum.dev
+grafana_host: grafana.hackorum.dev
+metrics_host: metrics.hackorum.dev
+mailpit_enabled: false
+staging_basic_auth: false
+other_host_name: staging
+other_host_metrics_host: metrics.staging.hackorum.dev
+other_app_host: staging.hackorum.dev
+other_host_enabled: false   # flip to true once the counterpart host runs platform.yml
+dumps_host: dumps.hackorum.dev

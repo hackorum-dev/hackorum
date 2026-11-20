@@ -1,0 +1,137 @@
+name: platform
+
+x-log: &log
+  driver: local
+  options: { max-size: "20m", max-file: "15", compress: "true" }
+
+services:
+  caddy:
+    image: {{ images.caddy }}
+    logging: *log
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - {{ platform_root }}/caddy:/etc/caddy:ro
+      - {{ platform_root }}/data/caddy:/data
+      - {{ platform_root }}/data/caddy-config:/config
+      - {{ bulk_root }}/logs/caddy:/var/log/caddy
+      - {{ hackorum_dumps_root }}/public:/dumps/public:ro
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    networks: [edge]
+    restart: unless-stopped
+
+  prometheus:
+    image: {{ images.prometheus }}
+    logging: *log
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time={{ prometheus_retention_time }}
+      - --storage.tsdb.retention.size={{ prometheus_retention_size }}
+      - --web.external-url=https://{{ grafana_host }}/prometheus/
+      - --web.route-prefix=/
+    volumes:
+      - {{ platform_root }}/prometheus:/etc/prometheus:ro
+      - {{ platform_root }}/data/prometheus:/prometheus
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    networks: [edge]
+    expose: ["9090"]
+    restart: unless-stopped
+
+  alertmanager:
+    image: {{ images.alertmanager }}
+    logging: *log
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.external-url=https://{{ grafana_host }}/alertmanager/
+      - --web.route-prefix=/
+      - --cluster.listen-address=
+    volumes:
+      - {{ platform_root }}/alertmanager:/etc/alertmanager:ro
+      - {{ platform_root }}/data/alertmanager:/alertmanager
+    networks: [edge]
+    expose: ["9093"]
+    restart: unless-stopped
+
+  grafana:
+    image: {{ images.grafana }}
+    logging: *log
+    environment:
+      GF_SERVER_ROOT_URL: https://{{ grafana_host }}
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: {{ grafana_admin_password | replace('$', '$$') | to_json }}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    volumes:
+      - {{ platform_root }}/grafana/provisioning:/etc/grafana/provisioning:ro
+      - {{ platform_root }}/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - {{ platform_root }}/data/grafana:/var/lib/grafana
+    networks: [edge]
+    expose: ["3000"]
+    restart: unless-stopped
+
+  # host netns for real host network stats; 9100 is closed outside by nftables
+  node_exporter:
+    image: {{ images.node_exporter }}
+    logging: *log
+    command:
+      - --path.rootfs=/host
+      - --collector.textfile.directory=/textfile
+      - --web.listen-address=:9100
+    network_mode: host
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+      - {{ platform_root }}/textfile:/textfile:ro
+    restart: unless-stopped
+
+  cadvisor:
+    image: {{ images.cadvisor }}
+    logging: *log
+    command: ["--docker_only=true", "--housekeeping_interval=30s", "--store_container_labels=false"]
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    networks: [edge]
+    expose: ["8080"]
+    restart: unless-stopped
+
+  blackbox:
+    image: {{ images.blackbox_exporter }}
+    logging: *log
+    command: ["--config.file=/config/blackbox.yml"]
+    volumes:
+      - {{ platform_root }}/blackbox:/config:ro
+    networks: [edge]
+    expose: ["9115"]
+    restart: unless-stopped
+
+  smartctl:
+    image: {{ images.smartctl_exporter }}
+    logging: *log
+    privileged: true
+    user: root
+    networks: [edge]
+    expose: ["9633"]
+    restart: unless-stopped
+{% if mailpit_enabled %}
+
+  mailpit:
+    image: {{ images.mailpit }}
+    logging: *log
+    environment:
+      MP_MAX_MESSAGES: "5000"
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    networks: [edge]
+    expose: ["1025", "8025"]
+    restart: unless-stopped
+{% endif %}
+
+networks:
+  edge:
+    external: true

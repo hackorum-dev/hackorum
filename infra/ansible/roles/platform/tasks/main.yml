@@ -1,0 +1,135 @@
+- name: Platform directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0755') }}"
+  loop:
+    - { path: "{{ platform_root }}/compose" }
+    - { path: "{{ platform_root }}/caddy/sites" }
+    - { path: "{{ platform_root }}/data/caddy" }
+    - { path: "{{ platform_root }}/data/caddy-config" }
+    - { path: "{{ platform_root }}/prometheus/rules" }
+    - { path: "{{ platform_root }}/prometheus/targets" }
+    - { path: "{{ platform_root }}/data/prometheus", owner: "65534", group: "65534" }
+    - { path: "{{ platform_root }}/data/alertmanager", owner: "65534", group: "65534" }
+    - { path: "{{ platform_root }}/alertmanager" }
+    - { path: "{{ platform_root }}/blackbox" }
+    - { path: "{{ platform_root }}/grafana/provisioning/datasources" }
+    - { path: "{{ platform_root }}/grafana/provisioning/dashboards" }
+    - { path: "{{ platform_root }}/grafana/provisioning/alerting" }
+    - { path: "{{ platform_root }}/grafana/provisioning/plugins" }
+    - { path: "{{ platform_root }}/grafana/dashboards" }
+    - { path: "{{ platform_root }}/data/grafana", owner: "472", group: "472" }
+    - { path: "{{ platform_root }}/textfile", mode: "0775" }
+    - { path: "{{ bulk_root }}/logs/caddy" }
+    - { path: "{{ hackorum_dumps_root }}/public" }
+
+- name: Edge network
+  community.docker.docker_network:
+    name: edge
+    state: present
+
+- name: Compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ platform_root }}/compose/compose.yml"
+    owner: root
+    group: docker
+    mode: "0640"
+  notify: Platform up
+
+- name: Caddyfile
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: "{{ platform_root }}/caddy/Caddyfile"
+    mode: "0644"
+  notify: Reload caddy
+
+- name: Caddy error page
+  ansible.builtin.copy:
+    src: caddy-error.html
+    dest: "{{ platform_root }}/caddy/error.html"
+    mode: "0644"
+
+- name: Prometheus config
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ platform_root }}/prometheus/prometheus.yml"
+    owner: root
+    group: "65534"
+    mode: "0640"
+  notify: Reload prometheus
+
+- name: Prometheus rules (platform-owned)
+  ansible.builtin.copy:
+    src: "rules/{{ item }}"
+    dest: "{{ platform_root }}/prometheus/rules/{{ item }}"
+    mode: "0644"
+  loop: [host.yml, site.yml, backup.yml, monitoring.yml]
+  notify: Reload prometheus
+
+- name: Bulk disk rule
+  ansible.builtin.template:
+    src: rules/bulk.yml.j2
+    dest: "{{ platform_root }}/prometheus/rules/bulk.yml"
+    mode: "0644"
+  when: bulk_device is defined
+  notify: Reload prometheus
+
+- name: Bulk disk rule absent
+  ansible.builtin.file:
+    path: "{{ platform_root }}/prometheus/rules/bulk.yml"
+    state: absent
+  when: bulk_device is not defined
+  notify: Reload prometheus
+
+- name: Alertmanager config
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ platform_root }}/alertmanager/alertmanager.yml"
+    owner: root
+    group: "65534"
+    mode: "0640"
+  notify: Reload alertmanager
+
+- name: Blackbox config
+  ansible.builtin.template:
+    src: blackbox.yml.j2
+    dest: "{{ platform_root }}/blackbox/blackbox.yml"
+    mode: "0644"
+  notify: Restart blackbox
+
+- name: Grafana datasource
+  ansible.builtin.template:
+    src: grafana-datasources.yml.j2
+    dest: "{{ platform_root }}/grafana/provisioning/datasources/prometheus.yml"
+    mode: "0644"
+  notify: Restart grafana
+
+- name: Grafana dashboard provider
+  ansible.builtin.copy:
+    src: grafana-dashboards.yml
+    dest: "{{ platform_root }}/grafana/provisioning/dashboards/hackorum.yml"
+    mode: "0644"
+  notify: Restart grafana
+
+- name: Grafana dashboards
+  ansible.builtin.copy:
+    src: dashboards/
+    dest: "{{ platform_root }}/grafana/dashboards/"
+    mode: "0644"
+
+- name: Platform unit
+  ansible.builtin.template:
+    src: platform.service.j2
+    dest: /etc/systemd/system/platform.service
+    mode: "0644"
+
+- name: Platform service enabled and started
+  ansible.builtin.systemd:
+    name: platform
+    enabled: true
+    state: started
+    daemon_reload: true

@@ -1,0 +1,2 @@
+docker_major: 29
+ghcr_user: hackorum-deploy  # noqa: var-naming[no-role-prefix]

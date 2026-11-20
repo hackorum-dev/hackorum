@@ -1,0 +1,104 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [staging, prod]
+        required: true
+      scope:
+        type: choice
+        options: [platform, site, deploy, restore, wipe]
+        default: deploy
+      image_tag:
+        type: string
+        description: image tag (commit sha); empty = current main
+        default: ""
+  workflow_run:
+    workflows: ["Docker Build"]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'staging' }}
+      SCOPE: ${{ github.event_name == 'workflow_dispatch' && inputs.scope || 'deploy' }}
+      REF: ${{ github.ref }}
+    steps:
+      - name: Check scope and ref
+        run: |
+          if [ "$ENVIRONMENT" = "prod" ] && [ "$SCOPE" = "wipe" ]; then
+            echo "wipe is staging-only" >&2
+            exit 1
+          fi
+          if [ "$ENVIRONMENT" = "prod" ] && [ "$REF" != "refs/heads/main" ]; then
+            echo "prod deploys only from main" >&2
+            exit 1
+          fi
+
+  deploy:
+    needs: guard
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       vars.STAGING_AUTO_DEPLOY == 'true')
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'staging' }}
+    concurrency:
+      group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'staging' }}
+      cancel-in-progress: false
+    env:
+      ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'staging' }}
+      SCOPE: ${{ github.event_name == 'workflow_dispatch' && inputs.scope || 'deploy' }}
+      IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.image_tag || github.event.workflow_run.head_sha }}
+    defaults:
+      run:
+        working-directory: infra/ansible
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve image tag
+        run: |
+          tag="${IMAGE_TAG:-$(git ls-remote origin refs/heads/main | cut -f1)}"
+          if [[ ! $tag =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "invalid image tag" >&2
+            exit 1
+          fi
+          echo "IMAGE_TAG=$tag" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - run: pip install 'ansible-core==2.22.*'
+      - run: ansible-galaxy collection install -r requirements.yml
+
+      - name: SSH and vault secrets
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$ANSIBLE_VAULT_PASSWORD" > .vault_pass
+
+      - name: Run playbook
+        run: |
+          extra=(-e "image_tag=$IMAGE_TAG")
+          if [ "$SCOPE" = "wipe" ]; then
+            host=$(ansible-inventory -i "inventory/$ENVIRONMENT.yml" --list | python3 -c 'import json,sys; print(list(json.load(sys.stdin)["_meta"]["hostvars"])[0])')
+            extra+=(-e "confirm_wipe=$host")
+          fi
+          ansible-playbook -i "inventory/$ENVIRONMENT.yml" "playbooks/$SCOPE.yml" "${extra[@]}"

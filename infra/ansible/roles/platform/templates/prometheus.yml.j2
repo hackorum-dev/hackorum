@@ -1,0 +1,78 @@
+global:
+  scrape_interval: {{ prometheus_scrape_interval }}
+  evaluation_interval: {{ prometheus_scrape_interval }}
+  external_labels:
+    env: {{ env_name }}
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs: [{ targets: ["prometheus:9090"] }]
+  - job_name: alertmanager
+    static_configs: [{ targets: ["alertmanager:9093"] }]
+  - job_name: node
+    static_configs: [{ targets: ["host.docker.internal:9100"], labels: { host: "{{ env_name }}" } }]
+  - job_name: cadvisor
+    static_configs: [{ targets: ["cadvisor:8080"], labels: { host: "{{ env_name }}" } }]
+  - job_name: smartctl
+    static_configs: [{ targets: ["smartctl:9633"], labels: { host: "{{ env_name }}" } }]
+  - job_name: caddy
+    static_configs: [{ targets: ["caddy:9180"], labels: { host: "{{ env_name }}" } }]
+  - job_name: grafana
+    static_configs: [{ targets: ["grafana:3000"] }]
+
+  # https probes of both sites, run from this host
+  - job_name: blackbox_http
+    metrics_path: /probe
+    params: { module: [http_2xx] }
+    static_configs:
+      - targets: ["https://{{ app_host }}/up"]
+        labels: { site: "{{ env_name }}" }
+      - targets: ["https://{{ other_app_host }}/up"]
+        labels: { site: "{{ other_host_name }}" }
+    relabel_configs:
+      - { source_labels: [__address__], target_label: __param_target }
+      - { source_labels: [__param_target], target_label: instance }
+      - { target_label: __address__, replacement: "blackbox:9115" }
+
+  - job_name: blackbox_smtp
+    metrics_path: /probe
+    params: { module: [smtp_banner] }
+    static_configs:
+      - targets: ["{{ mail_host }}:25"]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: __param_target }
+      - { source_labels: [__param_target], target_label: instance }
+      - { target_label: __address__, replacement: "blackbox:9115" }
+
+  # the local app layer (plan 3) drops targets here; the other host is scraped via the other_* jobs
+  - job_name: file_sd
+    file_sd_configs:
+      - files: ["/etc/prometheus/targets/*.yml"]
+        refresh_interval: 1m
+{% if other_host_enabled %}
+
+  # the other host's exporters through its metrics_host (basic auth)
+  - job_name: other_node
+    scheme: https
+    metrics_path: /node/metrics
+    basic_auth: { username: {{ other_host_metrics_user | to_json }}, password: {{ other_host_metrics_password | to_json }} }
+    static_configs: [{ targets: ["{{ other_host_metrics_host }}"], labels: { host: "{{ other_host_name }}" } }]
+  - job_name: other_cadvisor
+    scheme: https
+    metrics_path: /cadvisor/metrics
+    basic_auth: { username: {{ other_host_metrics_user | to_json }}, password: {{ other_host_metrics_password | to_json }} }
+    static_configs: [{ targets: ["{{ other_host_metrics_host }}"], labels: { host: "{{ other_host_name }}" } }]
+  - job_name: other_smartctl
+    scheme: https
+    metrics_path: /smartctl/metrics
+    basic_auth: { username: {{ other_host_metrics_user | to_json }}, password: {{ other_host_metrics_password | to_json }} }
+    static_configs: [{ targets: ["{{ other_host_metrics_host }}"], labels: { host: "{{ other_host_name }}" } }]
+{% endif %}

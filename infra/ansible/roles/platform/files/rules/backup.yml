@@ -1,0 +1,20 @@
+groups:
+  - name: backup
+    rules:
+      - alert: BackupStale
+        expr: time() - hackorum_backup_last_success_timestamp_seconds > 26*3600
+        for: 10m
+        labels: { severity: critical }
+        annotations: { summary: "{{ $labels.host }} last successful backup older than 26h" }
+
+      - alert: RestoreDrillFailed
+        expr: hackorum_restore_last_status != 0
+        for: 10m
+        labels: { severity: critical }
+        annotations: { summary: "staging restore drill failed (status {{ $value }})" }
+
+      - alert: RestoreDrillStale
+        expr: time() - hackorum_restore_last_run_timestamp_seconds > 26*3600
+        for: 10m
+        labels: { severity: warning }
+        annotations: { summary: "staging restore drill has not run in 26h" }

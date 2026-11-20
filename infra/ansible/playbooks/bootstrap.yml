@@ -1,0 +1,39 @@
+# run once on a fresh host: ansible-playbook -i inventory/<env>.yml playbooks/bootstrap.yml
+- name: Bootstrap deploy user
+  hosts: all
+  become: false
+  vars:
+    ansible_user: root
+  tasks:
+    - name: Install sudo
+      ansible.builtin.apt:
+        name: sudo
+        update_cache: true
+
+    - name: Create deploy user
+      ansible.builtin.user:
+        name: "{{ deploy_user }}"
+        shell: /bin/bash
+        groups: sudo
+        append: true
+
+    - name: Passwordless sudo for deploy
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/90-deploy
+        content: "{{ deploy_user }} ALL=(ALL) NOPASSWD:ALL\n"
+        mode: "0440"
+        validate: visudo -cf %s
+
+    - name: Check deploy ssh keys
+      ansible.builtin.assert:
+        that:
+          - deploy_ssh_public_keys | length > 0
+          - deploy_ssh_public_keys | reject('match', '^(ssh-(ed25519|rsa)|ecdsa-sha2-|sk-)') | list | length == 0
+        quiet: true
+        fail_msg: deploy_ssh_public_keys must be a non-empty list of ssh public keys (exclusive authorized_key would lock you out)
+
+    - name: Authorized keys
+      ansible.posix.authorized_key:
+        user: "{{ deploy_user }}"
+        key: "{{ deploy_ssh_public_keys | join('\n') }}"
+        exclusive: true

@@ -47,3 +47,5 @@ CLAUDE.md
 /postgres-ci/
 
 /public/brainstorm
+
+infra/ansible/.vault_pass

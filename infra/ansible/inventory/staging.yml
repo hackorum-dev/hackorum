@@ -1,0 +1,8 @@
+all:
+  children:
+    staging:
+      hosts:
+        staging.hackorum.dev:
+          ansible_host: 213.239.196.125
+          ansible_user: deploy
+          bulk_device: LABEL=bulk   # 12TB HDD, formatted by hand (README); omit on hosts without one

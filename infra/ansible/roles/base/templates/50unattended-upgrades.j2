@@ -1,0 +1,7 @@
+Unattended-Upgrade::Origins-Pattern {
+  "origin=Debian,codename=${distro_codename},label=Debian-Security";
+  "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
+};
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "{{ unattended_reboot_time }}";

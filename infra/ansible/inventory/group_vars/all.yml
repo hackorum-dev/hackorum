@@ -1,0 +1,42 @@
+# shared defaults, env-specific files override
+deploy_user: deploy
+platform_root: /srv/platform
+hackorum_root: /srv/hackorum
+bulk_root: /srv/bulk   # HDD mount when bulk_device is set, plain dir otherwise
+hackorum_dumps_root: "{{ bulk_root }}/hackorum/dumps"
+timezone: Europe/Budapest
+
+# image tags: verify with `docker manifest inspect <image>:<tag>` before first run
+images:
+  caddy: caddy:2.11.9
+  prometheus: prom/prometheus:v3.16.0
+  alertmanager: prom/alertmanager:v0.35.0
+  grafana: grafana/grafana:13.3.1
+  node_exporter: prom/node-exporter:v1.13.1
+  cadvisor: ghcr.io/google/cadvisor:v0.61.1
+  blackbox_exporter: prom/blackbox-exporter:v0.29.1
+  smartctl_exporter: prometheuscommunity/smartctl-exporter:v0.15.0
+  mailpit: axllent/mailpit:v1.34.0
+
+prometheus_retention_time: 5y
+prometheus_retention_size: 20GB
+prometheus_scrape_interval: 60s
+
+firewall_public_tcp: [22, 80, 443, 25]
+firewall_mail_submission_open: false   # phase C flips this: adds 465, 587, 993
+
+unattended_reboot_time: "04:30"
+
+deploy_ssh_public_keys: "{{ vault_deploy_ssh_public_keys }}"
+acme_email: "{{ vault_acme_email }}"
+grafana_admin_password: "{{ vault_grafana_admin_password }}"
+telegram_bot_token: "{{ vault_telegram_bot_token }}"
+telegram_chat_id: "{{ vault_telegram_chat_id }}"
+healthchecks_watchdog_url: "{{ vault_healthchecks_watchdog_url }}"
+metrics_basic_auth_user: "{{ vault_metrics_basic_auth_user }}"
+metrics_basic_auth_hash: "{{ vault_metrics_basic_auth_hash }}"
+other_host_metrics_user: "{{ vault_other_host_metrics_user }}"
+other_host_metrics_password: "{{ vault_other_host_metrics_password }}"
+staging_basic_auth_user: "{{ vault_staging_basic_auth_user | default('', true) }}"
+staging_basic_auth_hash: "{{ vault_staging_basic_auth_hash | default('', true) }}"
+ghcr_pull_token: "{{ vault_ghcr_pull_token | default('', true) }}"

@@ -1,0 +1,29 @@
+- name: Platform up
+  ansible.builtin.command:
+    cmd: docker compose -f {{ platform_root }}/compose/compose.yml up -d --remove-orphans
+  changed_when: true
+
+- name: Restart blackbox
+  ansible.builtin.command:
+    cmd: docker compose -f {{ platform_root }}/compose/compose.yml restart blackbox
+  changed_when: true
+
+- name: Restart grafana
+  ansible.builtin.command:
+    cmd: docker compose -f {{ platform_root }}/compose/compose.yml restart grafana
+  changed_when: true
+
+- name: Reload caddy
+  ansible.builtin.command:
+    cmd: docker compose -f {{ platform_root }}/compose/compose.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile
+  changed_when: true
+
+- name: Reload prometheus
+  ansible.builtin.command:
+    cmd: docker compose -f {{ platform_root }}/compose/compose.yml kill -s HUP prometheus
+  changed_when: true
+
+- name: Reload alertmanager
+  ansible.builtin.command:
+    cmd: docker compose -f {{ platform_root }}/compose/compose.yml kill -s HUP alertmanager
+  changed_when: true

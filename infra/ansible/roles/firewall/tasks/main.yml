@@ -1,0 +1,29 @@
+- name: Nftables config
+  ansible.builtin.template:
+    src: nftables.conf.j2
+    dest: /etc/nftables.conf
+    mode: "0644"
+    validate: nft -c -f %s
+  notify: Reload nftables
+
+- name: Nftables unit drop-in dir
+  ansible.builtin.file:
+    path: /etc/systemd/system/nftables.service.d
+    state: directory
+    mode: "0755"
+
+- name: Nftables unit drop-in
+  ansible.builtin.copy:
+    src: nftables-hackorum.conf
+    dest: /etc/systemd/system/nftables.service.d/hackorum.conf
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Apply systemd changes now
+  ansible.builtin.meta: flush_handlers
+
+- name: Nftables enabled
+  ansible.builtin.service:
+    name: nftables
+    enabled: true
+    state: started

@@ -1,0 +1,24 @@
+#!/usr/sbin/nft -f
+# Only our own table is flushed, docker keeps its ip/ip6 nat+filter tables.
+table inet hackorum
+flush table inet hackorum
+
+table inet hackorum {
+  set public_tcp {
+    type inet_service
+    elements = { {{ (firewall_public_tcp + ([465, 587, 993] if firewall_mail_submission_open else [])) | join(', ') }} }
+  }
+
+  chain input {
+    type filter hook input priority 0; policy drop;
+    ct state established,related accept
+    ct state invalid drop
+    iif lo accept
+    ip protocol icmp accept
+    ip6 nexthdr icmpv6 accept
+    tcp dport @public_tcp accept
+    # docker bridge traffic to the host (dns, metrics scrapes from containers)
+    iifname "docker0" accept
+    iifname "br-*" accept
+  }
+}

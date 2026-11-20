@@ -1,0 +1,31 @@
+name: Infra lint
+
+on:
+  pull_request:
+    paths: ["infra/**", ".github/workflows/infra-lint.yml"]
+  push:
+    branches: [main]
+    paths: ["infra/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/ansible
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install "ansible-core==2.22.*" "ansible-lint==26.*"
+      - run: ansible-galaxy collection install -r requirements.yml
+      - run: echo dummy > .vault_pass
+      - run: ansible-lint --offline
+      - run: |
+          for env in staging prod; do
+            ansible-playbook --syntax-check -i inventory/$env.yml playbooks/platform.yml
+          done

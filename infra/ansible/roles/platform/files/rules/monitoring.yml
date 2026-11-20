@@ -1,0 +1,14 @@
+groups:
+  - name: monitoring
+    rules:
+      - alert: TargetDown
+        expr: up{job!~"node|other_node"} == 0
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.job }} target {{ $labels.instance }} down for 5m" }
+
+      - alert: ConfigReloadFailed
+        expr: prometheus_config_last_reload_successful == 0 or alertmanager_config_last_reload_successful == 0
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.job }} config reload failed" }

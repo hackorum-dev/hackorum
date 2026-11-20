@@ -1,0 +1,31 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: telegram
+  group_by: [alertname, host]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: [alertname = Watchdog]
+      receiver: watchdog
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 5m
+
+receivers:
+  - name: telegram
+    telegram_configs:
+      - bot_token: {{ telegram_bot_token | to_json }}
+        chat_id: {{ telegram_chat_id }}
+        parse_mode: ""
+        message: |
+          [{{ '{{' }} .Status | toUpper {{ '}}' }}] {{ env_name }}: {{ '{{' }} range .Alerts {{ '}}' }}{{ '{{' }} .Annotations.summary {{ '}}' }}
+          {{ '{{' }} end {{ '}}' }}
+        send_resolved: true
+
+  - name: watchdog
+    webhook_configs:
+      - url: {{ healthchecks_watchdog_url | to_json }}
+        send_resolved: false
