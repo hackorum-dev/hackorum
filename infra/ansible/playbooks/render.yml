@@ -1,0 +1,47 @@
+# ansible-playbook -i inventory/<env>.yml playbooks/render.yml -e render_dir=$PWD/rendered
+- name: Render templates locally
+  hosts: all
+  connection: local
+  gather_facts: false
+  become: false
+  vars:
+    render_root: "{{ render_dir }}/{{ env_name }}"
+    platform_root: "{{ render_root }}/platform"
+    hackorum_root: "{{ render_root }}/hackorum"
+    bulk_root: "{{ render_root }}/bulk"
+    hackorum_dumps_root: "{{ bulk_root }}/hackorum/dumps"
+    render_only: true
+  tasks:
+    - name: Dirs
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ platform_root }}/compose"
+        - "{{ platform_root }}/caddy/sites"
+        - "{{ platform_root }}/prometheus/rules"
+        - "{{ platform_root }}/prometheus/targets"
+        - "{{ platform_root }}/alertmanager"
+        - "{{ platform_root }}/blackbox"
+        - "{{ hackorum_root }}/compose"
+        - "{{ hackorum_root }}/postgres/init"
+        - "{{ hackorum_root }}/dms/config/rspamd/override.d"
+
+    - name: Platform templates
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../roles/platform/templates/{{ item.src }}"
+        dest: "{{ platform_root }}/{{ item.dest }}"
+        mode: "0644"
+      loop:
+        - { src: compose.yml.j2, dest: compose/compose.yml }
+        - { src: Caddyfile.j2, dest: caddy/Caddyfile }
+        - { src: prometheus.yml.j2, dest: prometheus/prometheus.yml }
+        - { src: alertmanager.yml.j2, dest: alertmanager/alertmanager.yml }
+        - { src: blackbox.yml.j2, dest: blackbox/blackbox.yml }
+        - { src: rules/bulk.yml.j2, dest: prometheus/rules/bulk.yml }
+
+    - name: Hackorum templates
+      ansible.builtin.include_role:
+        name: hackorum
+        tasks_from: render

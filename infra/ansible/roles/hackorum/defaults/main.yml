@@ -1,0 +1,21 @@
+render_only: false  # noqa: var-naming[no-role-prefix]
+hackorum_compose: "{{ hackorum_root }}/compose/compose.yml"
+# vault values that must be non-empty strings (a bare `key:` in the vault renders None)
+hackorum_required_secrets:
+  - rails_master_key
+  - secret_key_base
+  - postgres_password
+  - umami_db_password
+  - umami_app_secret
+  - umami_hash_salt
+  - receiver_password
+  - app_smtp_password
+  - google_client_id
+  - google_client_secret
+hackorum_orchestrator_secrets:
+  - ci_deploy_ssh_private_key
+  - hackorum_github_token
+# caddy cert dir of mail_host (issuer pinned in the platform Caddyfile)
+hackorum_mail_cert_dir: "/caddy-certs/caddy/certificates/acme-v02.api.letsencrypt.org-directory/{{ mail_host }}"
+hackorum_mail_cert_host_dir: "{{ platform_root }}/data/caddy/caddy/certificates/acme-v02.api.letsencrypt.org-directory/{{ mail_host }}"
+hackorum_dkim_dir: "{{ hackorum_root }}/dms/config/rspamd/dkim"

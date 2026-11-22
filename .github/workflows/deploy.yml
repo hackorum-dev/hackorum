@@ -79,7 +79,7 @@ jobs:
         with:
           python-version: "3.13"
 
-      - run: pip install 'ansible-core==2.22.*'
+      - run: pip install 'ansible-core==2.22.*' passlib
       - run: ansible-galaxy collection install -r requirements.yml
 
       - name: SSH and vault secrets

@@ -11,3 +11,8 @@ other_host_name: prod
 other_host_metrics_host: metrics.hackorum.dev
 other_app_host: hackorum.dev
 other_host_enabled: false   # flip to true once the counterpart host runs platform.yml
+orchestrator_enabled: false
+dkim_selector: staging
+restore_enabled: true
+backup_enabled: false
+backup_source_host: oldprod   # hackorum.dev after cutover

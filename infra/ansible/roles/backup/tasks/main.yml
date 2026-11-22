@@ -1,0 +1,141 @@
+# names only in the message, never values
+- name: Required backup secrets are non-empty strings
+  ansible.builtin.assert:
+    that: backup_missing_secrets | length == 0
+    quiet: true
+    fail_msg: "empty, unset or not a string in the vault: {{ backup_missing_secrets | join(', ') }}"
+  vars:
+    backup_secret_names: [restic_password, storagebox_user, storagebox_host, storagebox_ssh_private_key]
+    backup_set_secrets: >-
+      {{ backup_secret_names | zip(query('vars', *backup_secret_names, default=''))
+         | selectattr('1', 'string') | selectattr('1') | map('first') | list }}
+    backup_missing_secrets: "{{ backup_secret_names | difference(backup_set_secrets) }}"
+
+- name: Dirs
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: /root/.ssh, mode: "0700" }
+    - { path: "{{ platform_root }}/restic", mode: "0700" }
+    - { path: "{{ bulk_root }}/restic-cache", mode: "0700" }
+
+- name: Restic env
+  ansible.builtin.template:
+    src: restic.env.j2
+    dest: "{{ platform_root }}/restic/restic.env"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Storage box ssh key
+  ansible.builtin.copy:
+    content: "{{ storagebox_ssh_private_key | trim }}\n"
+    dest: /root/.ssh/storagebox
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Storage box ssh config
+  ansible.builtin.blockinfile:
+    path: /root/.ssh/config
+    create: true
+    owner: root
+    group: root
+    mode: "0600"
+    marker: "# {mark} hackorum storagebox"
+    block: "{{ lookup('ansible.builtin.template', 'ssh_config.j2') }}"
+
+- name: Scripts
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ platform_root }}/restic/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop: [backup.sh, monthly_dumps.sh, restore.sh, restic_check.sh]
+
+- name: Private tables list
+  ansible.builtin.copy:
+    src: private_tables.txt
+    dest: "{{ platform_root }}/restic/private_tables.txt"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Restic repo initialized?
+  ansible.builtin.shell: set -a && . {{ platform_root }}/restic/restic.env && restic cat config
+  register: backup_repo
+  changed_when: false
+  failed_when: false
+
+- name: Restic init
+  ansible.builtin.shell: set -a && . {{ platform_root }}/restic/restic.env && restic init
+  when: backup_repo.rc != 0
+  changed_when: true
+
+- name: Unit files
+  ansible.builtin.template:
+    src: hackorum-backup.service.j2
+    dest: /etc/systemd/system/hackorum-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Backup systemd daemon-reload
+
+- name: Restore unit file
+  ansible.builtin.template:
+    src: hackorum-restore.service.j2
+    dest: /etc/systemd/system/hackorum-restore.service
+    owner: root
+    group: root
+    mode: "0644"
+  when: restore_enabled
+  notify: Backup systemd daemon-reload
+
+- name: Static unit files
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - hackorum-backup.timer
+    - hackorum-restic-check.service
+    - hackorum-restic-check.timer
+    - hackorum-monthly-dumps.service
+    - hackorum-monthly-dumps.timer
+    - hackorum-restore.timer
+  notify: Backup systemd daemon-reload
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Backup timers
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: "{{ backup_enabled }}"
+    state: "{{ 'started' if backup_enabled else 'stopped' }}"
+  loop: [hackorum-backup.timer, hackorum-restic-check.timer, hackorum-monthly-dumps.timer]
+
+- name: Restore timer
+  ansible.builtin.systemd:
+    name: hackorum-restore.timer
+    enabled: "{{ restore_enabled }}"
+    state: "{{ 'started' if restore_enabled else 'stopped' }}"
+
+# a disabled job keeps its last textfile forever: stale alerts or a fake green
+- name: Stale backup metrics gone
+  ansible.builtin.file:
+    path: "{{ platform_root }}/textfile/backup.prom"
+    state: absent
+  when: not backup_enabled
+
+- name: Stale restore metrics gone
+  ansible.builtin.file:
+    path: "{{ platform_root }}/textfile/restore.prom"
+    state: absent
+  when: not restore_enabled

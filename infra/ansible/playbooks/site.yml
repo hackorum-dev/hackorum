@@ -1,0 +1,10 @@
+- name: Full converge
+  hosts: all
+  become: true
+  roles:
+    - { role: base, tags: [base] }
+    - { role: firewall, tags: [firewall] }
+    - { role: docker, tags: [docker] }
+    - { role: platform, tags: [platform] }
+    - { role: hackorum, tags: [hackorum, deploy] }
+    - { role: backup, tags: [backup] }

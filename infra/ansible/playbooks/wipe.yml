@@ -1,0 +1,113 @@
+# ansible-playbook -i inventory/staging.yml playbooks/wipe.yml -e confirm_wipe=<inventory hostname>
+- name: Wipe and rebuild the app layer (staging only)
+  hosts: all
+  become: true
+  vars:
+    wipe_dkim_dir: "{{ hackorum_root }}/dms/config/rspamd/dkim"
+    wipe_dkim_keep: "{{ platform_root }}/restic/dkim-keep"
+  pre_tasks:
+    - name: Guard
+      ansible.builtin.assert:
+        that:
+          - env_name == 'staging'
+          - confirm_wipe is defined and confirm_wipe == inventory_hostname
+        fail_msg: "wipe is staging only and needs -e confirm_wipe=<inventory hostname>"
+
+    - name: Wipe marker (restore timer skips while this is fresh)
+      ansible.builtin.file:
+        path: "{{ platform_root }}/restic/.wipe-in-progress"
+        state: touch
+        mode: "0644"
+
+    - name: Stop hackorum.service
+      ansible.builtin.systemd:
+        name: hackorum
+        state: stopped
+      failed_when: false
+
+    - name: Remove containers, volumes, images of the app project
+      ansible.builtin.command:
+        cmd: docker compose -f {{ hackorum_root }}/compose/compose.yml down -v --rmi all --remove-orphans
+        removes: "{{ hackorum_root }}/compose/compose.yml"
+      changed_when: true
+      failed_when: false
+
+    - name: No app containers left
+      ansible.builtin.command:
+        cmd: docker ps -aq --filter label=com.docker.compose.project=hackorum
+      register: wipe_left
+      changed_when: false
+      failed_when: wipe_left.rc != 0 or wipe_left.stdout | length > 0
+
+    # a new key each drill would break DKIM until DNS is updated
+    - name: DKIM key present?
+      ansible.builtin.stat:
+        path: "{{ wipe_dkim_dir }}"
+      register: wipe_dkim
+
+    - name: Old DKIM copy gone
+      ansible.builtin.file:
+        path: "{{ wipe_dkim_keep }}"
+        state: absent
+      when: wipe_dkim.stat.isdir | default(false)
+
+    - name: DKIM copy dir
+      ansible.builtin.file:
+        path: "{{ wipe_dkim_keep }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+      when: wipe_dkim.stat.isdir | default(false)
+
+    - name: Keep DKIM key outside the app layer
+      ansible.builtin.command:
+        argv: [cp, -a, "{{ wipe_dkim_dir }}", "{{ wipe_dkim_keep }}/"]
+      changed_when: true
+      when: wipe_dkim.stat.isdir | default(false)
+
+    - name: Delete the app layer
+      ansible.builtin.file:
+        path: "{{ hackorum_root }}"
+        state: absent
+
+    # also after a wipe that failed past the delete: the copy is the only one left
+    - name: DKIM copy present?
+      ansible.builtin.stat:
+        path: "{{ wipe_dkim_keep }}/dkim"
+      register: wipe_dkim_kept
+
+    - name: Rspamd config dir
+      ansible.builtin.file:
+        path: "{{ wipe_dkim_dir | dirname }}"
+        state: directory
+        mode: "0755"
+      when: wipe_dkim_kept.stat.isdir | default(false)
+
+    - name: DKIM key back (role then skips generation)
+      ansible.builtin.command:
+        argv: [cp, -a, "{{ wipe_dkim_keep }}/dkim", "{{ wipe_dkim_dir | dirname }}/"]
+      changed_when: true
+      when: wipe_dkim_kept.stat.isdir | default(false)
+
+  roles:
+    - { role: hackorum, tags: [hackorum] }
+    - { role: backup, tags: [backup] }
+
+  post_tasks:
+    - name: Restore
+      ansible.builtin.command:
+        cmd: "{{ platform_root }}/restic/restore.sh"
+      environment:
+        CALLED_FROM_WIPE: "1"
+      register: restore
+      changed_when: true
+
+    - name: Remove wipe marker
+      ansible.builtin.file:
+        path: "{{ platform_root }}/restic/.wipe-in-progress"
+        state: absent
+
+    - name: Result
+      ansible.builtin.debug:
+        msg: "{{ restore.stdout_lines[-1] }}"

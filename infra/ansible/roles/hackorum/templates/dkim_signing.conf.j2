@@ -1,0 +1,12 @@
+# DMS default has use_esld = true: staging.<domain> would look for a key named after the parent
+# domain. Sign with the exact From domain and one fixed selector.
+enabled = true;
+sign_authenticated = true;
+sign_local = false;
+use_domain = "header";
+use_redis = false;
+use_esld = false;
+allow_username_mismatch = true;
+check_pubkey = false;
+selector = "{{ dkim_selector }}";
+path = "/tmp/docker-mailserver/rspamd/dkim/$domain-$selector.private";

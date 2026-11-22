@@ -1,0 +1,2 @@
+{{ receiver_user }}@{{ mail_domain }}|{SHA512-CRYPT}{{ receiver_password | password_hash('sha512', (receiver_password | hash('sha1'))[:16]) }}
+{{ app_smtp_user }}@{{ mail_domain }}|{SHA512-CRYPT}{{ app_smtp_password | password_hash('sha512', (app_smtp_password | hash('sha1'))[:16]) }}

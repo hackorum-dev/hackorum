@@ -1,0 +1,7 @@
+[Unit]
+Description=hackorum restic check
+
+[Service]
+Type=oneshot
+ExecStart=/srv/platform/restic/restic_check.sh
+Nice=10

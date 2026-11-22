@@ -1,0 +1,10 @@
+# plain imap for imap_worker_local on the compose network (port 143 is not published)
+ssl = yes
+auth_allow_cleartext = yes
+{% if env_name == 'staging' %}
+namespace inbox {
+  mailbox INBOX {
+    autoexpunge = 30d
+  }
+}
+{% endif %}

@@ -1,0 +1,87 @@
+- name: Compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ hackorum_compose }}"
+    mode: "0644"
+
+- name: Env file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ hackorum_root }}/compose/.env"
+    mode: "0600"
+
+- name: Postgresql.conf
+  ansible.builtin.template:
+    src: postgresql.conf.j2
+    dest: "{{ hackorum_root }}/postgres/postgresql.conf"
+    mode: "0644"
+  register: hackorum_pg_conf
+
+- name: Postgres init scripts
+  ansible.builtin.copy:
+    src: "pg-init/{{ item }}"
+    dest: "{{ hackorum_root }}/postgres/init/{{ item }}"
+    mode: "0755"
+  loop: [01_pg_stat_statements.sql, 02_create_umami_db.sh]
+
+- name: Postgres_exporter queries
+  ansible.builtin.copy:
+    src: postgres_exporter_queries.yml
+    dest: "{{ hackorum_root }}/postgres/exporter_queries.yml"
+    mode: "0644"
+  notify: Hackorum restart postgres_exporter
+
+- name: Caddy site snippet (platform layer)
+  ansible.builtin.template:
+    src: hackorum.caddy.j2
+    dest: "{{ platform_root }}/caddy/sites/hackorum.caddy"
+    mode: "0644"
+  notify: Hackorum reload caddy
+
+- name: Prometheus targets (platform layer, file_sd picks them up)
+  ansible.builtin.template:
+    src: prometheus-targets.yml.j2
+    dest: "{{ platform_root }}/prometheus/targets/hackorum.yml"
+    mode: "0644"
+
+- name: Mailserver env
+  ansible.builtin.template:
+    src: mail.env.j2
+    dest: "{{ hackorum_root }}/compose/mail.env"
+    mode: "0644"
+
+- name: Mailserver accounts
+  ansible.builtin.template:
+    src: postfix-accounts.cf.j2
+    dest: "{{ hackorum_root }}/dms/config/postfix-accounts.cf"
+    group: "{{ omit if render_only else 'hackorum-mail' }}"
+    mode: "0640"
+  no_log: true
+
+- name: Mailserver aliases
+  ansible.builtin.template:
+    src: postfix-virtual.cf.j2
+    dest: "{{ hackorum_root }}/dms/config/postfix-virtual.cf"
+    group: "{{ omit if render_only else 'hackorum-mail' }}"
+    mode: "0644"
+
+- name: Dovecot override
+  ansible.builtin.template:
+    src: dovecot.cf.j2
+    dest: "{{ hackorum_root }}/dms/config/dovecot.cf"
+    group: "{{ omit if render_only else 'hackorum-mail' }}"
+    mode: "0644"
+
+- name: Rspamd multimap override
+  ansible.builtin.copy:
+    src: multimap.conf
+    dest: "{{ hackorum_root }}/dms/config/rspamd/override.d/multimap.conf"
+    group: "{{ omit if render_only else 'hackorum-mail' }}"
+    mode: "0644"
+
+- name: Rspamd dkim signing
+  ansible.builtin.template:
+    src: dkim_signing.conf.j2
+    dest: "{{ hackorum_root }}/dms/config/rspamd/override.d/dkim_signing.conf"
+    group: "{{ omit if render_only else 'hackorum-mail' }}"
+    mode: "0644"

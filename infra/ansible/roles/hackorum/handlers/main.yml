@@ -1,0 +1,11 @@
+- name: Hackorum restart postgres_exporter
+  ansible.builtin.command:
+    cmd: docker compose -f {{ hackorum_compose }} restart postgres_exporter
+  changed_when: true
+  when: not render_only
+
+- name: Hackorum reload caddy
+  ansible.builtin.command:
+    cmd: docker compose -f {{ platform_root }}/compose/compose.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile
+  changed_when: true
+  when: not render_only

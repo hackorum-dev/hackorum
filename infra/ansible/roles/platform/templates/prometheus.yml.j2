@@ -54,6 +54,7 @@ scrape_configs:
 
   # the local app layer (plan 3) drops targets here; the other host is scraped via the other_* jobs
   - job_name: file_sd
+    honor_labels: true
     file_sd_configs:
       - files: ["/etc/prometheus/targets/*.yml"]
         refresh_interval: 1m

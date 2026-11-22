@@ -2,6 +2,6 @@ all:
   children:
     prod:
       hosts:
-        hackorum.dev:  # bulk_device: LABEL=bulk moves here with the box at promotion
+        hackorum.dev:  # bulk_device, puma_workers, pg_ram_gb move here with the box at promotion
           ansible_host: 203.0.113.20
           ansible_user: deploy

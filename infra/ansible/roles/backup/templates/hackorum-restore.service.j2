@@ -1,0 +1,7 @@
+[Unit]
+Description=hackorum nightly restore drill (staging)
+After=hackorum.service
+
+[Service]
+Type=oneshot
+ExecStart={{ platform_root }}/restic/restore.sh --from-host {{ backup_source_host }}

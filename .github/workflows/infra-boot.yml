@@ -1,0 +1,58 @@
+name: Infra boot
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  boot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - run: pip install 'ansible-core==2.22.*' passlib
+      - run: ansible-galaxy collection install -r infra/ansible/requirements.yml
+
+      - name: Render
+        working-directory: infra/ansible
+        run: |
+          echo dummy > .vault_pass
+          ansible-playbook -i inventory/ci.yml playbooks/render.yml -e "render_dir=$GITHUB_WORKSPACE/rendered"
+
+      - name: Build image
+        run: docker build -t ghcr.io/hackorum-dev/hackorum:ci .
+
+      - name: Boot db and web
+        working-directory: rendered/ci/hackorum/compose
+        run: |
+          docker network create edge
+          docker compose up -d --wait db
+          docker compose run --rm --no-deps web bin/rails db:prepare
+          docker compose up -d web jobs
+
+      - name: Check /up and /metrics
+        run: |
+          for i in $(seq 1 30); do
+            curl -fs http://127.0.0.1:3000/up && break
+            sleep 5
+          done
+          curl -fs http://127.0.0.1:3000/up
+          curl -fs http://127.0.0.1:3000/metrics | grep -q hackorum_solid_queue_ready_jobs
+
+      - name: Logs on failure
+        if: failure()
+        working-directory: rendered/ci/hackorum/compose
+        run: docker compose logs --tail=200
+
+      - name: Teardown
+        if: always()
+        working-directory: rendered/ci/hackorum/compose
+        run: docker compose down -v || true

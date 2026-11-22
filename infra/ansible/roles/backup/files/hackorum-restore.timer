@@ -1,0 +1,9 @@
+[Unit]
+Description=hackorum nightly restore drill timer
+
+[Timer]
+OnCalendar=Mon..Sat 04:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

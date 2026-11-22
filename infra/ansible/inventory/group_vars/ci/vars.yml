@@ -1,0 +1,26 @@
+# boot check in CI, rendered only, never deployed
+env_name: ci
+app_host: ci.hackorum.test
+mail_host: mail.ci.hackorum.test
+mail_domain: ci.hackorum.test
+grafana_host: grafana.ci.hackorum.test
+metrics_host: metrics.ci.hackorum.test
+mailpit_enabled: false
+staging_basic_auth: false
+other_host_name: none
+other_host_metrics_host: metrics.ci.hackorum.test
+other_app_host: ci.hackorum.test
+other_host_enabled: false
+orchestrator_enabled: false
+dkim_selector: ci
+restore_enabled: false
+backup_enabled: false
+backup_source_host: none
+puma_workers: 1
+pg_ram_gb: 4
+image_tag: ci
+
+# production.rb reads these from credentials otherwise
+ci_ar_primary_key: ciprimarykey0123456789abcdef0123
+ci_ar_deterministic_key: cideterministic0123456789abcdef0
+ci_ar_salt: cisalt0123456789abcdef0123456789

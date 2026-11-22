@@ -1,0 +1,206 @@
+name: hackorum
+
+x-log: &log
+  driver: local
+  options: { max-size: "20m", max-file: "15", compress: "true" }
+
+x-app: &app
+  image: ${APP_IMAGE}:${IMAGE_TAG}
+  env_file: .env
+  logging: *log
+  group_add: ["1500"]
+  volumes:
+    - {{ hackorum_root }}/dms/config:/dms-config
+  networks: [default, edge]
+  depends_on:
+    db:
+      condition: service_healthy
+  restart: unless-stopped
+  labels: { autoheal: "true" }
+
+services:
+  web:
+    <<: *app
+    logging:
+      driver: local
+      options: { max-size: "250m", max-file: "100", compress: "true" }
+    ports: ["127.0.0.1:3000:3000"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:3000/up || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # no ps in the image: scan /proc, [x] keeps grep from matching itself
+  jobs:
+    <<: *app
+    command: ["bin/jobs"]
+    healthcheck:
+      test: ["CMD-SHELL", "grep -qs '[s]olid-queue-' /proc/[0-9]*/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  imap_worker_local:
+    <<: *app
+    command: ["bundle", "exec", "ruby", "script/imap_idle.rb"]
+    environment:
+      IMAP_HOST: mailserver
+      IMAP_PORT: "143"
+      IMAP_SSL: "false"
+      IMAP_USERNAME: {{ receiver_user }}@{{ mail_domain }}
+      IMAP_PASSWORD: ${RECEIVER_PASSWORD}
+      IMAP_MAILBOX_LABEL: {{ imap_mailbox_label }}
+    depends_on:
+      db:
+        condition: service_healthy
+      mailserver:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "grep -qs '[i]map_idle[.]rb' /proc/[0-9]*/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+{% if orchestrator_enabled %}
+
+  orchestrator:
+    <<: *app
+    entrypoint: ["./bin/orchestrator-entrypoint"]
+    command: ["bin/orchestrator", "--repo", "/ci/repo", "--worktree", "/ci/worktree"]
+    environment:
+      RAILS_LOG_LEVEL: warn
+      CI_REPO_DIR: /ci/repo
+      CI_WORKTREE_DIR: /ci/worktree
+      HACKORUM_PG_REPO: /ci/repo
+      GIT_SSH_COMMAND: ssh -i /root/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new
+    volumes:
+      - {{ bulk_root }}/hackorum/ci:/ci
+      - {{ hackorum_root }}/secrets/ci_deploy_key:/run/hackorum_deploy_key:ro
+    # heartbeat mtime: a stalled git call leaves a live process, a process check misses it
+    healthcheck:
+      test: ["CMD-SHELL", "test $$(( $$(date +%s) - $$(stat -c %Y /tmp/orchestrator.heartbeat) )) -lt 600"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 300s
+{% endif %}
+
+  db:
+    image: {{ images_app.postgres }}
+    logging: *log
+    environment:
+      POSTGRES_USER: hackorum
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: hackorum
+      UMAMI_DB: umami
+      UMAMI_DB_USER: umami
+      UMAMI_DB_PASSWORD: ${UMAMI_DB_PASSWORD}
+    volumes:
+      - {{ hackorum_root }}/data/postgres:/var/lib/postgresql
+      - {{ hackorum_dumps_root }}:/dumps
+      - {{ hackorum_root }}/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - {{ hackorum_root }}/postgres/init:/docker-entrypoint-initdb.d:ro
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hackorum -d hackorum"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      # crash recovery after an unclean stop must not be killed by autoheal
+      start_period: 300s
+    stop_grace_period: 2m
+    shm_size: {{ (pg_ram_gb / 4) | round | int }}g
+    restart: unless-stopped
+    labels: { autoheal: "true" }
+
+  postgres_exporter:
+    image: {{ images_app.postgres_exporter }}
+    logging: *log
+    environment:
+      DATA_SOURCE_URI: db:5432/hackorum?sslmode=disable
+      DATA_SOURCE_USER: hackorum
+      DATA_SOURCE_PASS: ${POSTGRES_PASSWORD}
+      PG_EXPORTER_EXTEND_QUERY_PATH: /queries.yml
+    volumes:
+      - {{ hackorum_root }}/postgres/exporter_queries.yml:/queries.yml:ro
+    networks: [default, edge]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mailserver:
+    image: {{ images_app.mailserver }}
+    logging: *log
+    hostname: {{ mail_host }}
+    env_file: mail.env
+    ports: ["25:25"]
+    volumes:
+      - {{ hackorum_root }}/data/mail:/var/mail
+      - {{ hackorum_root }}/data/mail-state:/var/mail-state
+      - {{ hackorum_root }}/data/mail-logs:/var/log/mail
+      - {{ hackorum_root }}/dms/config:/tmp/docker-mailserver
+      - {{ platform_root }}/data/caddy:/caddy-certs:ro
+    networks:
+      default:
+        aliases: [{{ mail_host }}]
+    stop_grace_period: 1m
+    healthcheck:
+      test: ["CMD-SHELL", "ss -lnt | grep -q ':25 ' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # slow boot; imap_worker_local waits for healthy, early fails would abort up -d
+      start_period: 120s
+    restart: unless-stopped
+    labels: { autoheal: "true" }
+
+  postfix_exporter:
+    image: {{ images_app.postfix_exporter }}
+    logging: *log
+    command: ["--postfix.showq_path=/var/spool/postfix/public/showq", "--postfix.logfile_path=/var/log/mail/mail.log"]
+    volumes:
+      - {{ hackorum_root }}/data/mail-state/spool-postfix:/var/spool/postfix:ro
+      - {{ hackorum_root }}/data/mail-logs:/var/log/mail:ro
+    networks: [edge]
+    depends_on: [mailserver]
+    restart: unless-stopped
+
+  umami:
+    image: {{ images_app.umami }}
+    logging: *log
+    environment:
+      DATABASE_URL: ${UMAMI_DATABASE_URL}
+      APP_SECRET: ${UMAMI_APP_SECRET}
+      HASH_SALT: ${UMAMI_HASH_SALT}
+    networks: [default, edge]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    labels: { autoheal: "true" }
+
+  autoheal:
+    image: {{ images_app.autoheal }}
+    logging: *log
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+      AUTOHEAL_INTERVAL: 30
+      AUTOHEAL_START_PERIOD: 60
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  psql:
+    image: {{ images_app.postgres }}
+    logging: *log
+    entrypoint: ["psql", "${DATABASE_URL}"]
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["tools"]
+
+networks:
+  default:
+  edge:
+    external: true

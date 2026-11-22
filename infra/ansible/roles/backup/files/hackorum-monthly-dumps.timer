@@ -1,0 +1,9 @@
+[Unit]
+Description=hackorum monthly public/private dumps timer
+
+[Timer]
+OnCalendar=*-*-01 02:15:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -14,7 +14,7 @@ groups:
         annotations: { summary: "staging restore drill failed (status {{ $value }})" }
 
       - alert: RestoreDrillStale
-        expr: time() - hackorum_restore_last_run_timestamp_seconds > 26*3600
+        expr: time() - hackorum_restore_last_run_timestamp_seconds > 50*3600
         for: 10m
         labels: { severity: warning }
-        annotations: { summary: "staging restore drill has not run in 26h" }
+        annotations: { summary: "staging restore drill has not run in 50h" }

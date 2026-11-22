@@ -6,6 +6,14 @@ bulk_root: /srv/bulk   # HDD mount when bulk_device is set, plain dir otherwise
 hackorum_dumps_root: "{{ bulk_root }}/hackorum/dumps"
 timezone: Europe/Budapest
 
+puma_threads: 3
+job_concurrency: 1
+app_image: ghcr.io/hackorum-dev/hackorum
+image_tag: main   # overridden by -e image_tag=<sha> from the deploy workflow
+imap_mailbox_label: INBOX
+receiver_user: receiver
+app_smtp_user: app
+
 # image tags: verify with `docker manifest inspect <image>:<tag>` before first run
 images:
   caddy: caddy:2.11.9
@@ -18,6 +26,14 @@ images:
   smartctl_exporter: prometheuscommunity/smartctl-exporter:v0.15.0
   mailpit: axllent/mailpit:v1.34.0
 
+images_app:
+  postgres: postgres:18.7
+  mailserver: ghcr.io/docker-mailserver/docker-mailserver:17.0.0
+  umami: ghcr.io/umami-software/umami:3.5.0
+  postgres_exporter: prometheuscommunity/postgres-exporter:v0.21.1
+  postfix_exporter: ghcr.io/hsn723/postfix_exporter:0.21.2
+  autoheal: willfarrell/autoheal:1.2.0
+
 prometheus_retention_time: 5y
 prometheus_retention_size: 20GB
 prometheus_scrape_interval: 60s
@@ -25,7 +41,7 @@ prometheus_scrape_interval: 60s
 firewall_public_tcp: [22, 80, 443, 25]
 firewall_mail_submission_open: false   # phase C flips this: adds 465, 587, 993
 
-unattended_reboot_time: "04:30"
+unattended_reboot_time: "06:30"
 
 deploy_ssh_public_keys: "{{ vault_deploy_ssh_public_keys }}"
 acme_email: "{{ vault_acme_email }}"
@@ -40,3 +56,27 @@ other_host_metrics_password: "{{ vault_other_host_metrics_password }}"
 staging_basic_auth_user: "{{ vault_staging_basic_auth_user | default('', true) }}"
 staging_basic_auth_hash: "{{ vault_staging_basic_auth_hash | default('', true) }}"
 ghcr_pull_token: "{{ vault_ghcr_pull_token | default('', true) }}"
+
+rails_master_key: "{{ vault_rails_master_key }}"
+secret_key_base: "{{ vault_secret_key_base }}"
+postgres_password: "{{ vault_postgres_password }}"
+umami_db_password: "{{ vault_umami_db_password }}"
+umami_app_secret: "{{ vault_umami_app_secret }}"
+umami_hash_salt: "{{ vault_umami_hash_salt }}"
+receiver_password: "{{ vault_receiver_password }}"
+app_smtp_password: "{{ vault_app_smtp_password }}"
+google_client_id: "{{ vault_google_client_id }}"
+google_client_secret: "{{ vault_google_client_secret }}"
+restic_password: "{{ vault_restic_password }}"
+storagebox_user: "{{ vault_storagebox_user }}"
+storagebox_host: "{{ vault_storagebox_host }}"
+storagebox_ssh_private_key: "{{ vault_storagebox_ssh_private_key }}"
+healthchecks_backup_url: "{{ vault_healthchecks_backup_url }}"
+healthchecks_restore_url: "{{ vault_healthchecks_restore_url }}"
+healthchecks_monthly_url: "{{ vault_healthchecks_monthly_url }}"
+hackorum_github_token: "{{ vault_hackorum_github_token | default('', true) }}"
+ci_deploy_ssh_private_key: "{{ vault_ci_deploy_ssh_private_key | default('', true) }}"
+staging_mail_allowlist: "{{ vault_staging_mail_allowlist | default('', true) }}"
+staging_reply_override: "{{ vault_staging_reply_override | default('', true) }}"
+umami_website_id: "{{ vault_umami_website_id | default('', true) }}"
+lineage_api_token: "{{ vault_lineage_api_token | default('', true) }}"

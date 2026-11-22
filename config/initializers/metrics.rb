@@ -31,6 +31,7 @@ if Hackorum::Metrics.enabled?
       gauge :solid_queue_scheduled_jobs, comment: "Jobs scheduled for later", aggregation: :most_recent
       gauge :solid_queue_failed_jobs,    comment: "Jobs in failed executions", aggregation: :most_recent
       gauge :solid_queue_oldest_ready_seconds, comment: "Age of the oldest ready job", aggregation: :most_recent
+      gauge :imap_last_ingest_timestamp_seconds, comment: "Last IMAP message processed (unix time, 0 = none)", aggregation: :most_recent
     end
 
     collect do
@@ -48,6 +49,13 @@ if Hackorum::Metrics.enabled?
       end
     rescue ActiveRecord::StatementInvalid, ActiveRecord::ConnectionNotEstablished => e
       Rails.logger.warn("[metrics] solid queue collect failed: #{e.class}: #{e.message}")
+    end
+
+    # primary db, separate from the queue db above
+    collect do
+      hackorum.imap_last_ingest_timestamp_seconds.set({}, ImapSyncState.maximum(:updated_at).to_i)
+    rescue ActiveRecord::StatementInvalid, ActiveRecord::ConnectionNotEstablished => e
+      Rails.logger.warn("[metrics] imap collect failed: #{e.class}: #{e.message}")
     end
   end
 end

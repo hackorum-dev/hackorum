@@ -1,0 +1,38 @@
+groups:
+  - name: app
+    rules:
+      - alert: PumaBacklog
+        expr: sum by (host) (puma_backlog) > 0
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }} puma backlog above 0 for 5m" }
+      - alert: SolidQueueLatency
+        expr: hackorum_solid_queue_oldest_ready_seconds > 300
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }} oldest ready job older than 5m" }
+      # gauge, not a counter: delta, so clearing failed jobs is not read as a reset
+      - alert: SolidQueueFailures
+        expr: delta(hackorum_solid_queue_failed_jobs[1h]) > 0
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }} failed jobs in the last hour" }
+      - alert: PostgresConnectionsHigh
+        expr: sum by (host) (pg_stat_activity_count) / max by (host) (pg_settings_max_connections) > 0.8
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }} postgres connections above 80% of max" }
+      - alert: PostgresLongTransaction
+        expr: hackorum_long_tx_seconds > 600
+        for: 1m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }} transaction open longer than 10m" }
+      - alert: PostfixDeferredQueue
+        expr: postfix_showq_message_size_bytes_count{queue="deferred"} > 50
+        for: 15m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }} more than 50 deferred mails" }
+      - alert: ImapWorkerIdle
+        expr: (time() - max by (host) (hackorum_imap_last_ingest_timestamp_seconds) > 6*3600) and on() (day_of_week() > 0 and day_of_week() < 6)
+        for: 15m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }} no list mail ingested for 6h on a weekday" }

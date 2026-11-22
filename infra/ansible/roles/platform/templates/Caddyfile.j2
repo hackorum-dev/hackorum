@@ -117,6 +117,13 @@ http://:9180 {
 	reverse_proxy mailpit:8025
 }
 {% endif %}
+{% if umami_host is defined %}
+
+{{ umami_host }} {
+	import access_log
+	reverse_proxy umami:3000
+}
+{% endif %}
 {% if dumps_host is defined %}
 
 {{ dumps_host }} {
@@ -126,7 +133,11 @@ http://:9180 {
 }
 {% endif %}
 
-# only so caddy holds a cert the mailserver can reuse
+# only so caddy holds a cert the mailserver can reuse; issuer pinned so the
+# cert path is acme-v02.api.letsencrypt.org-directory (ZeroSSL would differ)
 {{ mail_host }} {
+	tls {
+		issuer acme
+	}
 	respond "mail host" 404
 }

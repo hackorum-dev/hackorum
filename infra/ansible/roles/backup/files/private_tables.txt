@@ -1,0 +1,27 @@
+# Tables that contain private user data.
+# Used to include for the private dump, and exclude for the public dump.
+activities
+admin_email_changes
+identities
+imap_sync_states
+mentions
+message_moves
+message_read_ranges
+name_reservations
+note_edits
+note_mentions
+note_tags
+notes
+outgoing_drafts
+page_load_stats
+saved_search_preferences
+saved_searches
+team_members
+teams
+thread_awarenesses
+topic_ignores
+topic_merges
+topic_stars
+user_features
+user_tokens
+users

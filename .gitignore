@@ -49,3 +49,4 @@ CLAUDE.md
 /public/brainstorm
 
 infra/ansible/.vault_pass
+rendered/

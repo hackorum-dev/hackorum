@@ -1,0 +1,29 @@
+# plaintext dummy values, not secrets
+vault_deploy_ssh_public_keys: []
+vault_acme_email: ci@ci.hackorum.test
+vault_grafana_admin_password: dummy
+vault_telegram_bot_token: dummy
+vault_telegram_chat_id: dummy
+vault_healthchecks_watchdog_url: https://hc.invalid/watchdog
+vault_healthchecks_backup_url: https://hc.invalid/backup
+vault_healthchecks_restore_url: https://hc.invalid/restore
+vault_healthchecks_monthly_url: https://hc.invalid/monthly
+vault_metrics_basic_auth_user: metrics
+vault_metrics_basic_auth_hash: "$2a$14$dummydummydummydummydummydummydummydummydummydummydummy"
+vault_other_host_metrics_user: metrics
+vault_other_host_metrics_password: dummy
+# empty = no master key: a wrong one makes AR encryption fail to decrypt credentials at boot
+vault_rails_master_key: ""
+vault_secret_key_base: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+vault_postgres_password: dummy-postgres-password
+vault_umami_db_password: dummy-umami-db-password
+vault_umami_app_secret: dummy-umami-app-secret
+vault_umami_hash_salt: dummy-umami-hash-salt
+vault_receiver_password: dummy-receiver-password
+vault_app_smtp_password: dummy-app-smtp-password
+vault_google_client_id: dummy-client-id
+vault_google_client_secret: dummy-client-secret
+vault_restic_password: dummy
+vault_storagebox_user: dummy
+vault_storagebox_host: storagebox.invalid
+vault_storagebox_ssh_private_key: dummy

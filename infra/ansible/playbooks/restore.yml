@@ -1,0 +1,23 @@
+# ansible-playbook -i inventory/<env>.yml playbooks/restore.yml [-e from_host=<name>] [-e snapshot=<id>] [-e restore_mail=0|1]
+- name: Restore app layer from restic
+  hosts: all
+  become: true
+  tasks:
+    - name: Check restore_mail
+      ansible.builtin.assert:
+        that: restore_mail is not defined or restore_mail | string in ['0', '1']
+        fail_msg: "restore_mail must be 0 or 1 (default: 1 on prod, 0 elsewhere)"
+
+    - name: Run restore.sh
+      ansible.builtin.command:
+        argv: >-
+          {{ [platform_root ~ '/restic/restore.sh']
+             + (['--from-host', from_host] if from_host is defined else [])
+             + (['--snapshot', snapshot] if snapshot is defined else []) }}
+      environment: "{{ {'RESTORE_MAIL': restore_mail | string} if restore_mail is defined else {} }}"
+      register: restore
+      changed_when: true
+
+    - name: Result
+      ansible.builtin.debug:
+        msg: "{{ restore.stdout_lines[-1] }}"

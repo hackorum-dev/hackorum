@@ -1,0 +1,10 @@
+[Unit]
+Description=hackorum weekly restic check timer
+
+[Timer]
+OnCalendar=Sat 03:00
+RandomizedDelaySec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=hackorum nightly backup
+After=hackorum.service
+
+[Service]
+Type=oneshot
+ExecStart={{ platform_root }}/restic/backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

@@ -1,0 +1,95 @@
+- name: Check secrets
+  ansible.builtin.import_tasks: assert.yml
+
+# platform's caddy/prometheus reloads (LE issuer pin for mail_host) must land before the mail cert wait
+- name: Flush platform handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Hackorum-mail group (web/jobs write dms config, mailserver reads it)
+  ansible.builtin.group:
+    name: hackorum-mail
+    gid: 1500
+
+- name: Directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0755') }}"
+  loop:
+    - { path: "{{ hackorum_root }}/compose" }
+    - { path: "{{ hackorum_root }}/postgres/init" }
+    - { path: "{{ hackorum_root }}/data/postgres", owner: "999", group: "999", mode: "0700" }
+    - { path: "{{ hackorum_root }}/data/mail-state" }
+    - { path: "{{ hackorum_root }}/dms/config", group: hackorum-mail, mode: "2775" }
+    - { path: "{{ hackorum_root }}/dms/config/rspamd", group: hackorum-mail, mode: "2775" }
+    - { path: "{{ hackorum_root }}/dms/config/rspamd/override.d", group: hackorum-mail, mode: "2775" }
+    - { path: "{{ hackorum_root }}/secrets", mode: "0700" }
+    - { path: "{{ hackorum_dumps_root }}/daily", mode: "0750" }
+    - { path: "{{ hackorum_dumps_root }}/public" }
+    - { path: "{{ hackorum_dumps_root }}/private", mode: "0750" }
+    - { path: "{{ bulk_root }}/hackorum/ci" }
+
+# create only: DMS chowns /var/mail (5000) and /var/log/mail (syslog) on every start
+- name: Mail data dirs
+  ansible.builtin.file:
+    path: "{{ hackorum_root }}/data/{{ item }}"
+    state: directory  # noqa: risky-file-permissions
+  loop: [mail, mail-logs]
+
+- name: CI deploy key
+  ansible.builtin.copy:
+    content: "{{ ci_deploy_ssh_private_key | trim }}\n"
+    dest: "{{ hackorum_root }}/secrets/ci_deploy_key"
+    mode: "0600"
+  when: orchestrator_enabled
+  no_log: true
+
+- name: Render configs
+  ansible.builtin.import_tasks: render.yml
+
+- name: Hackorum unit
+  ansible.builtin.template:
+    src: hackorum.service.j2
+    dest: /etc/systemd/system/hackorum.service
+    mode: "0644"
+
+- name: Hackorum unit enabled
+  ansible.builtin.systemd:
+    name: hackorum
+    enabled: true
+    daemon_reload: true
+
+# caddy gets it on first start of the platform layer; mailserver (manual SSL) cannot start without it
+- name: Mail cert issued by caddy
+  ansible.builtin.wait_for:
+    path: "{{ hackorum_mail_cert_host_dir }}/{{ mail_host }}.key"
+    timeout: 300
+    msg: >-
+      no Let's Encrypt cert for {{ mail_host }} after 5 min. Needs a DNS A record for {{ mail_host }}
+      pointing at this box and caddy running with the platform Caddyfile (issuer pinned to LE).
+      Check: sudo docker compose -f {{ platform_root }}/compose/compose.yml logs caddy
+  when: not render_only
+
+- name: Deploy (pull, migrate, up)
+  ansible.builtin.import_tasks: deploy.yml
+
+# after deploy: starting the unit earlier would run up -d before db:prepare
+- name: Hackorum unit started
+  ansible.builtin.systemd:
+    name: hackorum
+    state: started
+
+# up -d waits for mailserver healthy (imap_worker_local depends on it); setup needs /etc/dms-settings of a started container
+- name: DKIM key
+  ansible.builtin.command:
+    cmd: >-
+      docker compose -f {{ hackorum_compose }} exec -T mailserver
+      setup config dkim domain {{ mail_domain }} selector {{ dkim_selector }}
+    creates: "{{ hackorum_dkim_dir }}/{{ mail_domain }}-{{ dkim_selector }}.private"
+  register: hackorum_dkim
+  until: hackorum_dkim is succeeded
+  retries: 6
+  delay: 10
+  when: not render_only

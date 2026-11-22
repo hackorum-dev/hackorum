@@ -1,0 +1,8 @@
+[Unit]
+Description=hackorum monthly dumps
+After=hackorum.service
+
+[Service]
+Type=oneshot
+ExecStart=/srv/platform/restic/monthly_dumps.sh
+Nice=10

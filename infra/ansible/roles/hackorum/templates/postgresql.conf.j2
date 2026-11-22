@@ -1,0 +1,18 @@
+listen_addresses = '*'
+
+shared_buffers = {{ (pg_ram_gb * 0.25) | round | int }}GB
+effective_cache_size = {{ (pg_ram_gb * 0.6) | round | int }}GB
+work_mem = 32MB
+maintenance_work_mem = {{ [(pg_ram_gb * 0.05) | round | int, 1] | max }}GB
+
+shared_preload_libraries = 'pg_stat_statements'
+pg_stat_statements.max = 10000
+pg_stat_statements.track = all
+
+wal_level = replica
+wal_compression = on
+max_wal_size = 8GB
+min_wal_size = 2GB
+
+autovacuum_vacuum_cost_limit = 1000
+log_min_duration_statement = 2000

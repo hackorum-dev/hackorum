@@ -1,0 +1,13 @@
+# names only in the message, never values
+- name: Required secrets are non-empty strings
+  ansible.builtin.assert:
+    that: hackorum_missing_secrets | length == 0
+    quiet: true
+    fail_msg: "empty, unset or not a string in the vault: {{ hackorum_missing_secrets | join(', ') }}"
+  vars:
+    hackorum_secret_names: "{{ hackorum_required_secrets + (hackorum_orchestrator_secrets if orchestrator_enabled else []) }}"
+    hackorum_set_secrets: >-
+      {{ hackorum_secret_names | zip(query('vars', *hackorum_secret_names, default=''))
+         | selectattr('1', 'string') | selectattr('1') | map('first') | list }}
+    hackorum_missing_secrets: "{{ hackorum_secret_names | difference(hackorum_set_secrets) }}"
+  when: not render_only

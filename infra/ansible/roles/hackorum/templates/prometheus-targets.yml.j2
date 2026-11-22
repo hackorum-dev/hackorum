@@ -1,0 +1,6 @@
+- targets: ["web:3000"]
+  labels: { job: hackorum_web, host: "{{ env_name }}" }
+- targets: ["postgres_exporter:9187"]
+  labels: { job: hackorum_postgres, host: "{{ env_name }}" }
+- targets: ["postfix_exporter:9154"]
+  labels: { job: hackorum_postfix, host: "{{ env_name }}" }

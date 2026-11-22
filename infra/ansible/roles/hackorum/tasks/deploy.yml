@@ -1,0 +1,44 @@
+- name: Check secrets
+  ansible.builtin.import_tasks: assert.yml
+
+- name: Env file with image tag
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ hackorum_root }}/compose/.env"
+    mode: "0600"
+
+- name: Pull images
+  ansible.builtin.command:
+    cmd: docker compose -f {{ hackorum_compose }} pull --quiet
+  changed_when: false
+
+# bind-mounted postgresql.conf: only a new container (or restart) reads it
+- name: Start db first
+  ansible.builtin.command:
+    cmd: >-
+      docker compose -f {{ hackorum_compose }} up -d --wait
+      {{ '--force-recreate' if hackorum_pg_conf_changed else '' }} db
+  vars:
+    hackorum_pg_conf_changed: "{{ hackorum_pg_conf is defined and hackorum_pg_conf is changed }}"
+  changed_when: hackorum_pg_conf_changed
+
+# one-off inherits web's autoheal label + /up healthcheck: unlabel it or autoheal kills long migrations
+- name: Db:prepare
+  ansible.builtin.command:
+    cmd: docker compose -f {{ hackorum_compose }} run --rm --no-deps -l autoheal=false web bin/rails db:prepare
+  register: hackorum_prepare
+  changed_when: "'migrating' in hackorum_prepare.stdout or 'Created database' in hackorum_prepare.stdout"
+
+- name: Up
+  ansible.builtin.command:
+    cmd: docker compose -f {{ hackorum_compose }} up -d --remove-orphans
+  changed_when: false
+
+- name: Wait for /up
+  ansible.builtin.uri:
+    url: http://127.0.0.1:3000/up
+    status_code: 200
+  register: hackorum_up
+  until: hackorum_up.status == 200
+  retries: 24
+  delay: 5

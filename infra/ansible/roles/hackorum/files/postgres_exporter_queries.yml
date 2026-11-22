@@ -1,0 +1,11 @@
+hackorum_db_size:
+  query: "SELECT datname, pg_database_size(datname) AS bytes FROM pg_database WHERE datistemplate = false"
+  metrics:
+    - datname: { usage: "LABEL", description: "database" }
+    - bytes: { usage: "GAUGE", description: "database size in bytes" }
+hackorum_long_tx:
+  query: >-
+    SELECT coalesce(max(extract(epoch from now() - xact_start)), 0) AS seconds
+    FROM pg_stat_activity WHERE state <> 'idle' AND backend_type = 'client backend'
+  metrics:
+    - seconds: { usage: "GAUGE", description: "age of the oldest open transaction" }

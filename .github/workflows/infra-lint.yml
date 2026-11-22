@@ -21,11 +21,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - run: pip install "ansible-core==2.22.*" "ansible-lint==26.*"
+      - run: pip install "ansible-core==2.22.*" "ansible-lint==26.*" passlib
       - run: ansible-galaxy collection install -r requirements.yml
       - run: echo dummy > .vault_pass
       - run: ansible-lint --offline
       - run: |
           for env in staging prod; do
-            ansible-playbook --syntax-check -i inventory/$env.yml playbooks/platform.yml
+            for p in platform site deploy render restore wipe; do
+              ansible-playbook --syntax-check -i inventory/$env.yml playbooks/$p.yml
+            done
           done

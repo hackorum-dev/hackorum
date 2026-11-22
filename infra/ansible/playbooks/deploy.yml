@@ -1,0 +1,8 @@
+- name: Deploy app image
+  hosts: all
+  become: true
+  tasks:
+    - name: Render env and deploy
+      ansible.builtin.include_role:
+        name: hackorum
+        tasks_from: deploy

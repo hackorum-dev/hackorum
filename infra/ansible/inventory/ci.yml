@@ -1,0 +1,6 @@
+all:
+  children:
+    ci:
+      hosts:
+        ci.hackorum.test:
+          ansible_connection: local

@@ -67,7 +67,7 @@
     src: "rules/{{ item }}"
     dest: "{{ platform_root }}/prometheus/rules/{{ item }}"
     mode: "0644"
-  loop: [host.yml, site.yml, backup.yml, monitoring.yml]
+  loop: [host.yml, site.yml, backup.yml, monitoring.yml, app.yml]
   notify: Reload prometheus
 
 - name: Bulk disk rule

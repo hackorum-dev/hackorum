@@ -1,0 +1,16 @@
+[Unit]
+Description=hackorum app layer
+After=docker.service platform.service
+Wants=docker.service platform.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+WorkingDirectory={{ hackorum_root }}/compose
+ExecStart=/usr/bin/docker compose -f compose.yml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose -f compose.yml down
+TimeoutStartSec=600
+TimeoutStopSec=300
+
+[Install]
+WantedBy=multi-user.target
