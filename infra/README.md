@@ -246,7 +246,7 @@ Follow the confirmation link, repeat per list. Then `/admin/imap_sync_states` sh
 
 ## Backups
 
-Role `backup`: restic over sftp to a Hetzner Storage Box. Repo `sftp:storagebox:/hackorum-restic`, config in
+Role `backup`: restic over sftp to a Hetzner Storage Box. Repo `sftp:storagebox:hackorum-restic` (relative: inside the Storage Box home dir, its root is not writable), config in
 `/srv/platform/restic/restic.env` (0600), restic cache on the HDD (`/srv/bulk/restic-cache`).
 
 ### Storage Box setup (once)

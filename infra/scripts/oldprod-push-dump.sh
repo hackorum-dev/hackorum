@@ -9,7 +9,7 @@
 #     (Ubuntu 22.04 ships 0.12), then use the static binary from the GitHub release.
 #  3. Copy the storagebox ssh key to /root/.ssh/storagebox (0600) and add the Host block
 #     (see infra/ansible/roles/backup/templates/ssh_config.j2) to /root/.ssh/config.
-#  4. /root/oldprod-restic.env (0600): RESTIC_REPOSITORY=sftp:storagebox:/hackorum-restic
+#  4. /root/oldprod-restic.env (0600): RESTIC_REPOSITORY=sftp:storagebox:hackorum-restic
 #     and RESTIC_PASSWORD=<restic_password from the vault>.
 #  5. Install this file as /root/oldprod-push-dump.sh (0755), adjust OLD_DEPLOY_DIR, run it
 #     once by hand, confirm `restic snapshots --host oldprod`, then cron:

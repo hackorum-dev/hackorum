@@ -69,7 +69,9 @@
   ansible.builtin.shell: set -a && . {{ platform_root }}/restic/restic.env && restic cat config
   register: backup_repo
   changed_when: false
-  failed_when: false
+  failed_when:
+    - backup_repo.rc != 0
+    - "'Is there a repository at the following location' not in backup_repo.stderr"
 
 - name: Restic init
   ansible.builtin.shell: set -a && . {{ platform_root }}/restic/restic.env && restic init
