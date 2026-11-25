@@ -20,6 +20,7 @@ class User < ApplicationRecord
   has_many :outgoing_drafts, dependent: :destroy
   has_many :user_features, dependent: :destroy
   has_many :api_tokens, dependent: :destroy
+  has_one :mailbox, dependent: :destroy
 
   enum :mention_restriction, { anyone: "anyone", teammates_only: "teammates_only" }, default: :anyone
 
@@ -88,6 +89,7 @@ class User < ApplicationRecord
   validates :password, presence: true, confirmation: true, length: { minimum: MIN_PASSWORD_LENGTH },
                        on: [ :registration, :password_change ]
   validate :username_available_in_reservations
+  validate :password_differs_from_mail_password, on: :password_change
 
   before_save :release_old_username_reservation
   after_save :reserve_username
@@ -128,7 +130,7 @@ class User < ApplicationRecord
   def username_available_in_reservations
     return if username.blank? || !will_save_change_to_username?
 
-    if NameReservation.reserved?(username)
+    if NameReservation.reserved?(username) || NameReservation.role_name?(username)
       errors.add(:username, "is reserved")
       return
     end
@@ -137,21 +139,48 @@ class User < ApplicationRecord
     existing = NameReservation.find_by(name: normalized)
     return unless existing
     return if existing.owner_type == "User" && existing.owner_id == id
+    return if held_by_own_address?(existing)
 
     errors.add(:username, "is already taken")
   end
 
   def release_old_username_reservation
     return unless will_save_change_to_username?
-    NameReservation.release_for(self) if username_was.present?
+    return if username_was.blank?
+    old = NameReservation.normalize(username_was)
+    address = own_address(old)
+    if address && NameReservation.exists?(name: old, owner_type: "User", owner_id: id)
+      NameReservation.transfer!(name: old, to: address)
+    else
+      NameReservation.release_for(self)
+    end
   end
 
   def reserve_username
-    return if username.blank?
-    NameReservation.reserve!(name: username, owner: self)
+    return if username.blank? || !saved_change_to_username?
+    name = NameReservation.normalize(username)
+    existing = NameReservation.find_by(name: name)
+    if existing && held_by_own_address?(existing)
+      NameReservation.transfer!(name: name, to: self)
+    else
+      NameReservation.reserve!(name: username, owner: self)
+    end
+  end
+
+  def own_address(name)
+    mailbox&.addresses&.find_by(local_part: name)
+  end
+
+  def held_by_own_address?(reservation)
+    reservation.owner_type == "MailboxAddress" && own_address(reservation.name)&.id == reservation.owner_id
   end
 
   def release_name_reservation
     NameReservation.release_for(self)
+  end
+
+  def password_differs_from_mail_password
+    return if password.blank? || mailbox.nil?
+    errors.add(:password, "must differ from your mail password") if MailPasswordHash.matches?(mailbox.password_hash, password)
   end
 end

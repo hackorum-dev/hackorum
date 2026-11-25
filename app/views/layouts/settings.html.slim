@@ -24,6 +24,10 @@
       = link_to drafts_path, class: settings_nav_link_class(:my_emails) do
         i.fas.fa-paper-plane
         span My emails
+      - if current_user&.mailbox
+        = link_to settings_mailbox_path, class: settings_nav_link_class(:mailbox) do
+          i.fas.fa-inbox
+          span Mailbox
       = link_to settings_api_tokens_path, class: settings_nav_link_class(:api_tokens) do
         i.fas.fa-key
         span API tokens

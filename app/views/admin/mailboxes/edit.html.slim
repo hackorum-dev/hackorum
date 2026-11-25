@@ -1,0 +1,49 @@
+- content_for :title, "Admin — Edit Mailbox"
+
+.settings-page
+  h1 = "Mailbox of #{@mailbox.user.username}"
+
+  p
+    | Login:
+    = " "
+    code = mailbox_address_label(@mailbox.login_local_part)
+
+  = form_with model: @mailbox, url: admin_mailbox_path(@mailbox), method: :patch, local: true do |f|
+    - if @mailbox.errors.any?
+      .flash-alert
+        ul
+          - @mailbox.errors.full_messages.each do |msg|
+            li = msg
+
+    .form-group
+      = f.label :quota_mb, "Quota (MB)"
+      = f.number_field :quota_mb, required: true, class: "form-input"
+
+    = f.submit "Save", class: "button-primary"
+
+  h2 Aliases
+
+  - aliases = @mailbox.alias_addresses
+  - if aliases.any?
+    .email-table-wrap
+      table.email-table
+        thead
+          tr
+            th Address
+            th Actions
+        tbody
+          - aliases.each do |address|
+            tr
+              td
+                code = mailbox_address_label(address.local_part)
+              td
+                = button_to "Remove", admin_mailbox_address_path(@mailbox, address), method: :delete, class: "button-danger-secondary button-small", form: { data: { turbo_confirm: "Remove #{mailbox_address_label(address.local_part)}?" } }
+  - else
+    p No aliases yet.
+
+  = form_with url: admin_mailbox_addresses_path(@mailbox), method: :post, local: true do |f|
+    .form-group
+      = f.label :local_part, "New alias"
+      = f.text_field :local_part, required: true, class: "form-input"
+
+    = f.submit "Add alias", class: "button-primary"

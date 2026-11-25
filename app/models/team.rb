@@ -50,7 +50,7 @@ class Team < ApplicationRecord
   def name_available_in_reservations
     return if name.blank? || !will_save_change_to_name?
 
-    if NameReservation.reserved?(name)
+    if NameReservation.reserved?(name) || NameReservation.role_name?(name)
       errors.add(:name, "is reserved")
       return
     end

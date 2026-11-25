@@ -1,0 +1,47 @@
+- content_for :title, "Admin — Mailboxes"
+
+.settings-page
+  h1
+    | Mailboxes
+    span.settings-page-count = "(#{@mailboxes.size})"
+
+  .saved-searches-actions
+    = link_to "New mailbox", new_admin_mailbox_path, class: "button-primary"
+
+  - if @mailboxes.any?
+    .email-table-wrap
+      table.email-table
+        thead
+          tr
+            th User
+            th Login
+            th Aliases
+            th Quota
+            th State
+            th Actions
+        tbody
+          - @mailboxes.each do |mailbox|
+            - login = mailbox.addresses.find(&:login?)
+            tr
+              td = mailbox.user.deleted_at ? "Deleted user" : mailbox.user.username
+              td
+                code = mailbox_address_label(login&.local_part)
+              td
+                - aliases = mailbox.addresses.reject(&:login?).sort_by(&:local_part)
+                - if aliases.any?
+                  - aliases.each do |a|
+                    div
+                      code = mailbox_address_label(a.local_part)
+                - else
+                  | -
+              td = number_to_human_size(mailbox.quota_mb.megabytes)
+              td = mailbox.disabled? || mailbox.user.deleted_at ? "disabled" : "active"
+              td
+                = link_to "Edit", edit_admin_mailbox_path(mailbox), class: "button-secondary button-small"
+                - if mailbox.disabled?
+                  = button_to "Enable", enable_admin_mailbox_path(mailbox), method: :post, class: "button-secondary button-small"
+                  = link_to "Delete", confirm_destroy_admin_mailbox_path(mailbox), class: "button-danger-secondary button-small"
+                - else
+                  = button_to "Disable", disable_admin_mailbox_path(mailbox), method: :post, class: "button-secondary button-small", form: { data: { turbo_confirm: "Disable mailbox #{login&.local_part}?" } }
+  - else
+    p No mailboxes yet.

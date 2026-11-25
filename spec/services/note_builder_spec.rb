@@ -23,6 +23,14 @@ RSpec.describe NoteBuilder do
     expect(Activity.find_by(user: mentioned_user, subject: note).activity_type).to eq("note_mentioned")
   end
 
+  it "treats an address name like an unknown mention" do
+    owner = create(:user, username: "mbxowner")
+    Mailbox.grant!(user: owner, login: "mbxowner").add_alias("zsolt.parragi")
+    expect {
+      described_class.new(author: author).create!(topic:, message:, body: "Ping @zsolt.parragi")
+    }.to raise_error(NoteBuilder::Error, "Unknown mention: @zsolt.parragi")
+  end
+
   it "updates mentions and hides removed recipients" do
     bob = create(:user, username: "bob")
     devs = create(:team, name: "devs")

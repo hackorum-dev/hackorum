@@ -1,0 +1,66 @@
+- content_for :title, "Settings - Mailbox"
+
+.settings-page
+  h1 Mailbox
+
+  - if @mailbox.disabled?
+    p.settings-hint This mailbox is disabled.
+
+  .settings-section
+    h2 Addresses
+    ul
+      li
+        code = mailbox_address_label(@mailbox.login_local_part)
+        |  (login)
+      - @mailbox.alias_addresses.each do |address|
+        li
+          code = mailbox_address_label(address.local_part)
+
+  .settings-section
+    h2 Connection settings
+    - if MailConfig.available? && MailConfig.host.present?
+      ul
+        li
+          | IMAP:
+          = " "
+          code = "#{MailConfig.host} port 993 (SSL/TLS)"
+        li
+          | SMTP:
+          = " "
+          code = "#{MailConfig.host} port 465 (SSL/TLS) or 587 (STARTTLS)"
+        li
+          | Username:
+          = " "
+          code = mailbox_address_label(@mailbox.login_local_part)
+        - if MailConfig.webmail_host.present?
+          li
+            | Webmail:
+            = " "
+            = link_to "https://#{MailConfig.webmail_host}", "https://#{MailConfig.webmail_host}"
+    - else
+      p Mail is not available on this server.
+
+  - unless @mailbox.disabled?
+    - if @generated_password
+      .settings-section
+        h2 New mail password
+        p.settings-hint Copy it now. It is not stored and will not be shown again.
+        .form-group
+          = label_tag :generated_mail_password, "New mail password"
+          = text_field_tag :generated_mail_password, @generated_password, readonly: true, autofocus: true, autocomplete: "off", spellcheck: false, name: nil, class: "api-token-value"
+
+    .settings-section
+      h2 Set mail password
+      p.settings-hint 12 to 128 characters, different from your site password.
+      = form_with url: settings_mailbox_path, method: :patch, local: true, data: { turbo: false } do
+        .form-group
+          = label_tag :password, "New mail password"
+          = password_field_tag :password, nil, required: true, autocomplete: "new-password"
+        .form-group
+          = label_tag :password_confirmation, "Confirm new mail password"
+          = password_field_tag :password_confirmation, nil, required: true, autocomplete: "new-password"
+        = submit_tag "Set mail password", class: "button-primary"
+
+    .settings-section
+      h2 Generate a password
+      = button_to "Generate password", generate_settings_mailbox_path, method: :post, class: "button-primary", form: { data: { turbo: false }, onsubmit: "return confirm('Replace the current mail password? Mail clients using the old one stop working.')" }

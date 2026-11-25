@@ -13,6 +13,9 @@ production:
   clear_solid_queue_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
     schedule: every hour at minute 12
+  mail_config_render:
+    class: MailConfigRenderJob
+    schedule: every hour
   reset_stale_sending_drafts:
     class: ResetStaleSendingDraftsJob
     schedule: every 5 minutes

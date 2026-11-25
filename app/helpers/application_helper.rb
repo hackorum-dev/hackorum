@@ -1,4 +1,8 @@
 module ApplicationHelper
+  def mailbox_address_label(local_part)
+    "#{local_part}@#{MailConfig.domain}"
+  end
+
   def meta_title
     base = if content_for?(:meta_title)
       content_for(:meta_title)

@@ -45,6 +45,16 @@ RSpec.describe 'Password reset', type: :request do
     expect(user.reload.authenticate('newsecret')).to be_truthy
   end
 
+  it 'refuses a new password equal to the mail password' do
+    user = create(:user, password: 'oldsecret', password_confirmation: 'oldsecret')
+    Mailbox.grant!(user: user, login: 'resetter').change_password('mail secret one')
+    _, raw = UserToken.issue!(purpose: 'reset_password', user: user, email: 'x@example.com', ttl: 30.minutes)
+
+    patch password_path, params: { token: raw, password: 'mail secret one', password_confirmation: 'mail secret one' }
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(user.reload.authenticate('oldsecret')).to be_truthy
+  end
+
   it 'invalidates other reset tokens once one is used' do
     user = create(:user, password: 'oldsecret', password_confirmation: 'oldsecret')
     _, first = UserToken.issue!(purpose: 'reset_password', user: user, email: 'x@example.com', ttl: 30.minutes)

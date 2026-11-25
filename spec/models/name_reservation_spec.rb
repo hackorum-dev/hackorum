@@ -35,5 +35,37 @@ RSpec.describe NameReservation, type: :model do
       expect(team).not_to be_valid
       expect(team.errors[:name]).to include("is reserved")
     end
+
+    it "blocks system mail names everywhere" do
+      %w[receiver app noreply postmaster dmarc mailer-daemon].each do |name|
+        expect(described_class.reserved?(name)).to be(true)
+        expect(build(:user, username: name)).not_to be_valid
+        expect(build(:team, name: name)).not_to be_valid
+      end
+    end
+
+    it "blocks role names for users and teams but lets reserve! take them" do
+      expect(described_class.role_name?(" Info ")).to be(true)
+      expect(described_class.reserved?("info")).to be(false)
+      user = build(:user, username: "info")
+      expect(user).not_to be_valid
+      expect(user.errors[:username]).to include("is reserved")
+      expect(build(:team, name: "Security").tap(&:valid?).errors[:name]).to include("is reserved")
+      expect { described_class.reserve!(name: "info", owner: create(:user)) }.not_to raise_error
+    end
+
+    it "leaves an existing holder of a role name alone" do
+      user = create(:user)
+      user.update_columns(username: "admin")
+      user.reload
+      expect(user.update(aware_before: Time.current)).to be(true)
+    end
+
+    it "leaves an existing holder of a system name alone" do
+      user = create(:user)
+      user.update_columns(username: "postmaster")
+      user.reload
+      expect(user.update(aware_before: Time.current)).to be(true)
+    end
   end
 end

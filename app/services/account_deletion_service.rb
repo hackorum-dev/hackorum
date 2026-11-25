@@ -13,6 +13,7 @@ class AccountDeletionService
     person = user.person
 
     ActiveRecord::Base.transaction do
+      disable_mailbox
       delete_account_data
       delete_notes
       handle_aliases(person)
@@ -29,6 +30,12 @@ class AccountDeletionService
   private
 
   attr_reader :user
+
+  def disable_mailbox
+    mailbox = user.mailbox
+    return unless mailbox
+    mailbox.update!(disabled_at: Time.current, password_hash: MailPasswordHash.create(SecureRandom.alphanumeric(32)))
+  end
 
   def delete_account_data
     OutgoingDraft.where(user_id: user.id).delete_all

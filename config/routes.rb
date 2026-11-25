@@ -31,6 +31,14 @@ Rails.application.routes.draw do
     resources :page_load_stats, only: [ :index ]
     resources :outgoing_messages, only: [ :index ]
     resources :mailing_lists, only: [ :index, :new, :create, :edit, :update ]
+    resources :mailboxes, only: [ :index, :new, :create, :edit, :update, :destroy ] do
+      member do
+        post :disable
+        post :enable
+        get :confirm_destroy
+      end
+      resources :addresses, only: [ :create, :destroy ], controller: "mailbox_addresses"
+    end
     resources :global_tags, only: [ :index, :new, :create, :edit, :update, :destroy ] do
       member do
         post :retire
@@ -130,6 +138,9 @@ Rails.application.routes.draw do
     resource :import, only: [ :show, :create ]
     resource :deletion, only: [ :show, :create ]
     resources :saved_searches
+    resource :mailbox, only: [ :show, :update ] do
+      post :generate
+    end
     resources :api_tokens, only: [ :index, :create, :destroy ]
     resources :saved_search_preferences, only: [ :create ] do
       post :set_default, on: :collection

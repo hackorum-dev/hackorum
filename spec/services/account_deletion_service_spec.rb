@@ -87,4 +87,24 @@ RSpec.describe AccountDeletionService do
     expect(ApiToken.where(user_id: user.id)).to be_empty
     expect(other.reload).to have_attributes(created_via_token_id: nil, last_edited_via_token_id: nil)
   end
+
+  it "disables the mailbox and keeps its names" do
+    user = create(:user, username: "dutow")
+    mailbox = Mailbox.grant!(user: user, login: "dutow")
+    mailbox.add_alias("zsolt.parragi")
+    described_class.new(user).call
+    expect(mailbox.reload).to be_disabled
+    expect(NameReservation.where(name: %w[dutow zsolt.parragi]).count).to eq(2)
+  end
+
+  it "replaces the mail password hash" do
+    user = create(:user, username: "dutow")
+    mailbox = Mailbox.grant!(user: user, login: "dutow")
+    mailbox.change_password("a long mail password")
+    old = mailbox.reload.password_hash
+    described_class.new(user).call
+    expect(mailbox.reload.password_hash).not_to eq(old)
+    expect(MailPasswordHash.matches?(mailbox.password_hash, "a long mail password")).to be(false)
+    expect(mailbox.password_hash).to start_with(MailPasswordHash::PREFIX)
+  end
 end

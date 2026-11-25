@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_11_15_110200) do
+ActiveRecord::Schema[8.0].define(version: 2026_11_25_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -366,6 +366,27 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_15_110200) do
     t.index ["requested_by_run_id"], name: "index_lineage_rechecks_on_requested_by_run_id"
     t.index ["topic_id", "commit_id"], name: "index_lineage_rechecks_open", unique: true, where: "(done_at IS NULL)"
     t.index ["topic_id"], name: "index_lineage_rechecks_on_topic_id"
+  end
+
+  create_table "mailbox_addresses", force: :cascade do |t|
+    t.bigint "mailbox_id", null: false
+    t.string "local_part", null: false
+    t.boolean "login", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["local_part"], name: "index_mailbox_addresses_on_local_part", unique: true
+    t.index ["mailbox_id"], name: "index_mailbox_addresses_on_mailbox_id"
+    t.index ["mailbox_id"], name: "index_mailbox_addresses_one_login", unique: true, where: "login"
+  end
+
+  create_table "mailboxes", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "password_hash", null: false
+    t.integer "quota_mb", default: 5120, null: false
+    t.datetime "disabled_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_mailboxes_on_user_id", unique: true
   end
 
   create_table "mailing_lists", force: :cascade do |t|
@@ -1267,6 +1288,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_15_110200) do
   add_foreign_key "lineage_rechecks", "commits"
   add_foreign_key "lineage_rechecks", "patchset_runs", column: "requested_by_run_id", on_delete: :nullify
   add_foreign_key "lineage_rechecks", "topics"
+  add_foreign_key "mailbox_addresses", "mailboxes"
+  add_foreign_key "mailboxes", "users"
   add_foreign_key "mentions", "aliases"
   add_foreign_key "mentions", "messages"
   add_foreign_key "mentions", "people"

@@ -241,4 +241,26 @@ RSpec.describe User, type: :model do
       end
     end
   end
+
+  describe "mail password clash" do
+    let(:user) { create(:user, username: "mailuser") }
+
+    it "refuses a site password equal to the mail password" do
+      mailbox = grant_mailbox(user: user, login: "mailuser")
+      mailbox.change_password("shared mail secret")
+      user.reload.assign_attributes(password: "shared mail secret", password_confirmation: "shared mail secret")
+      expect(user.save(context: :password_change)).to be(false)
+      expect(user.errors[:password]).to include("must differ from your mail password")
+    end
+
+    it "allows other passwords and users without a mailbox" do
+      grant_mailbox(user: user, login: "mailuser").change_password("shared mail secret")
+      user.reload.assign_attributes(password: "something else", password_confirmation: "something else")
+      expect(user.save(context: :password_change)).to be(true)
+
+      other = create(:user)
+      other.assign_attributes(password: "shared mail secret", password_confirmation: "shared mail secret")
+      expect(other.save(context: :password_change)).to be(true)
+    end
+  end
 end

@@ -19,6 +19,15 @@ RSpec.describe 'Session invalidation', type: :request do
     expect(response).to redirect_to(new_session_path)
   end
 
+  it 'refuses a site password equal to the mail password' do
+    mailbox = Mailbox.grant!(user: user, login: 'mailer')
+    mailbox.change_password('mail secret one')
+    patch settings_update_current_password_path, params: { current_password: 'oldsecret', password: 'mail secret one', password_confirmation: 'mail secret one' }
+    expect(response).to redirect_to(settings_password_path)
+    expect(flash[:alert]).to include('must differ from your mail password')
+    expect(user.reload.authenticate('oldsecret')).to be_truthy
+  end
+
   it 'keeps the session that changed the password' do
     patch settings_update_current_password_path, params: { current_password: 'oldsecret', password: 'newsecret1', password_confirmation: 'newsecret1' }
     expect(response).to redirect_to(settings_password_path)

@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 class NameReservation < ApplicationRecord
-  RESERVED_NAMES = %w[global].freeze
+  RESERVED_NAMES = %w[global receiver app noreply postmaster dmarc mailer-daemon].freeze
+  ROLE_NAMES = %w[abuse admin contact hostmaster info security support webmaster].freeze
 
   validates :name, presence: true, uniqueness: true
   validates :owner_type, presence: true
@@ -28,12 +29,23 @@ class NameReservation < ApplicationRecord
     end
   end
 
+  def self.transfer!(name:, to:)
+    raise ArgumentError, "Owner must be persisted" unless to && to.id
+    record = find_by!(name: normalize(name))
+    record.update!(owner_type: to.class.name, owner_id: to.id)
+    record
+  end
+
   def self.release_for(owner)
     where(owner_type: owner.class.name, owner_id: owner.id).delete_all
   end
 
   def self.reserved?(name)
     RESERVED_NAMES.include?(normalize(name))
+  end
+
+  def self.role_name?(name)
+    ROLE_NAMES.include?(normalize(name))
   end
 
   def self.normalize(str)

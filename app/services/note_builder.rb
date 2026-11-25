@@ -91,7 +91,7 @@ class NoteBuilder
   def resolve_mentions(names, owner:)
     return [] if names.empty?
 
-    reservations = NameReservation.where(name: names).index_by(&:name)
+    reservations = NameReservation.where(name: names, owner_type: %w[User Team]).index_by(&:name)
     missing = names - reservations.keys
     raise Error, "Unknown mention: @#{missing.first}" if missing.any?
 

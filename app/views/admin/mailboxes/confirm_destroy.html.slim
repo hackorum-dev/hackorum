@@ -1,0 +1,29 @@
+- content_for :title, "Admin — Delete Mailbox"
+
+- login_label = mailbox_address_label(@mailbox.login_local_part)
+
+.settings-page
+  h1 Delete mailbox
+
+  p = "User: #{@mailbox.user.username}"
+  p
+    | Login:
+    = " "
+    code = login_label
+  - aliases = @mailbox.alias_addresses
+  - if aliases.any?
+    p Aliases:
+    ul
+      - aliases.each do |address|
+        li
+          code = mailbox_address_label(address.local_part)
+
+  p Remove its maildir on the mail server first (see infra/README.md), or the next owner of this login gets the old mail.
+  - if MailConfig.domain.present?
+    p
+      | Maildir:
+      = " "
+      code = "/var/mail/#{MailConfig.domain}/#{@mailbox.login_local_part}/"
+
+  = button_to "Delete mailbox #{login_label}", admin_mailbox_path(@mailbox), method: :delete, class: "button-danger-secondary"
+  = link_to "Cancel", admin_mailboxes_path, class: "button-secondary"
