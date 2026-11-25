@@ -15,6 +15,8 @@
              + (['--from-host', from_host] if from_host is defined else [])
              + (['--snapshot', snapshot] if snapshot is defined else []) }}
       environment: "{{ {'RESTORE_MAIL': restore_mail | string} if restore_mail is defined else {} }}"
+      async: 10800
+      poll: 30
       register: restore
       changed_when: true
 
