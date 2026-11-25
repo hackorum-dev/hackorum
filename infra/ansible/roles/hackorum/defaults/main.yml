@@ -10,6 +10,7 @@ hackorum_required_secrets:
   - umami_hash_salt
   - receiver_password
   - app_smtp_password
+  - roundcube_des_key
   - google_client_id
   - google_client_secret
 hackorum_orchestrator_secrets:

@@ -1,0 +1,8 @@
+rates {
+  user = {
+    bucket = { burst = {{ mail_user_rate_limit }}; rate = "{{ mail_user_rate_limit }} / 1h"; }
+  }
+}
+whitelisted_user = ["{{ app_smtp_user }}@{{ mail_domain }}"];
+# default is any postmaster/mailer-daemon recipient, which lets one extra rcpt skip the limit
+whitelisted_rcpts = ["postmaster@{{ mail_domain }}"];

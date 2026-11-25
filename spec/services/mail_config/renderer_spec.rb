@@ -23,25 +23,52 @@ RSpec.describe MailConfig::Renderer do
     expect(read("postfix-accounts.cf")).to eq(<<~EOS)
       receiver@hackorum.test|{SHA512-CRYPT}$6$r
       app@hackorum.test|{SHA512-CRYPT}$6$a
-      dutow@hackorum.test|#{dutow.password_hash}
       zed@hackorum.test|#{zed.password_hash}
+      dutow@hackorum.test|#{dutow.password_hash}
     EOS
     expect(read("postfix-virtual.cf")).to eq(<<~EOS)
       dmarc@hackorum.test ops@example.com
       info@hackorum.test dutow@hackorum.test
       zsolt.parragi@hackorum.test dutow@hackorum.test
     EOS
-    expect(read("dovecot-quotas.cf")).to eq("dutow@hackorum.test:2048M\nzed@hackorum.test:5120M\n")
+    expect(read("dovecot-quotas.cf")).to eq("zed@hackorum.test:5120M\ndutow@hackorum.test:2048M\n")
     expect(read("sender-login.map")).to eq(<<~EOS)
       receiver@hackorum.test receiver@hackorum.test
       app@hackorum.test app@hackorum.test
+      zed@hackorum.test zed@hackorum.test
       dutow@hackorum.test dutow@hackorum.test
       info@hackorum.test dutow@hackorum.test
       zsolt.parragi@hackorum.test dutow@hackorum.test
-      zed@hackorum.test zed@hackorum.test
     EOS
     expect(File.stat(File.join(dir, "postfix-accounts.cf")).mode & 0o777).to eq(0o640)
     expect(File.stat(File.join(dir, "postfix-virtual.cf")).mode & 0o777).to eq(0o644)
+  end
+
+  # the mailserver looks accounts and quotas up with an unanchored grep and takes the first hit
+  it "puts a login before every other login its pattern can match" do
+    %w[brian ian a-b a.b xa.b].each { |l| grant_mailbox(login: l) }
+    render
+    order = %w[a.b a-b ian xa.b brian]
+    expect(read("postfix-accounts.cf").lines.drop(2).map { |l| l.split("@").first }).to eq(order)
+    expect(read("dovecot-quotas.cf").lines.map { |l| l.split("@").first }).to eq(order)
+    order.each do |login|
+      first_hit = read("postfix-accounts.cf").lines.drop(2).find { |l| l.match?(/#{login}@hackorum.test/) }
+      expect(first_hit).to start_with("#{login}@"), login
+      expect(read("dovecot-quotas.cf").lines.find { |l| l.match?(/#{login}@hackorum.test:/i) }).to start_with("#{login}@"), login
+    end
+  end
+
+  it "does not render a mailbox whose login an unanchored match would mix up with a system account" do
+    fragment("postfix-accounts.system.cf", "receiver@hackorum.test|x\nlistrx@hackorum.test|y\n")
+    grant_mailbox(login: "rx")
+    grant_mailbox(login: "mylistrx")
+    grant_mailbox(login: "zed")
+    expect(Rails.logger).to receive(:error).with(/rx@hackorum.test/).ordered
+    expect(Rails.logger).to receive(:error).with(/mylistrx@hackorum.test/).ordered
+    render
+    expect(read("postfix-accounts.cf").lines.map { |l| l.split("@").first }).to eq(%w[receiver listrx zed])
+    expect(read("dovecot-quotas.cf")).to eq("zed@hackorum.test:5120M\n")
+    expect(read("sender-login.map")).not_to match(/^(my)?(list)?rx@.* (rx|mylistrx)@/)
   end
 
   it "renders only the system part without mailboxes" do

@@ -6,10 +6,12 @@ set -a; . "$(dirname "$0")/restic.env"; set +a
 
 FROM_HOST="${BACKUP_SOURCE_HOST:-}"
 SNAPSHOT="latest"
+MAIL_SNAPSHOT=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --from-host) FROM_HOST="$2"; shift 2 ;;
     --snapshot) SNAPSHOT="$2"; shift 2 ;;
+    --mail-snapshot) MAIL_SNAPSHOT="$2"; shift 2 ;;
     *) echo "unknown arg $1" >&2; exit 2 ;;
   esac
 done
@@ -24,6 +26,16 @@ START=$(date +%s)
 STOPPED=0
 DROPPED=0
 SILENCE=""
+
+# stdin: restic snapshots --json; stdout: short id of the newest one, empty for none
+PICK_NEWEST='
+import json, re, sys
+from datetime import datetime
+def when(s):
+    return datetime.fromisoformat(re.sub(r"(\.\d{6})\d+", r"\1", s["time"]).replace("Z", "+00:00"))
+snaps = json.load(sys.stdin)
+print(max(snaps, key=when)["short_id"] if snaps else "")
+'
 
 ping() { curl -fsS -m 10 --retry 3 -o /dev/null "$HEALTHCHECKS_RESTORE_URL$1" || true; }
 am() { docker compose -f "$PLATFORM_ROOT/compose/compose.yml" exec -T alertmanager amtool --alertmanager.url=http://localhost:9093 "$@"; }
@@ -57,11 +69,12 @@ fi
 ping /start
 trap 'fail "$BASH_COMMAND"' ERR
 # prints just the silence id (amtool 0.35 has no -q on add)
-SILENCE=$(am silence add 'alertname=~"SiteProbeFailing|TargetDown|SmtpBannerDown|ImapWorkerIdle"' \
+SILENCE=$(am silence add 'alertname=~"SiteProbeFailing|TargetDown|SmtpBannerDown|MailTlsPortDown|WebmailDown|ImapWorkerIdle"' \
   --duration=3h --author=restore.sh --comment="restore in progress" || true)
 
 # an explicit snapshot id is already unique, --host only narrows "latest"
-SNAP_ARGS=(--host "$FROM_HOST")
+# the hourly mail snapshots of the same host have no dumps
+SNAP_ARGS=(--host "$FROM_HOST" --tag nightly)
 [ "$SNAPSHOT" = latest ] || SNAP_ARGS=()
 # fail before touching anything if the snapshot is not there
 if [ "$SNAPSHOT" = latest ]; then
@@ -70,6 +83,14 @@ if [ "$SNAPSHOT" = latest ]; then
 else
   restic cat --retry-lock 30m snapshot "$SNAPSHOT" >/dev/null
 fi
+# mail comes from the newest snapshot that has it (the hourly ones are newer than the nightly)
+if [ "$RESTORE_MAIL" = 1 ] && [ -z "$MAIL_SNAPSHOT" ] && [ "$SNAPSHOT" != latest ]; then
+  MAIL_SNAPSHOT="$SNAPSHOT"
+fi
+if [ "$RESTORE_MAIL" = 1 ] && [ -z "$MAIL_SNAPSHOT" ]; then
+  MAIL_SNAPSHOT=$(restic snapshots --retry-lock 30m --host "$FROM_HOST" --path "$HACKORUM_MAIL_DATA" --json | python3 -c "$PICK_NEWEST")
+  [ -n "$MAIL_SNAPSHOT" ] || { echo "no snapshot with $HACKORUM_MAIL_DATA for host $FROM_HOST" >&2; false; }
+fi
 
 # download and validate everything first: apps keep running meanwhile
 $COMPOSE up -d --wait db
@@ -77,7 +98,8 @@ mkdir -p "$DUMPS"
 TMP=$(mktemp -d "$HACKORUM_DUMPS_ROOT/restore.XXXX")
 restic restore --retry-lock 30m "$SNAPSHOT" "${SNAP_ARGS[@]}" --target "$TMP" --include "$DUMPS"
 if [ "$RESTORE_MAIL" = 1 ]; then
-  restic restore --retry-lock 30m "$SNAPSHOT" "${SNAP_ARGS[@]}" --target "$TMP" --include "$HACKORUM_ROOT/data/mail" --include "$HACKORUM_ROOT/dms"
+  restic restore --retry-lock 30m "$MAIL_SNAPSHOT" --target "$TMP" --include "$HACKORUM_MAIL_DATA"
+  restic restore --retry-lock 30m "$SNAPSHOT" "${SNAP_ARGS[@]}" --target "$TMP" --include "$HACKORUM_ROOT/dms"
 fi
 for db in hackorum umami; do
   [ -s "$TMP$DUMPS/$db.dump" ] || { echo "snapshot has no $db.dump" >&2; false; }
@@ -92,8 +114,8 @@ STOPPED=1
 $COMPOSE stop $APPS
 if [ "$RESTORE_MAIL" = 1 ]; then
   $COMPOSE stop mailserver
-  mkdir -p "$HACKORUM_ROOT/data/mail" "$HACKORUM_ROOT/dms"
-  rsync -a --delete "$TMP$HACKORUM_ROOT/data/mail/" "$HACKORUM_ROOT/data/mail/"
+  mkdir -p "$HACKORUM_MAIL_DATA" "$HACKORUM_ROOT/dms"
+  rsync -a --delete "$TMP$HACKORUM_MAIL_DATA/" "$HACKORUM_MAIL_DATA/"
   rsync -a "$TMP$HACKORUM_ROOT/dms/" "$HACKORUM_ROOT/dms/"
 fi
 mv -f "$TMP$DUMPS/hackorum.dump" "$TMP$DUMPS/umami.dump" "$DUMPS/"
@@ -125,6 +147,8 @@ for i in $(seq 1 24); do
   [ "$i" = 24 ] && fail "web did not come up"
   sleep 5
 done
+# the restored db has other mailboxes than the files on disk; after the apps are up, a failure here must not leave them down
+$COMPOSE exec -T web bin/rails mail:render
 
 unsilence
 metric 0

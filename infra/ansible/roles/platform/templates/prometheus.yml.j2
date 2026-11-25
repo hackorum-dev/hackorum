@@ -51,6 +51,30 @@ scrape_configs:
       - { source_labels: [__address__], target_label: __param_target }
       - { source_labels: [__param_target], target_label: instance }
       - { target_label: __address__, replacement: "blackbox:9115" }
+{% if firewall_mail_submission_open | bool %}
+
+  - job_name: blackbox_mail_tls
+    metrics_path: /probe
+    params: { module: [tls_connect] }
+    static_configs:
+      - targets: ["{{ mail_host }}:465", "{{ mail_host }}:993"]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: __param_target }
+      - { source_labels: [__param_target], target_label: instance }
+      - { target_label: __address__, replacement: "blackbox:9115" }
+{% endif %}
+{% if webmail_host is defined %}
+
+  - job_name: blackbox_webmail
+    metrics_path: /probe
+    params: { module: [http_webmail] }
+    static_configs:
+      - targets: ["https://{{ webmail_host }}/"]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: __param_target }
+      - { source_labels: [__param_target], target_label: instance }
+      - { target_label: __address__, replacement: "blackbox:9115" }
+{% endif %}
 
   # the local app layer (plan 3) drops targets here; the other host is scraped via the other_* jobs
   - job_name: file_sd

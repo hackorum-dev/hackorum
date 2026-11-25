@@ -55,7 +55,7 @@
     owner: root
     group: root
     mode: "0755"
-  loop: [backup.sh, monthly_dumps.sh, restore.sh, restic_check.sh]
+  loop: [backup.sh, mail_backup.sh, monthly_dumps.sh, restore.sh, restic_check.sh]
 
 - name: Private tables list
   ansible.builtin.copy:
@@ -80,11 +80,12 @@
 
 - name: Unit files
   ansible.builtin.template:
-    src: hackorum-backup.service.j2
-    dest: /etc/systemd/system/hackorum-backup.service
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
     owner: root
     group: root
     mode: "0644"
+  loop: [hackorum-backup.service, hackorum-mail-backup.service]
   notify: Backup systemd daemon-reload
 
 - name: Restore unit file
@@ -106,6 +107,7 @@
     mode: "0644"
   loop:
     - hackorum-backup.timer
+    - hackorum-mail-backup.timer
     - hackorum-restic-check.service
     - hackorum-restic-check.timer
     - hackorum-monthly-dumps.service
@@ -121,7 +123,7 @@
     name: "{{ item }}"
     enabled: "{{ backup_enabled }}"
     state: "{{ 'started' if backup_enabled else 'stopped' }}"
-  loop: [hackorum-backup.timer, hackorum-restic-check.timer, hackorum-monthly-dumps.timer]
+  loop: [hackorum-backup.timer, hackorum-mail-backup.timer, hackorum-restic-check.timer, hackorum-monthly-dumps.timer]
 
 - name: Restore timer
   ansible.builtin.systemd:
@@ -132,8 +134,9 @@
 # a disabled job keeps its last textfile forever: stale alerts or a fake green
 - name: Stale backup metrics gone
   ansible.builtin.file:
-    path: "{{ platform_root }}/textfile/backup.prom"
+    path: "{{ platform_root }}/textfile/{{ item }}"
     state: absent
+  loop: [backup.prom, mail_backup.prom]
   when: not backup_enabled
 
 - name: Stale restore metrics gone

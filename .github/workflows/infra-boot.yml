@@ -27,6 +27,12 @@ jobs:
           echo dummy > .vault_pass
           ansible-playbook -i inventory/ci.yml playbooks/render.yml -e "render_dir=$GITHUB_WORKSPACE/rendered"
 
+      - name: Rspamd from owner rule
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q luajit
+          luajit infra/ansible/roles/hackorum/files/tests/from_owner_test.lua rendered/ci/hackorum/dms/rspamd-lua/from_owner.lua
+
       - name: Build image
         run: docker build -t ghcr.io/hackorum-dev/hackorum:ci .
 
@@ -46,6 +52,16 @@ jobs:
           done
           curl -fs http://127.0.0.1:3000/up
           curl -fs http://127.0.0.1:3000/metrics | grep -q hackorum_solid_queue_ready_jobs
+
+      - name: Mail config render
+        working-directory: rendered/ci/hackorum
+        run: |
+          cmp dms/config/postfix-accounts.system.cf dms/config/postfix-accounts.cf
+          docker compose -f compose/compose.yml exec -T web bin/rails mail:render
+          grep -q '^receiver@ci.hackorum.test|' dms/config/postfix-accounts.cf
+          grep -q '^app@ci.hackorum.test|' dms/config/postfix-accounts.cf
+          grep -qx 'receiver@ci.hackorum.test receiver@ci.hackorum.test' dms/config/sender-login.map
+          test -f dms/config/dovecot-quotas.cf
 
       - name: Logs on failure
         if: failure()

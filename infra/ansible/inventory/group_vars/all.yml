@@ -4,6 +4,7 @@ platform_root: /srv/platform
 hackorum_root: /srv/hackorum
 bulk_root: /srv/bulk   # HDD mount when bulk_device is set, plain dir otherwise
 hackorum_dumps_root: "{{ bulk_root }}/hackorum/dumps"
+hackorum_mail_data: "{{ hackorum_root }}/data/mail"
 timezone: Europe/Budapest
 
 puma_threads: 3
@@ -33,13 +34,16 @@ images_app:
   postgres_exporter: prometheuscommunity/postgres-exporter:v0.21.1
   postfix_exporter: ghcr.io/hsn723/postfix_exporter:0.21.2
   autoheal: willfarrell/autoheal:1.2.0
+  webmail: roundcube/roundcubemail:1.7.7-apache
 
 prometheus_retention_time: 5y
 prometheus_retention_size: 20GB
 prometheus_scrape_interval: 60s
 
 firewall_public_tcp: [22, 80, 443, 25]
-firewall_mail_submission_open: false   # phase C flips this: adds 465, 587, 993
+firewall_mail_submission_open: true   # 465, 587, 993: firewall set and mailserver ports
+mail_fail2ban_enabled: true
+mail_user_rate_limit: 100   # recipients per hour per login, the app account is exempt
 
 unattended_reboot_time: "06:30"
 
@@ -65,6 +69,7 @@ umami_app_secret: "{{ vault_umami_app_secret }}"
 umami_hash_salt: "{{ vault_umami_hash_salt }}"
 receiver_password: "{{ vault_receiver_password }}"
 app_smtp_password: "{{ vault_app_smtp_password }}"
+roundcube_des_key: "{{ vault_roundcube_des_key | default('', true) }}"
 google_client_id: "{{ vault_google_client_id }}"
 google_client_secret: "{{ vault_google_client_secret }}"
 restic_password: "{{ vault_restic_password }}"
@@ -74,6 +79,7 @@ storagebox_ssh_private_key: "{{ vault_storagebox_ssh_private_key }}"
 healthchecks_backup_url: "{{ vault_healthchecks_backup_url }}"
 healthchecks_restore_url: "{{ vault_healthchecks_restore_url }}"
 healthchecks_monthly_url: "{{ vault_healthchecks_monthly_url }}"
+healthchecks_mail_backup_url: "{{ vault_healthchecks_mail_backup_url | default('', true) }}"
 hackorum_github_token: "{{ vault_hackorum_github_token | default('', true) }}"
 ci_deploy_ssh_private_key: "{{ vault_ci_deploy_ssh_private_key | default('', true) }}"
 staging_mail_allowlist: "{{ vault_staging_mail_allowlist | default('', true) }}"

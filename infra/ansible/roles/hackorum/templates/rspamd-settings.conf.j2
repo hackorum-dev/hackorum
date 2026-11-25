@@ -1,0 +1,9 @@
+# DMS limits authenticated mail to the dkim group, these symbols have to run for it too
+authenticated {
+    priority = high;
+    authenticated = yes;
+    apply {
+        groups_enabled = [dkim];
+        symbols_enabled = [FROM_OWNER_CHECK, RATELIMIT_CHECK, RATELIMIT_UPDATE];
+    }
+}

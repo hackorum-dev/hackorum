@@ -2,6 +2,7 @@ env_name: prod
 app_host: hackorum.dev
 mail_host: mail.hackorum.dev
 mail_domain: hackorum.dev
+webmail_host: webmail.hackorum.dev
 grafana_host: grafana.hackorum.dev
 metrics_host: metrics.hackorum.dev
 mailpit_enabled: false

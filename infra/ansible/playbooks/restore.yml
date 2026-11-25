@@ -1,4 +1,4 @@
-# ansible-playbook -i inventory/<env>.yml playbooks/restore.yml [-e from_host=<name>] [-e snapshot=<id>] [-e restore_mail=0|1]
+# ansible-playbook -i inventory/<env>.yml playbooks/restore.yml [-e from_host=<name>] [-e snapshot=<id>] [-e mail_snapshot=<id>] [-e restore_mail=0|1]
 - name: Restore app layer from restic
   hosts: all
   become: true
@@ -13,7 +13,8 @@
         argv: >-
           {{ [platform_root ~ '/restic/restore.sh']
              + (['--from-host', from_host] if from_host is defined else [])
-             + (['--snapshot', snapshot] if snapshot is defined else []) }}
+             + (['--snapshot', snapshot] if snapshot is defined else [])
+             + (['--mail-snapshot', mail_snapshot] if mail_snapshot is defined else []) }}
       environment: "{{ {'RESTORE_MAIL': restore_mail | string} if restore_mail is defined else {} }}"
       async: 10800
       poll: 30

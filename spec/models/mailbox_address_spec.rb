@@ -22,6 +22,16 @@ RSpec.describe MailboxAddress, type: :model do
     expect(mailbox.add_alias(" Zsolt.Parragi ").local_part).to eq("zsolt.parragi")
   end
 
+  it "refuses a login that the mailserver's unanchored account match would mix up with a system account" do
+    %w[iver p a.p myapp xreceiver].each do |login|
+      owner = create(:user, username: "owner#{login.delete('.')}")
+      expect { Mailbox.grant!(user: owner, login: login) }
+        .to raise_error(ActiveRecord::RecordInvalid, /conflicts with a system mail account/), login
+    end
+    %w[apple pat receivers].each { |login| expect(grant_mailbox(login: login)).to be_persisted, login }
+    expect(mailbox.add_alias("myapp")).to be_persisted
+  end
+
   it "rejects system names, allows role names" do
     expect(mailbox.add_alias("postmaster").errors[:local_part]).to include("is reserved")
     expect(mailbox.add_alias("security")).to be_persisted

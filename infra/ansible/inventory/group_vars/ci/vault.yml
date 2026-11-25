@@ -21,6 +21,7 @@ vault_umami_app_secret: dummy-umami-app-secret
 vault_umami_hash_salt: dummy-umami-hash-salt
 vault_receiver_password: dummy-receiver-password
 vault_app_smtp_password: dummy-app-smtp-password
+vault_roundcube_des_key: 0123456789abcdef01234567
 vault_google_client_id: dummy-client-id
 vault_google_client_secret: dummy-client-secret
 vault_restic_password: dummy

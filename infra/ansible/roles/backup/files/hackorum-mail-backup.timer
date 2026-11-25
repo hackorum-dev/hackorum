@@ -1,0 +1,9 @@
+[Unit]
+Description=hackorum hourly mail backup timer
+
+[Timer]
+OnCalendar=*-*-* *:30:00
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

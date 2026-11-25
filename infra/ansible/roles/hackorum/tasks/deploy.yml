@@ -42,3 +42,9 @@
   until: hackorum_up.status == 200
   retries: 24
   delay: 5
+
+- name: Mail config render
+  ansible.builtin.command:
+    cmd: docker compose -f {{ hackorum_compose }} exec -T web bin/rails mail:render
+  register: hackorum_mail_render
+  changed_when: hackorum_mail_render.stdout | trim not in ['unchanged', 'skipped']

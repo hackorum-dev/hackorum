@@ -134,12 +134,16 @@ services:
     logging: *log
     hostname: {{ mail_host }}
     env_file: mail.env
-    ports: ["25:25"]
+{% if mail_fail2ban_enabled | bool %}
+    cap_add: [NET_ADMIN]
+{% endif %}
+    ports: ["25:25"{% if firewall_mail_submission_open | bool %}, "465:465", "587:587", "993:993"{% endif %}]
     volumes:
-      - {{ hackorum_root }}/data/mail:/var/mail
+      - {{ hackorum_mail_data }}:/var/mail
       - {{ hackorum_root }}/data/mail-state:/var/mail-state
       - {{ hackorum_root }}/data/mail-logs:/var/log/mail
       - {{ hackorum_root }}/dms/config:/tmp/docker-mailserver
+      - {{ hackorum_root }}/dms/rspamd-lua/from_owner.lua:/etc/rspamd/lua.local.d/from_owner.lua:ro
       - {{ platform_root }}/data/caddy:/caddy-certs:ro
     networks:
       default:
@@ -166,6 +170,29 @@ services:
     depends_on: [mailserver]
     restart: unless-stopped
 
+{% if webmail_host is defined %}
+  webmail:
+    image: {{ images_app.webmail }}
+    logging: *log
+    environment:
+      ROUNDCUBEMAIL_DEFAULT_HOST: ssl://{{ mail_host }}
+      ROUNDCUBEMAIL_DEFAULT_PORT: "993"
+      ROUNDCUBEMAIL_SMTP_SERVER: tls://{{ mail_host }}
+      ROUNDCUBEMAIL_SMTP_PORT: "587"
+      ROUNDCUBEMAIL_DB_TYPE: sqlite
+      ROUNDCUBEMAIL_USERNAME_DOMAIN: {{ mail_domain }}
+      # 50 MB message limit after base64
+      ROUNDCUBEMAIL_UPLOAD_MAX_FILESIZE: 36M
+      ROUNDCUBEMAIL_DES_KEY: ${ROUNDCUBE_DES_KEY}
+    volumes:
+      - {{ hackorum_root }}/data/roundcube:/var/roundcube/db
+    networks: [default, edge]
+    depends_on:
+      mailserver:
+        condition: service_healthy
+    restart: unless-stopped
+
+{% endif %}
   umami:
     image: {{ images_app.umami }}
     logging: *log

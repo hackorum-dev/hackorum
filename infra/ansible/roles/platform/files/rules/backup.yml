@@ -7,6 +7,12 @@ groups:
         labels: { severity: critical }
         annotations: { summary: "{{ $labels.host }} last successful backup older than 26h" }
 
+      - alert: MailBackupStale
+        expr: time() - hackorum_mail_backup_last_success_timestamp_seconds > 3*3600
+        for: 10m
+        labels: { severity: critical }
+        annotations: { summary: "{{ $labels.host }} last successful hourly mail backup older than 3h" }
+
       - alert: RestoreDrillFailed
         expr: hackorum_restore_last_status != 0
         for: 10m

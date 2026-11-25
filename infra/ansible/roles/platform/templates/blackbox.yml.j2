@@ -11,3 +11,16 @@ modules:
     tcp:
       query_response:
         - expect: "^220 "
+  tls_connect:
+    prober: tcp
+    timeout: 10s
+    tcp:
+      tls: true
+      preferred_ip_protocol: ip4
+  # 401 is the staging basic auth
+  http_webmail:
+    prober: http
+    timeout: 10s
+    http:
+      preferred_ip_protocol: ip4
+      valid_status_codes: [200, 401]

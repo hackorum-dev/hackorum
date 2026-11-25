@@ -1,0 +1,10 @@
+[Unit]
+Description=hackorum hourly mail backup
+After=hackorum.service
+
+[Service]
+Type=oneshot
+ExecStart={{ platform_root }}/restic/mail_backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

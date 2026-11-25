@@ -27,6 +27,7 @@
         - "{{ hackorum_root }}/compose"
         - "{{ hackorum_root }}/postgres/init"
         - "{{ hackorum_root }}/dms/config/rspamd/override.d"
+        - "{{ hackorum_root }}/dms/rspamd-lua"
 
     - name: Platform templates
       ansible.builtin.template:

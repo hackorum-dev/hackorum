@@ -18,3 +18,15 @@ groups:
         for: 5m
         labels: { severity: critical }
         annotations: { summary: "{{ $labels.instance }} smtp banner probe failing" }
+
+      - alert: MailTlsPortDown
+        expr: probe_success{job="blackbox_mail_tls"} == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations: { summary: "{{ $labels.instance }} tls probe failing" }
+
+      - alert: WebmailDown
+        expr: probe_success{job="blackbox_webmail"} == 0
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.instance }} webmail probe failing" }

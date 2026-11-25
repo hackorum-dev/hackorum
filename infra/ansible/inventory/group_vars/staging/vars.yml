@@ -2,6 +2,7 @@ env_name: staging
 app_host: staging.hackorum.dev
 mail_host: mail.staging.hackorum.dev
 mail_domain: staging.hackorum.dev
+webmail_host: webmail.staging.hackorum.dev
 grafana_host: grafana.staging.hackorum.dev
 metrics_host: metrics.staging.hackorum.dev
 mailpit_host: mailpit.staging.hackorum.dev

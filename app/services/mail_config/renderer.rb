@@ -39,7 +39,7 @@ module MailConfig
       raise MissingFragment, "postfix-accounts.system.cf has no accounts" if system_accounts.empty?
 
       taken = system_keys(accounts, virtual)
-      mailboxes = enabled_mailboxes.reject { |m| collision?(taken, login(m)) }
+      mailboxes = enabled_mailboxes.reject { |m| collision?(taken, login(m)) || mixed_up?(system_accounts, login(m)) }
       {
         "postfix-accounts.cf" => join(accounts, mailboxes.map { |m| "#{addr(login(m))}|#{m.password_hash}" }),
         "postfix-virtual.cf" => join(virtual, aliases(mailboxes, taken).sort.map { |a, l| "#{addr(a)} #{addr(l)}" }),
@@ -54,7 +54,7 @@ module MailConfig
     def enabled_mailboxes
       scope = Mailbox.enabled.joins(:user).where(users: { deleted_at: nil })
       scope = scope.where(users: { admin: true }) if Hackorum.staging?
-      scope.includes(:addresses).filter_map { |m| m if login(m) }.sort_by { |m| login(m) }
+      scope.includes(:addresses).filter_map { |m| m if login(m) }.sort_by { |m| first_match_order(login(m)) }
     end
 
     def login(mailbox)
@@ -84,6 +84,17 @@ module MailConfig
       return false unless taken.include?(addr(local).downcase)
       @logged ||= Set.new
       Rails.logger.error("mail config: #{addr(local)} collides with a system entry, skipped") if @logged.add?(local)
+      true
+    end
+
+    # shorter first, more dots first: the first line a login's pattern matches is then its own
+    def first_match_order(login) = [ login.length, -login.count("."), login ]
+
+    def mixed_up?(system_accounts, local)
+      suffix = "@#{@domain}".downcase
+      names = system_accounts.map(&:downcase).select { |a| a.end_with?(suffix) }.map { |a| a.delete_suffix(suffix) }
+      return false unless names.any? { |name| MailConfig.mixed_up?(local, name) }
+      Rails.logger.error("mail config: #{addr(local)} would be mixed up with a system account, skipped")
       true
     end
 

@@ -1,0 +1,25 @@
+local owners = rspamd_config:add_map({
+  type = 'hash',
+  url = 'file:///tmp/docker-mailserver/sender-login.map',
+  description = 'address -> login',
+})
+local exempt = '{{ app_smtp_user }}@{{ mail_domain }}'
+
+rspamd_config:register_symbol({
+  name = 'FROM_OWNER_CHECK',
+  type = 'prefilter',
+  flags = 'explicit_disable',
+  callback = function(task)
+    local user = task:get_user()
+    if not user then return end
+    user = user:lower()
+    if user == exempt then return end
+    -- a login can be an alias (dovecot accepts them), compare owners on both sides
+    local login = owners and owners:get_key(user)
+    local from = task:get_from('mime')
+    local addr = from and #from == 1 and from[1].addr and from[1].addr:lower()
+    if not login or not addr or owners:get_key(addr) ~= login then
+      task:set_pre_result('reject', 'From address not owned by login', 'from_owner_check')
+    end
+  end,
+})

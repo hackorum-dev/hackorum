@@ -11,6 +11,7 @@ class MailboxAddress < ApplicationRecord
   validates :local_part, format: { with: FORMAT }, allow_blank: true
   validate :no_consecutive_dots
   validate :name_available, on: :create
+  validate :no_system_account_mixup, on: :create
 
   after_commit { MailConfigRenderJob.perform_later }
   after_create :reserve_name
@@ -34,6 +35,12 @@ class MailboxAddress < ApplicationRecord
     elsif (existing = NameReservation.find_by(name: local_part)) && !owned_by_user?(existing)
       errors.add(:local_part, "is already taken")
     end
+  end
+
+  def no_system_account_mixup
+    return unless login? && local_part.present?
+    return unless MailConfig::SYSTEM_ACCOUNTS.any? { |system| MailConfig.mixed_up?(local_part, system) }
+    errors.add(:local_part, "conflicts with a system mail account")
   end
 
   def owned_by_user?(reservation)

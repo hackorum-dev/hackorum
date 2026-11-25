@@ -3,6 +3,7 @@ env_name: ci
 app_host: ci.hackorum.test
 mail_host: mail.ci.hackorum.test
 mail_domain: ci.hackorum.test
+webmail_host: webmail.ci.hackorum.test
 grafana_host: grafana.ci.hackorum.test
 metrics_host: metrics.ci.hackorum.test
 mailpit_enabled: false

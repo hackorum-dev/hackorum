@@ -94,8 +94,11 @@ Add to `inventory/group_vars/<env>/vault.yml` (all `vault_` prefixed). Required 
 - `rails_master_key`, `secret_key_base`, `umami_app_secret`, `umami_hash_salt`, `google_client_id`,
   `google_client_secret`: copy from old prod `deploy/.env` (RAILS_MASTER_KEY, SECRET_KEY_BASE, UMAMI_*, GOOGLE_*).
 - `postgres_password`, `umami_db_password`, `receiver_password`, `app_smtp_password`, `restic_password`: generate.
+  `receiver_password` is reachable from the internet (IMAPS, webmail): 20+ random characters, asserted.
+- `roundcube_des_key`: exactly 24 characters (`openssl rand -hex 12`), asserted.
 - `storagebox_user`, `storagebox_host`: Hetzner Robot. `storagebox_ssh_private_key`: new ed25519 key, public half uploaded to the box.
 - `healthchecks_backup_url`, `healthchecks_restore_url`, `healthchecks_monthly_url`: one check each in healthchecks.io.
+  `healthchecks_mail_backup_url` is optional (hourly mail backup, empty = no ping).
 - Required on prod only: `hackorum_github_token` (old `HACKORUM_GITHUB_TOKEN`) and `ci_deploy_ssh_private_key` (both for the
   orchestrator, asserted), `umami_website_id` (not asserted, but empty = no analytics script on prod).
 - Optional: `lineage_api_token` (old `LINEAGE_API_TOKEN`, empty = lineage API off),
@@ -105,9 +108,12 @@ Add to `inventory/group_vars/<env>/vault.yml` (all `vault_` prefixed). Required 
 
 nftables table `inet hackorum`, input policy drop. Docker publishes `ports:` by
 DNAT in the forward path, which this chain never sees: a published port is
-public no matter what. Only caddy (80/443) and the mailserver (25) publish.
+public no matter what. Only caddy (80/443) and the mailserver publish: 25, and
+465/587/993 while `firewall_mail_submission_open` is true (it drives both the
+nftables set and the compose `ports:`).
 Everything else is `expose:` on the `edge` network. The Hetzner Robot firewall
-is the second layer, set by hand (see Fresh host, stateless).
+is the second layer, set by hand (see Fresh host, stateless): it has to allow
+465, 587 and 993 too.
 
 ## Monitoring
 
@@ -165,11 +171,23 @@ when the repository variable `STAGING_WIPE_DRILL` is `true`. Enable it after the
 
 ## Mail
 
-docker-mailserver 17 (Dovecot 2.4, Rspamd, Valkey) in the app compose stack. Config is rendered by the
-`hackorum` role into `/srv/hackorum/compose/mail.env` and `/srv/hackorum/dms/config/`
-(`postfix-accounts.cf`, `postfix-virtual.cf`, `dovecot.cf`, `rspamd/override.d/{multimap,dkim_signing}.conf`).
-Accounts: `receiver@<domain>` (imap_worker_local ingests it) and `app@<domain>` (Rails SMTP, port 587).
+docker-mailserver 17 (Dovecot 2.4, Rspamd, Valkey, fail2ban) in the app compose stack. Config is rendered by the
+`hackorum` role into `/srv/hackorum/compose/mail.env`, `/srv/hackorum/dms/config/`
+(`dovecot.cf`, `postfix-main.cf`, `sender-login-app.pcre`, `fail2ban-jail.cf`,
+`rspamd/override.d/{multimap,dkim_signing,ratelimit,settings}.conf`) and `/srv/hackorum/dms/rspamd-lua/from_owner.lua`.
+System accounts: `receiver@<domain>` (imap_worker_local ingests it) and `app@<domain>` (Rails SMTP, port 587).
 `postmaster@` and `dmarc@` forward to the ACME email.
+
+Accounts and aliases have two writers. Ansible writes only the system part, as fragments:
+`postfix-accounts.system.cf` and `postfix-virtual.system.cf`. Rails merges them with the mailboxes from
+`/admin/mailboxes` into `postfix-accounts.cf`, `postfix-virtual.cf`, `dovecot-quotas.cf` and `sender-login.map`
+(`rails mail:render`: on every mailbox change, hourly, at the end of each deploy and after a restore).
+On a host where the final files do not exist yet the role copies the fragments, so the mailserver starts without Rails.
+Do not edit the final files by hand, the next render overwrites them.
+
+`postfix-main.cf`, `fail2ban-jail.cf`, `dovecot.cf` and the Lua file are only read when the container is created.
+The role recreates the mailserver when one of them (or `sender-login-app.pcre`) changes (handler), a restart is not enough.
+The first run after this change fails at the secrets assert until the vault has `vault_roundcube_des_key`.
 
 The mail cert is Caddy's: the `mail_host` site in the platform Caddyfile pins the issuer to Let's Encrypt,
 so the files are in `acme-v02.api.letsencrypt.org-directory/<mail_host>/` (ZeroSSL would use another dir).
@@ -184,6 +202,10 @@ The role waits for the key file before starting the stack. DNS for `mail_host` m
 | `<selector>._domainkey.<domain>` | TXT | content of the `.public.dns.txt` file below |
 | `_dmarc.<domain>` | TXT | `v=DMARC1; p=none; rua=mailto:dmarc@<domain>` |
 | PTR of the box IPv4 | PTR | `mail.<domain>` (Hetzner Robot, rDNS) |
+| `webmail.<domain>` | A/AAAA | the box (needed before the playbook run, Caddy gets the cert) |
+| `_imaps._tcp.<domain>` | SRV | `0 1 993 mail.<domain>.` |
+| `_submissions._tcp.<domain>` | SRV | `0 1 465 mail.<domain>.` |
+| `_submission._tcp.<domain>` | SRV | `0 1 587 mail.<domain>.` |
 
 Staging: domain `staging.hackorum.dev`, selector `staging`. Prod: domain `hackorum.dev`, selector `prod`.
 DMARC stays `p=none` on purpose until phase A's list sending is understood.
@@ -238,10 +260,89 @@ Follow the confirmation link, repeat per list. Then `/admin/imap_sync_states` sh
 `last_uid` and `sudo docker compose -f /srv/hackorum/compose/compose.yml logs imap_worker_local` shows ingests.
 `ImapWorkerIdle` fires (weekdays, after 6h without ingest) until the lists are subscribed.
 
+### Mailboxes
+
+Real mailboxes are granted in `/admin/mailboxes`, the owner sets the password in `/settings/mailbox`.
+Clients: IMAPS `mail.<domain>:993`, SMTP `mail.<domain>:465` (TLS) or `:587` (STARTTLS), username is the login address.
+Webmail: Roundcube at `webmail.<domain>` (sqlite in `data/roundcube`, login is the mail address and mail password).
+On staging only mailboxes of admins are rendered.
+
+- Sender checks: a login sends only as its own addresses. Envelope: `SPOOF_PROTECTION=1` (Postfix), with
+  `postfix-main.cf` adding `sender-login-app.pcre` so `app@` may use any sender of the domain.
+  `From:` header: the rspamd prefilter `FROM_OWNER_CHECK` (`from_owner.lua`) against `sender-login.map`, `app@` exempt.
+  It fails closed: without the map no mailbox login can send (`rails mail:render` writes it), `app@` still can.
+  rspamd notices a changed map within a few minutes, so a new alias cannot send right away.
+  Both this rule and the rate limit run in rspamd: while rspamd is down Postfix accepts mail without them
+  (`milter_default_action = accept`, DMS default), only the envelope check is left.
+  The rule has a test, `luajit roles/hackorum/files/tests/from_owner_test.lua <rendered lua>` (CI runs it).
+- DMS runs authenticated mail through the `dkim` group only. `override.d/settings.conf` re-enables
+  `FROM_OWNER_CHECK` and the ratelimit symbols for it. If they do not fire (see checks), the fallback is
+  `RSPAMD_CHECK_AUTHENTICATED=1` in `mail.env.j2` instead of that file (full scanning of outbound mail).
+- Rate limit: `mail_user_rate_limit` recipients per hour per login (100), `app@` exempt. Over the limit is a 4xx.
+  It counts per SASL login, and DMS lets an alias log in with the mailbox password: every alias is its own bucket.
+- fail2ban: jails `dovecot` and `postfix`, 10 failed logins in 10 minutes ban the address for an hour.
+  The postfix jail runs in `mode = auth`: with the DMS default (`extra`) rejected recipients count too, and a list
+  server delivering to a removed address would get itself banned. Private ranges are ignored
+  (`fail2ban-jail.cf`): webmail and app containers log in from there, and if docker ever shows the gateway address
+  instead of the client the result is no bans, not everybody banned.
+  `setup fail2ban` lists bans, `setup fail2ban unban <ip>` removes one. `mail_fail2ban_enabled: false` turns it off.
+- Quotas: `dovecot-quotas.cf` from the admin page.
+- DMS finds the account of an alias, and the quota of an account, with an unanchored `grep` and takes the first
+  line that matches. With logins where one is the tail of another (`ian`, `brian`) the wrong line can win: `ian`'s
+  alias would get `brian`'s password and `brian` could send as it, or a mailbox would get another one's quota.
+  Rails renders shorter logins first (dotted before plain at the same length), so the first match is the right one,
+  and refuses a login that is the tail of a system account or ends with one (`iver`, `myapp`).
+  A hand-added account in a system fragment has to respect the same rule.
+- Deleting a mailbox keeps its maildir. Remove it before the delete in the admin page, or the next owner of that
+  login gets the old mail: `docker compose ... exec mailserver rm -rf /var/mail/<domain>/<login>`.
+- The maildirs live in `hackorum_mail_data` (default `data/mail`, NVMe). Moving them is that variable plus an rsync.
+
+### Mailbox checks
+
+After the first run with the ports open (staging first). DNS (`webmail`, SRV), `vault_roundcube_des_key` and the
+Robot firewall (465, 587, 993) come before the playbook run.
+
+    C="sudo docker compose -f /srv/hackorum/compose/compose.yml"
+    $C exec mailserver postconf smtpd_sender_login_maps      # ends with sender-login-app.pcre
+    $C exec mailserver rspamadm configdump ratelimit | grep -A3 user
+    $C exec mailserver rspamadm configdump settings | grep symbols_enabled
+    $C exec mailserver fail2ban-client status
+    $C exec mailserver cat /tmp/docker-mailserver/sender-login.map
+    $C logs mailserver | grep -i 'from_owner\|lua.*error'      # nothing
+
+1. Grant a mailbox to an admin, set a password: the login shows up in `postfix-accounts.cf`.
+2. Log in from outside: IMAPS 993, SMTP 465 and 587
+   (`swaks --server mail.<domain> --port 465 --tls-on-connect --auth-user <login> ...`).
+3. Mail from outside arrives at the login address and at an alias.
+4. Mail to an outside address has DKIM and SPF passing (`Authentication-Results`).
+5. `swaks --from <other>@<domain>`: `553 5.7.1`. `swaks --from <login> --header 'From: security@<domain>'`:
+   `From address not owned by login`. `--from <alias>` with the same header address: accepted.
+6. Site mail (`app@` as `noreply@`) still goes out: password reset to an allowlisted address.
+7. 7 failed logins from an outside IP: `fail2ban-client status dovecot` lists that IP and no `172.` address,
+   `grep 'rip=' /srv/hackorum/data/mail-logs/mail.log` shows public addresses.
+   A private address there means docker hides the client: set `mail_fail2ban_enabled: false` and fix that first.
+8. Webmail: log in, send, receive. `ls -l /srv/hackorum/data/roundcube/` has `sqlite.db`.
+9. Add an alias, `/admin/imap_sync_states` keeps advancing (ingestion survives the reload).
+10. After the nightly restore: admin mailboxes are rendered, a non-admin one granted on prod is not.
+11. Quota 1 MB, send 2 MB: rejected, ingestion unaffected.
+12. `receiver@` in a mail client and the webmail, read a few mails, ingestion keeps going.
+13. `mail_user_rate_limit: 3` on staging: the 4th recipient within the hour gets a 4xx, `app@` does not.
+14. Move `sender-login.map` away: a mailbox login cannot send, a password reset mail still goes out.
+    `rails mail:render` puts it back.
+15. A few mails from outside to an address that does not exist: `fail2ban-client status postfix` stays empty
+    (rejected recipients must not ban, list servers hit removed addresses).
+
+On prod after cutover, once the first hourly snapshot exists: `restic snapshots --tag nightly --latest 1` and
+`restic snapshots --tag mail-hourly --latest 1` both answer, the two `forget --dry-run` calls (see Backups) list only
+their own tag, and one `restore.yml` drill on staging from `hackorum.dev` goes through (it used to pick the hourly
+snapshot as `latest`, which has no dumps).
+
 ### Notes
 
 - Staging INBOX autoexpunges after 30 days (`dovecot.cf`). Prod keeps everything.
-- No webmail, IMAP is not published. Folders via doveadm in the mailserver container
+- `receiver@` can be opened in a mail client (IMAPS 993) or the webmail with `receiver_password`.
+  Never with client-side filters: the worker only ingests what stays in INBOX.
+  Folders also via doveadm in the mailserver container
   (`docker compose -f /srv/hackorum/compose/compose.yml exec mailserver ...`):
   `doveadm mailbox status -u receiver@<domain> messages '*'`,
   `doveadm fetch -u receiver@<domain> 'uid hdr.from hdr.subject' mailbox Junk all`,
@@ -275,10 +376,11 @@ without it the backups are unreadable.
 
 ### healthchecks.io checks
 
-Create three checks and put the ping URLs (no trailing slash) into the vault:
+Create the checks and put the ping URLs (no trailing slash) into the vault:
 - `vault_healthchecks_backup_url`: period 1 day, grace 3 hours (nightly at 02:00 + up to 5 min delay).
 - `vault_healthchecks_restore_url`: period 2 days, grace 3 hours (staging restore: Mon-Sat 04:00, Sundays are the wipe drill or nothing).
 - `vault_healthchecks_monthly_url`: period 1 month, grace 1 day.
+- `vault_healthchecks_mail_backup_url` (optional, prod): period 1 hour, grace 1 hour.
 
 Scripts ping `<url>/start`, `<url>` on success and `<url>/fail` on failure.
 
@@ -287,8 +389,13 @@ Scripts ping `<url>/start`, `<url>` on success and `<url>/fail` on failure.
 Timers exist on both envs but are enabled only if `backup_enabled` (prod true, staging false).
 - `hackorum-backup.timer`: daily 02:00 (+ up to 5 min). `backup.sh`: `pg_dump -Fc -Z0` of `hackorum` and `umami`
   into `<dumps root>/daily`, `restic backup` (dumps, mail, dms, compose dirs, caddy/grafana/prometheus data,
-  without mail-logs), `restic forget --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune` on Sundays,
-  writes `/srv/platform/textfile/backup.prom` (`hackorum_backup_*`).
+  roundcube data, without mail-logs), `restic forget --tag nightly --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune`
+  on Sundays, writes `/srv/platform/textfile/backup.prom` (`hackorum_backup_*`).
+- `hackorum-mail-backup.timer`: hourly at :30. `mail_backup.sh`: `restic backup --tag mail-hourly` of the maildirs,
+  `restic forget --tag mail-hourly --keep-last 24` (no prune, the Sunday run does that), writes `mail_backup.prom`.
+  `MailBackupStale` fires after 3 hours without a success (restic exit 3, files that vanished in the live maildir,
+  counts as success). The two `forget` calls are limited to their own tag:
+  check once with `--dry-run` that neither lists a snapshot of the other.
 - `hackorum-restic-check.timer`: Saturday 03:00, `restic_check.sh` (`restic check --read-data-subset=10%`); a failure
   pings `vault_healthchecks_backup_url/fail`, so it shows up on the backup check.
 - `hackorum-monthly-dumps.timer`: 1st of the month 02:15, public/private SQL dumps into `<dumps root>/public` and
@@ -337,13 +444,18 @@ Copy them to `/srv/bulk/hackorum/dumps/public/` on the new box, or let the next 
 
        ansible-playbook -i inventory/prod.yml playbooks/platform.yml --tags base   # installs restic
        ansible-playbook -i inventory/prod.yml playbooks/site.yml --tags backup     # restic.env, storage box key
-       sudo bash -c 'set -a; . /srv/platform/restic/restic.env; restic restore latest --host hackorum.dev --target / --include /srv/platform/data/caddy'
+       sudo bash -c 'set -a; . /srv/platform/restic/restic.env; restic restore latest --host hackorum.dev --tag nightly --target / --include /srv/platform/data/caddy'
 
 3. `platform.yml`, then `site.yml` (the backup role needs the storage box key and restic password in the vault;
    it finds the existing repo, no init).
+   On prod run `site.yml` with `-e backup_enabled=false` until the restore is done: the hourly mail backup would
+   otherwise snapshot the empty new maildir within the hour, and that would be the newest mail snapshot.
 4. `ansible-playbook -i inventory/prod.yml playbooks/restore.yml -e from_host=hackorum.dev`
    (optionally `-e snapshot=<id>`; with a snapshot id `from_host` is not needed). On prod this also restores
-   `data/mail` and `dms` (mail identity, DKIM keys); on staging it does not (`RESTORE_MAIL=0`, staging keeps its own).
+   the maildirs and `dms` (mail identity, DKIM keys); on staging it does not (`RESTORE_MAIL=0`, staging keeps its own).
+   `latest` is the newest `nightly` snapshot. The maildirs come from the newest snapshot that has them, normally
+   an hourly one; `-e mail_snapshot=<id>` picks another (`restic snapshots --tag mail-hourly`). With `-e snapshot=<id>`
+   and no `mail_snapshot` they come from that snapshot.
    `-e restore_mail=0|1` overrides that. Run it right after `site.yml`: the prod backup timer is on from then, and a
    02:00 run in between makes the empty new DB the latest `hackorum.dev` snapshot (then use `-e snapshot=<id>` of the
    last good one).
@@ -353,9 +465,10 @@ Copy them to `/srv/bulk/hackorum/dumps/public/` on the new box, or let the next 
 restores the latest dumps from `<dumps root>/daily`, drops and
 recreates `hackorum` and `umami` (umami objects are owned by `umami`), drops the queue/cache/cable DBs, runs
 `db:prepare`, on staging `staging:sanitize` and a receiver INBOX purge, starts everything, waits for `/up`,
+runs `mail:render` (the restored DB has other mailboxes than the files on disk),
 writes `/srv/platform/textfile/restore.prom` and pings `vault_healthchecks_restore_url`.
 While it runs, an Alertmanager silence (3h, expired at the end, best effort) mutes `SiteProbeFailing`, `TargetDown`,
-`SmtpBannerDown` and `ImapWorkerIdle`. `RestoreDrill*` alerts are never silenced.
+`SmtpBannerDown`, `MailTlsPortDown`, `WebmailDown` and `ImapWorkerIdle`. `RestoreDrill*` alerts are never silenced.
 
 ## Staging drills
 

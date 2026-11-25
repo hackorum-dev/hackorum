@@ -22,9 +22,11 @@
     - { path: "{{ hackorum_root }}/postgres/init" }
     - { path: "{{ hackorum_root }}/data/postgres", owner: "999", group: "999", mode: "0700" }
     - { path: "{{ hackorum_root }}/data/mail-state" }
+    - { path: "{{ hackorum_root }}/data/roundcube", owner: "33", group: "33", mode: "0750" }
     - { path: "{{ hackorum_root }}/dms/config", group: hackorum-mail, mode: "2775" }
     - { path: "{{ hackorum_root }}/dms/config/rspamd", group: hackorum-mail, mode: "2775" }
     - { path: "{{ hackorum_root }}/dms/config/rspamd/override.d", group: hackorum-mail, mode: "2775" }
+    - { path: "{{ hackorum_root }}/dms/rspamd-lua" }
     - { path: "{{ hackorum_root }}/secrets", mode: "0700" }
     - { path: "{{ hackorum_dumps_root }}/daily", mode: "0750" }
     - { path: "{{ hackorum_dumps_root }}/public" }
@@ -34,9 +36,11 @@
 # create only: DMS chowns /var/mail (5000) and /var/log/mail (syslog) on every start
 - name: Mail data dirs
   ansible.builtin.file:
-    path: "{{ hackorum_root }}/data/{{ item }}"
+    path: "{{ item }}"
     state: directory  # noqa: risky-file-permissions
-  loop: [mail, mail-logs]
+  loop:
+    - "{{ hackorum_mail_data }}"
+    - "{{ hackorum_root }}/data/mail-logs"
 
 - name: CI deploy key
   ansible.builtin.copy:

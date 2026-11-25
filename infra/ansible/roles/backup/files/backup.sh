@@ -36,7 +36,8 @@ done
 restic backup --quiet --retry-lock 30m --tag nightly \
   --exclude "$HACKORUM_ROOT/data/mail-logs" \
   "$HACKORUM_DUMPS_ROOT" \
-  "$HACKORUM_ROOT/data/mail" \
+  "$HACKORUM_MAIL_DATA" \
+  "$HACKORUM_ROOT/data/roundcube" \
   "$HACKORUM_ROOT/dms" \
   "$HACKORUM_ROOT/compose" \
   "$PLATFORM_ROOT/data/caddy" \
@@ -45,7 +46,7 @@ restic backup --quiet --retry-lock 30m --tag nightly \
   "$PLATFORM_ROOT/compose"
 
 if [ "$(date +%u)" = "7" ]; then
-  restic forget --quiet --retry-lock 30m --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune
+  restic forget --quiet --retry-lock 30m --tag nightly --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune
 fi
 
 SIZE=$(restic stats --retry-lock 30m --mode raw-data --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["total_size"])')

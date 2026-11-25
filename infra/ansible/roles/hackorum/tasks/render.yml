@@ -50,20 +50,35 @@
     dest: "{{ hackorum_root }}/compose/mail.env"
     mode: "0644"
 
-- name: Mailserver accounts
+# rails (mail:render) merges the system fragments with its mailboxes into the final files
+- name: Mailserver system accounts
   ansible.builtin.template:
-    src: postfix-accounts.cf.j2
-    dest: "{{ hackorum_root }}/dms/config/postfix-accounts.cf"
+    src: postfix-accounts.system.cf.j2
+    dest: "{{ hackorum_root }}/dms/config/postfix-accounts.system.cf"
     group: "{{ omit if render_only else 'hackorum-mail' }}"
     mode: "0640"
   no_log: true
 
-- name: Mailserver aliases
+- name: Mailserver system aliases
   ansible.builtin.template:
-    src: postfix-virtual.cf.j2
-    dest: "{{ hackorum_root }}/dms/config/postfix-virtual.cf"
+    src: postfix-virtual.system.cf.j2
+    dest: "{{ hackorum_root }}/dms/config/postfix-virtual.system.cf"
     group: "{{ omit if render_only else 'hackorum-mail' }}"
     mode: "0644"
+
+# first boot only: the mailserver has to start before rails ever rendered
+- name: Mailserver accounts and aliases bootstrap
+  ansible.builtin.copy:
+    src: "{{ hackorum_root }}/dms/config/{{ item.name }}.system.cf"
+    dest: "{{ hackorum_root }}/dms/config/{{ item.name }}.cf"
+    remote_src: true
+    force: false
+    group: "{{ omit if render_only else 'hackorum-mail' }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { name: postfix-accounts, mode: "0640" }
+    - { name: postfix-virtual, mode: "0644" }
+  no_log: true
 
 - name: Dovecot override
   ansible.builtin.template:
@@ -71,6 +86,48 @@
     dest: "{{ hackorum_root }}/dms/config/dovecot.cf"
     group: "{{ omit if render_only else 'hackorum-mail' }}"
     mode: "0644"
+  notify: Hackorum recreate mailserver
+
+- name: Postfix override
+  ansible.builtin.template:
+    src: postfix-main.cf.j2
+    dest: "{{ hackorum_root }}/dms/config/postfix-main.cf"
+    group: "{{ omit if render_only else 'hackorum-mail' }}"
+    mode: "0644"
+  notify: Hackorum recreate mailserver
+
+- name: Sender login map of the app account
+  ansible.builtin.template:
+    src: sender-login-app.pcre.j2
+    dest: "{{ hackorum_root }}/dms/config/sender-login-app.pcre"
+    group: "{{ omit if render_only else 'hackorum-mail' }}"
+    mode: "0644"
+  notify: Hackorum recreate mailserver
+
+- name: Fail2ban jail override
+  ansible.builtin.template:
+    src: fail2ban-jail.cf.j2
+    dest: "{{ hackorum_root }}/dms/config/fail2ban-jail.cf"
+    group: "{{ omit if render_only else 'hackorum-mail' }}"
+    mode: "0644"
+  notify: Hackorum recreate mailserver
+
+- name: Rspamd rate limit and settings
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ hackorum_root }}/dms/config/rspamd/override.d/{{ item.dest }}"
+    group: "{{ omit if render_only else 'hackorum-mail' }}"
+    mode: "0644"
+  loop:
+    - { src: ratelimit.conf.j2, dest: ratelimit.conf }
+    - { src: rspamd-settings.conf.j2, dest: settings.conf }
+
+- name: Rspamd from owner rule
+  ansible.builtin.template:
+    src: from_owner.lua.j2
+    dest: "{{ hackorum_root }}/dms/rspamd-lua/from_owner.lua"
+    mode: "0644"
+  notify: Hackorum recreate mailserver
 
 - name: Rspamd multimap override
   ansible.builtin.copy:

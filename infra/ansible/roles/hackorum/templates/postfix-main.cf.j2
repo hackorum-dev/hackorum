@@ -1,0 +1,1 @@
+smtpd_sender_login_maps = unionmap:{ texthash:/etc/postfix/virtual, hash:/etc/aliases, pcre:/etc/postfix/maps/sender_login_maps.pcre, pcre:/etc/postfix/regexp, pcre:/tmp/docker-mailserver/sender-login-app.pcre }

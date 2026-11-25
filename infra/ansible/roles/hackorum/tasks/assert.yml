@@ -11,3 +11,17 @@
          | selectattr('1', 'string') | selectattr('1') | map('first') | list }}
     hackorum_missing_secrets: "{{ hackorum_secret_names | difference(hackorum_set_secrets) }}"
   when: not render_only
+
+- name: Receiver password is long enough
+  ansible.builtin.assert:
+    that: receiver_password | length >= 20
+    quiet: true
+    fail_msg: "receiver_password is reachable from the internet, use 20+ random characters"
+  when: not render_only
+
+- name: Roundcube des key is 24 characters
+  ansible.builtin.assert:
+    that: roundcube_des_key | length == 24
+    quiet: true
+    fail_msg: "roundcube_des_key has to be exactly 24 characters (openssl rand -hex 12)"
+  when: not render_only

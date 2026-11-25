@@ -9,3 +9,10 @@
     cmd: docker compose -f {{ platform_root }}/compose/compose.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile
   changed_when: true
   when: not render_only
+
+# postfix-main.cf, dovecot.cf and friends are only read when the container is created
+- name: Hackorum recreate mailserver
+  ansible.builtin.command:
+    cmd: docker compose -f {{ hackorum_compose }} up -d --force-recreate --wait mailserver
+  changed_when: true
+  when: not render_only
