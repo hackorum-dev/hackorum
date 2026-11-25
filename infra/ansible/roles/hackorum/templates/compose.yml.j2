@@ -35,6 +35,9 @@ services:
   jobs:
     <<: *app
     command: ["bin/jobs"]
+    # db pool size: solid queue wants its worker threads (3, config/queue.yml) + 2, puma's value is too small
+    environment:
+      RAILS_MAX_THREADS: "5"
     healthcheck:
       test: ["CMD-SHELL", "grep -qs '[s]olid-queue-' /proc/[0-9]*/cmdline"]
       interval: 30s

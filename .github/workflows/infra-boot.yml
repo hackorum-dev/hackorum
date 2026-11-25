@@ -53,6 +53,12 @@ jobs:
           curl -fs http://127.0.0.1:3000/up
           curl -fs http://127.0.0.1:3000/metrics | grep -q hackorum_solid_queue_ready_jobs
 
+      - name: Jobs container stays up
+        working-directory: rendered/ci/hackorum/compose
+        run: |
+          sleep 20
+          test "$(docker inspect -f '{{.State.Status}} {{.RestartCount}}' "$(docker compose ps -aq jobs)")" = "running 0"
+
       - name: Mail config render
         working-directory: rendered/ci/hackorum
         run: |
