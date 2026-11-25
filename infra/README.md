@@ -209,12 +209,15 @@ role skips generation and the DNS record stays valid. Rotation steps are unchang
 
 ### Checks
 
-Inbound (from outside, after DNS and the Robot firewall allow 25):
+Inbound (from outside, after DNS and the Robot firewall allow 25). Postfix wants a resolvable sender
+domain and a fully qualified HELO:
 
-    swaks --to receiver@<domain> --from you@example.com --server mail.<domain>
-    ssh deploy@<host> 'sudo ls /srv/hackorum/data/mail/<domain>/receiver/new'
+    swaks --to receiver@<domain> --from you@<real domain> --helo <fqdn> --server mail.<domain>
+    ssh deploy@<host> 'sudo ls /srv/hackorum/data/mail/<domain>/receiver/new /srv/hackorum/data/mail/<domain>/receiver/.Junk/new'
 
-Expect `250 2.0.0 Ok: queued` and one new file.
+Expect `250 2.0.0 Ok: queued` and one new file. From a home IP it may land in `.Junk` (sender SPF/DMARC fail,
+dynamic IP), fine for this check; `X-Spamd-Result` in the file lists the rspamd symbols. Rejects and
+deliveries are in `/srv/hackorum/data/mail-logs/mail.log` (`NOQUEUE: reject`, `status=sent`).
 
 Outbound, DKIM and SPF (staging: `TEST_TO` must be on `staging_mail_allowlist`):
 
@@ -238,6 +241,12 @@ Follow the confirmation link, repeat per list. Then `/admin/imap_sync_states` sh
 ### Notes
 
 - Staging INBOX autoexpunges after 30 days (`dovecot.cf`). Prod keeps everything.
+- No webmail, IMAP is not published. Folders via doveadm in the mailserver container
+  (`docker compose -f /srv/hackorum/compose/compose.yml exec mailserver ...`):
+  `doveadm mailbox status -u receiver@<domain> messages '*'`,
+  `doveadm fetch -u receiver@<domain> 'uid hdr.from hdr.subject' mailbox Junk all`,
+  `doveadm move -u receiver@<domain> INBOX mailbox Junk uid <uid>` (the worker only reads INBOX).
+- Message size limit 50 MB (`POSTFIX_MESSAGE_SIZE_LIMIT`, DMS also uses it for the Dovecot quota_mail_size).
 - `dovecot.cf` sets `ssl = yes` and `auth_allow_cleartext = yes` for imap_worker_local (plain IMAP on 143
   inside the compose network, not published). Dovecot 2.4 with DMS 17's `ssl = required` would refuse it.
 - First boot logs `chgrp/chmod: cannot access .../spool-postfix/{maildrop,public}`: DMS permission fixup
