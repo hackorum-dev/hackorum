@@ -2,7 +2,7 @@ module Api
   module V1
     # A message that carries patches.
     class PatchsetSerializer < BaseSerializer
-      COLUMNS = %w[id topic_id sender_person_id subject created_at].freeze
+      COLUMNS = %w[id message_id topic_id sender_person_id subject created_at].freeze
       PRELOAD = [ :topic, { sender_person: PersonSerializer::PRELOAD } ].freeze
 
       def self.load(relation)
@@ -16,6 +16,7 @@ module Api
       def brief
         {
           message_id: record.id,
+          rfc_message_id: record.message_id,
           number: page_data.number(record.id),
           url: api_url("/messages/#{record.id}"),
           html_url: message_html_url(record),

@@ -7,7 +7,7 @@ RSpec.describe "API v1 branches", type: :request do
   let(:start) { Time.zone.parse("2026-03-01 10:00:00") }
 
   let(:branch_keys) do
-    %w[id url html_url branch_name topic message_id status failure_stage failure_reason conflict_files
+    %w[id url html_url branch_name topic message_id rfc_message_id status failure_stage failure_reason conflict_files
        state state_reason superseded base_sha base_source base_committed_at on_master pg_major behind attempted_at pushed_at
        pushed_head_sha github_url git_url last_master_apply_at master_apply_sha master_apply_error master_conflict_files
        ci_status ci_skip_reason latest_run created_at updated_at]
@@ -73,6 +73,7 @@ RSpec.describe "API v1 branches", type: :request do
       expect(json.keys).to match_array(branch_keys)
       expect(json).to include(
         "id" => row.id, "branch_name" => "t#{topic.id}_4", "message_id" => row.message_id,
+        "rfc_message_id" => row.message.message_id,
         "status" => "applied", "failure_stage" => nil, "failure_reason" => nil, "conflict_files" => [],
         "state" => "needs_rebase", "state_reason" => nil, "superseded" => false, "base_sha" => "a" * 40, "base_source" => "master",
         "base_committed_at" => "2026-03-01T11:00:00.000Z", "on_master" => true, "pg_major" => 19,
@@ -407,13 +408,15 @@ RSpec.describe "API v1 branches", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(body.keys).to match_array(branch_keys)
-      expect(body).to include("id" => row.id, "state" => "applies", "ci_status" => "success",
+      expect(body).to include("id" => row.id, "rfc_message_id" => row.message.message_id, "state" => "applies",
+                              "ci_status" => "success",
                               "behind" => { "days" => 1, "commits" => nil })
       expect(body["latest_run"].keys).to match_array(run_keys)
       expect(body["latest_run"]).to include("id" => run.id,
                                             "github_url" => "#{github}/actions/runs/#{run.github_run_id}")
       expect(queries.grep(/\A\s*(INSERT|UPDATE|DELETE)/i)).to be_empty
       expect(queries.grep(/FROM "patch_ci_runs"/).grep(/payload|"patch_ci_runs"\.\*/)).to be_empty
+      expect(queries.grep(/FROM "messages"/).grep(/"messages"\.\*|"messages"\."body"/)).to be_empty
       expect(response.body).not_to include("secret")
     end
 

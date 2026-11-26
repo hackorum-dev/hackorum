@@ -12,10 +12,11 @@ RSpec.describe "API v1 events", type: :request do
        is_patch_submission body attachments me]
   end
   let(:patchset_keys) do
-    %w[message_id number url html_url created_at subject sender topic files changed_paths branch download_url lineage]
+    %w[message_id rfc_message_id number url html_url created_at subject sender topic files changed_paths branch download_url
+       lineage]
   end
   let(:branch_keys) do
-    %w[id url html_url branch_name topic message_id status failure_stage failure_reason conflict_files
+    %w[id url html_url branch_name topic message_id rfc_message_id status failure_stage failure_reason conflict_files
        state state_reason superseded base_sha base_source base_committed_at on_master pg_major behind attempted_at pushed_at
        pushed_head_sha github_url git_url last_master_apply_at master_apply_sha master_apply_error master_conflict_files
        ci_status ci_skip_reason latest_run created_at updated_at]
@@ -94,13 +95,15 @@ RSpec.describe "API v1 events", type: :request do
       expect(second["occurred_at"]).to eq("2026-03-01T10:00:00.000Z")
       expect(second["author"]).to include("email" => "alice.a@example.org")
       expect(second["patchset"].keys).to match_array(patchset_keys)
-      expect(second["patchset"]).to include("message_id" => posted.message_id, "number" => 2)
+      expect(second["patchset"]).to include("message_id" => posted.message_id, "number" => 2,
+                                            "rfc_message_id" => posted.message.message_id)
       expect(second["patchset"]["files"].map { |file| file["file_name"] }).to eq([ "v1-0001-feature.patch" ])
       expect(second["patchset"]["branch"]).to include("id" => created.patch_branch_id, "ci_status" => "success")
 
       expect(third["occurred_at"]).to eq("2026-03-01T10:01:00.000Z")
       expect(third["branch"].keys).to match_array(branch_keys)
       expect(third["branch"]).to include("id" => created.patch_branch_id, "message_id" => posted.message_id,
+                                         "rfc_message_id" => posted.message.message_id,
                                          "state" => "applies", "behind" => { "days" => 3, "commits" => nil })
       expect(third["branch"]["latest_run"]).to include("id" => completed.patch_ci_run_id)
 
@@ -109,7 +112,8 @@ RSpec.describe "API v1 events", type: :request do
       expect(fourth["ci_run"]).to include("id" => completed.patch_ci_run_id, "status" => "success",
                                           "first_run" => true, "previous_status" => nil)
       expect(fourth["ci_run"]["branch"]).to eq(second["patchset"]["branch"])
-      expect(fourth["ci_run"]["branch"].keys).to match_array(%w[id branch_name status ci_status pushed_at url])
+      expect(fourth["ci_run"]["branch"].keys).to match_array(%w[id branch_name status ci_status pushed_at rfc_message_id url])
+      expect(fourth["ci_run"]["branch"]).to include("rfc_message_id" => posted.message.message_id)
       expect(response.body).not_to include("secret")
     end
 

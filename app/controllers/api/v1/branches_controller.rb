@@ -16,6 +16,7 @@ module Api
         branch = load(PatchBranch.where(lineage_only: false, id: path_param(:id))).first
         raise ActiveRecord::RecordNotFound unless branch
 
+        BranchSerializer.preload_messages([ branch ])
         render json: BranchSerializer.new(branch, context, repo_state: repo_state).full
       end
 

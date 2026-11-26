@@ -7,7 +7,8 @@ RSpec.describe "API v1 patchsets", type: :request do
   let(:start) { Time.zone.parse("2026-03-01 10:00:00") }
 
   let(:patchset_keys) do
-    %w[message_id number url html_url created_at subject sender topic files changed_paths branch download_url lineage]
+    %w[message_id rfc_message_id number url html_url created_at subject sender topic files changed_paths branch download_url
+       lineage]
   end
   let(:attachment_keys) { %w[id message_id file_name content_type byte_size is_patch url content_url] }
 
@@ -72,7 +73,8 @@ RSpec.describe "API v1 patchsets", type: :request do
 
       row = data.last
       expect(row.keys).to match_array(patchset_keys)
-      expect(row).to include("message_id" => first.id, "number" => 1, "subject" => "Add a feature",
+      expect(row).to include("message_id" => first.id, "rfc_message_id" => first.message_id, "number" => 1,
+                             "subject" => "Add a feature",
                              "created_at" => "2026-03-01T10:00:00.000Z", "branch" => nil)
       expect(row["url"]).to end_with("/api/v1/messages/#{first.id}")
       expect(row["html_url"]).to end_with("/topics/#{topic.id}#message-#{first.id}")
@@ -137,8 +139,9 @@ RSpec.describe "API v1 patchsets", type: :request do
 
       expect(ids).to eq([ internal.id, built.id ])
       expect(data.first["branch"]).to be_nil
-      expect(data.last["branch"].keys).to match_array(%w[id branch_name status ci_status pushed_at url])
+      expect(data.last["branch"].keys).to match_array(%w[id branch_name status ci_status pushed_at rfc_message_id url])
       expect(data.last["branch"]).to include("id" => branch.id, "branch_name" => "t#{topic.id}_1",
+                                             "rfc_message_id" => built.message_id,
                                              "status" => "applied", "ci_status" => "success",
                                              "pushed_at" => "2026-03-01T11:00:00.000Z")
       expect(data.last["branch"]["url"]).to end_with("/api/v1/branches/#{branch.id}")

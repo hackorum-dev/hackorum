@@ -7,9 +7,34 @@ module Api
       TEXT_LIMIT = 2000
       REF_COLUMNS = %i[id branch_name status ci_status pushed_at].freeze
 
-      # needs REF_COLUMNS only
+      # the REF_COLUMNS and the Message-ID header of the patch message, as `ref` reads them
+      def self.load_refs(relation)
+        relation.joins(:message).select(
+          *REF_COLUMNS.map { |name| PatchBranch.arel_table[name] },
+          "messages.message_id AS rfc_message_id"
+        )
+      end
+
+      # loads only the Message-ID header of each patch message, never the body
+      def self.preload_messages(records)
+        ActiveRecord::Associations::Preloader.new(
+          records: records.to_a, associations: :message, scope: Message.select(:id, :message_id)
+        ).call
+        records
+      end
+
+      def self.brief_list(records, context, **extras)
+        preload_messages(records)
+        super
+      end
+
+      # needs a row loaded through load_refs
       def ref
-        { **REF_COLUMNS.index_with { |name| record.public_send(name) }, url: api_url("/branches/#{record.id}") }
+        {
+          **REF_COLUMNS.index_with { |name| record.public_send(name) },
+          rfc_message_id: record.rfc_message_id,
+          url: api_url("/branches/#{record.id}")
+        }
       end
 
       def brief
@@ -20,6 +45,7 @@ module Api
           branch_name: record.branch_name,
           topic: topic_ref(record.topic),
           message_id: record.message_id,
+          rfc_message_id: record.message&.message_id,
           status: record.status,
           failure_stage: record.failure_stage,
           failure_reason: record.failure_reason&.first(TEXT_LIMIT),

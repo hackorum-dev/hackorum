@@ -69,7 +69,7 @@ Lists answer `{"data": [...], "next_cursor": ...}`. `limit` sets the page size: 
 5. `GET /topics/{id}/patchsets` lists the messages that carry patches, newest first: `limit=1` is the current version. `files` are the patch files, `changed_paths` the source files they touch. Download a file from its `content_url` (`GET /attachments/{id}/content`): the bytes come as `text/plain` or `application/octet-stream`, not as JSON.
 6. `GET /topics/{id}/commits` is what got committed for the thread, a change and its backports as one entry.
 
-`rfc_message_id` is the Message-ID header of a mail. `GET /messages/lookup?rfc_message_id=...` finds the message by it. Percent-encode the value, a `+` is sent as `%2B`. A field named `message_id` is always the numeric id.
+`rfc_message_id` is the Message-ID header of a mail. `GET /messages/lookup?rfc_message_id=...` finds the message by it. Percent-encode the value, a `+` is sent as `%2B`. A field named `message_id` is always the numeric id. Branches and patchsets carry both, so a consumer that holds the mail can match them without the lookup.
 
 ## Patches, branches and CI
 
