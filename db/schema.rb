@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_11_25_120000) do
+ActiveRecord::Schema[8.0].define(version: 2026_11_26_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -91,6 +91,38 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_25_120000) do
     t.datetime "updated_at", null: false
     t.integer "byte_size", default: 0, null: false
     t.index ["message_id"], name: "index_attachments_on_message_id"
+  end
+
+  create_table "classification_runs", force: :cascade do |t|
+    t.bigint "topic_id", null: false
+    t.string "status", null: false
+    t.string "phase"
+    t.string "worker"
+    t.datetime "claimed_at"
+    t.datetime "started_at"
+    t.datetime "finished_at"
+    t.float "duration_s"
+    t.integer "message_count"
+    t.bigint "through_message_id"
+    t.string "model"
+    t.string "effort"
+    t.string "prompt_version"
+    t.integer "input_tokens"
+    t.integer "cached_input_tokens"
+    t.integer "output_tokens"
+    t.jsonb "result"
+    t.string "kind"
+    t.string "size"
+    t.boolean "not_a_bug"
+    t.bigint "feature_group_id"
+    t.text "error"
+    t.string "failure_kind"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.boolean "enhancement"
+    t.index ["feature_group_id"], name: "index_classification_runs_on_feature_group_id"
+    t.index ["status", "claimed_at"], name: "index_classification_runs_on_status_and_claimed_at"
+    t.index ["topic_id", "created_at"], name: "index_classification_runs_on_topic_id_and_created_at"
   end
 
   create_table "commit_files", force: :cascade do |t|
@@ -280,6 +312,50 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_25_120000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["outgoing_draft_id"], name: "index_draft_attachments_on_outgoing_draft_id"
+  end
+
+  create_table "feature_group_dismissed_pairs", force: :cascade do |t|
+    t.bigint "low_id", null: false
+    t.bigint "high_id", null: false
+    t.datetime "created_at", null: false
+    t.index ["high_id"], name: "index_feature_group_dismissed_pairs_on_high_id"
+    t.index ["low_id", "high_id"], name: "index_feature_group_dismissed_pairs_on_low_id_and_high_id", unique: true
+  end
+
+  create_table "feature_group_topics", force: :cascade do |t|
+    t.bigint "feature_group_id"
+    t.bigint "topic_id", null: false
+    t.string "source", null: false
+    t.bigint "classification_run_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["feature_group_id"], name: "index_feature_group_topics_on_feature_group_id"
+    t.index ["topic_id"], name: "index_feature_group_topics_on_topic_id", unique: true
+  end
+
+  create_table "feature_group_versions", force: :cascade do |t|
+    t.bigint "feature_group_id", null: false
+    t.integer "major", null: false
+    t.string "status", null: false
+    t.string "source", null: false
+    t.jsonb "details"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "role"
+    t.index ["feature_group_id", "major"], name: "index_feature_group_versions_on_feature_group_id_and_major", unique: true
+  end
+
+  create_table "feature_groups", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "slug", null: false
+    t.text "summary"
+    t.string "source", null: false
+    t.bigint "merged_into_id"
+    t.bigint "created_by_run_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["merged_into_id"], name: "index_feature_groups_on_merged_into_id"
+    t.index ["slug"], name: "index_feature_groups_on_slug", unique: true
   end
 
   create_table "feed_events", force: :cascade do |t|
@@ -1259,6 +1335,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_25_120000) do
   add_foreign_key "aliases", "users"
   add_foreign_key "api_tokens", "users"
   add_foreign_key "attachments", "messages"
+  add_foreign_key "classification_runs", "feature_groups", on_delete: :nullify
+  add_foreign_key "classification_runs", "topics"
   add_foreign_key "commit_files", "commits"
   add_foreign_key "commit_people", "commits"
   add_foreign_key "commit_people", "people"
@@ -1280,6 +1358,14 @@ ActiveRecord::Schema[8.0].define(version: 2026_11_25_120000) do
   add_foreign_key "commitfest_patch_topics", "topics"
   add_foreign_key "contributor_memberships", "people"
   add_foreign_key "draft_attachments", "outgoing_drafts", on_delete: :cascade
+  add_foreign_key "feature_group_dismissed_pairs", "feature_groups", column: "high_id", on_delete: :cascade
+  add_foreign_key "feature_group_dismissed_pairs", "feature_groups", column: "low_id", on_delete: :cascade
+  add_foreign_key "feature_group_topics", "classification_runs", on_delete: :nullify
+  add_foreign_key "feature_group_topics", "feature_groups"
+  add_foreign_key "feature_group_topics", "topics"
+  add_foreign_key "feature_group_versions", "feature_groups"
+  add_foreign_key "feature_groups", "classification_runs", column: "created_by_run_id", on_delete: :nullify
+  add_foreign_key "feature_groups", "feature_groups", column: "merged_into_id"
   add_foreign_key "feed_events", "messages", on_delete: :cascade
   add_foreign_key "feed_events", "patch_branches", on_delete: :cascade
   add_foreign_key "feed_events", "patch_ci_runs", on_delete: :cascade

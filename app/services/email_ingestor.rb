@@ -101,6 +101,7 @@ class EmailIngestor
     MessageActivityBuilder.new(msg).process!
 
     OrphanReplyLinker.adopt_for(msg)
+    TopicLinks.sync_mentions!([ msg.id ])
 
     msg
   end

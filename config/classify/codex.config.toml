@@ -1,0 +1,10 @@
+# Classify profile, copied into the classify codex home by the runner.
+# Model and effort: Classify::MODEL / Classify::EFFORT, or the command line.
+approval_policy = "never"
+
+[features]
+multi_agent = false
+# no marketplace sync into the batch home, no skill injection into the prompt
+plugins = false
+remote_plugin = false
+skill_search = false

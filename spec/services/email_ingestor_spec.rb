@@ -52,6 +52,20 @@ RSpec.describe EmailIngestor do
       allow_any_instance_of(described_class).to receive(:handle_attachments)
     end
 
+    context "mention links" do
+      it "links to topics referenced by archive urls" do
+        sender_alias = create(:alias, email: "sender@example.com", user: user1)
+        allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([ sender_alias ])
+        other = create(:message, message_id: "other@example.com")
+        raw = raw_email.sub("This is the email body.", "see https://postgr.es/m/other@example.com")
+        ingestor.ingest_raw(raw, mailing_list: mailing_list)
+
+        mine = Message.find_by!(message_id: "test123@example.com").topic
+        expect(TopicLink.where(kind: "mention").pluck(:topic_id, :other_topic_id, :direction))
+          .to contain_exactly([ mine.id, other.topic_id, "out" ], [ other.topic_id, mine.id, "in" ])
+      end
+    end
+
     context "auto-starring" do
       it "creates star for registered sender" do
         sender_alias = create(:alias, email: "sender@example.com", user: user1)

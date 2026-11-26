@@ -78,11 +78,13 @@ module CommitImport
           update_unresolved(parsed, id_by_sha, topic_map)
           TopicLinks.sync_commits!(id_by_sha.values)
           update_cherry_picks(parsed, id_by_sha)
+          TopicLinks.sync_fixes!(id_by_sha.values)
           # aggregate refresh commits with the rows that produced it, in the
           # same batch transaction, so a crash later in the run cannot leave it
           # stale
           refresh_commit_aggregates(touched)
         end
+        refresh_versions { FeatureGroups::Versions.refresh_for_commits!(id_by_sha.values) }
       end
       # explicit trailer wins first, then the subject/author fallback refills
       # whatever a parser fix left NULL
@@ -131,16 +133,19 @@ module CommitImport
       end
       topic_map = message_topic_map(parsed.values.flat_map(&:message_ids).uniq)
 
-      Commit.transaction do
+      ids = Commit.transaction do
         id_by_sha = insert_commits(records, parsed, branch_map, topic_map)
         insert_files(records, id_by_sha)
         insert_people(records, parsed, id_by_sha)
         touched = insert_topic_links(parsed, id_by_sha, topic_map)
         TopicLinks.sync_commits!(id_by_sha.values)
+        TopicLinks.sync_fixes!(id_by_sha.values)
         # aggregate refresh commits with the commit_topics rows that produced
         # it, so a crash later in run! cannot leave it permanently short
         refresh_commit_aggregates(touched)
+        id_by_sha.values
       end
+      refresh_versions { FeatureGroups::Versions.refresh_for_commits!(ids) }
     end
 
     def insert_commits(records, parsed, branch_map, topic_map)
@@ -376,7 +381,11 @@ module CommitImport
           changed += 1
         end
       end
-      log("branch sets updated: #{changed}") if changed.positive?
+      return unless changed.positive?
+
+      log("branch sets updated: #{changed}")
+      # a cut can move master-only changes into the new branch's major
+      refresh_versions { FeatureGroups::Versions.refresh_unreleased! }
     end
 
     RELEASE_ASSIGN_BATCH = 5000
@@ -413,6 +422,7 @@ module CommitImport
           assign_release(shas, version, tag[:released_at]) if version
         end
       end
+      refresh_versions { FeatureGroups::Versions.refresh_unreleased! }
     end
 
     def assign_release(shas, version, released_at)
@@ -460,8 +470,11 @@ module CommitImport
         ) nearest
         WHERE c.id = nearest.id
           AND nearest.sha IS NOT NULL
+        RETURNING c.id
       SQL
-      ApplicationRecord.connection.execute(sql)
+      ids = ApplicationRecord.connection.exec_query(sql).rows.flatten
+      # a grouped backport stops being a change of its own
+      refresh_versions { FeatureGroups::Versions.refresh_for_commits!(ids) }
     end
 
     def retry_unresolved_message_ids
@@ -499,9 +512,19 @@ module CommitImport
           CommitTopic.upsert_all(rows.uniq { |r| [ r[:commit_id], r[:topic_id] ] },
                                 unique_by: %i[commit_id topic_id])
           TopicLinks.sync_commits!(rows.map { |r| r[:commit_id] })
+          TopicLinks.sync_fixes!(rows.map { |r| r[:commit_id] })
           refresh_commit_aggregates(touched)
         end
+        refresh_versions { FeatureGroups::Versions.refresh_for_commits!(rows.map { |r| r[:commit_id] }) }
       end
+    end
+
+    # Versions are derived data, refreshed outside the import transactions:
+    # a failure there is reported and the import goes on.
+    def refresh_versions
+      yield
+    rescue StandardError => e
+      Rails.error.report(e, handled: true, source: "commit_import.feature_versions")
     end
   end
 end

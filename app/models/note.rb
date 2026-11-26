@@ -16,6 +16,7 @@ class Note < ApplicationRecord
   scope :active, -> { where(deleted_at: nil) }
   scope :for_topic, ->(topic) { where(topic:) }
   scope :global_visible, -> { active.where(global: true) }
+  scope :without_bot, -> { (bot_id = Classify.bot_user_id) ? where.not(author_id: bot_id) : all }
   scope :visible_to, ->(user) {
     return global_visible unless user
 

@@ -6,20 +6,30 @@ module Topics
       @topic = topic
     end
 
-    def any? = entries.any?
+    def any? = entries.any? || feature_group.present?
+
+    def feature_group
+      return @feature_group if defined?(@feature_group)
+
+      @feature_group = FeatureGroupTopic.find_by(topic_id: @topic.id)&.feature_group&.surviving
+    end
 
     def entries
       @entries ||= begin
         links = TopicLink.where(topic_id: @topic.id).joins(:other_topic).merge(Topic.active).to_a
         by_topic = links.group_by(&:other_topic_id)
+        sibling_set = sibling_ids.to_set
         @topic_ids = by_topic.keys
         topics = Topic.where(id: by_topic.keys).index_by(&:id)
         load_change_keys(links.select { |l| l.kind == "commit" }.map(&:ref_id).uniq)
-        Lineage::ThreadRank.order(by_topic.keys).map do |tid|
-          rows = by_topic[tid]
+        siblings = sibling_ids - by_topic.keys
+        topics.merge!(Topic.where(id: siblings).index_by(&:id))
+        # siblings must not push linked threads out of the inline lines
+        (Lineage::ThreadRank.order(by_topic.keys) + Lineage::ThreadRank.order(siblings)).map do |tid|
+          rows = by_topic[tid] || []
           commit_ids = rows.select { |r| r.kind == "commit" }.map(&:ref_id).uniq
           keys = commit_ids.filter_map { |c| @key_of[c] }.uniq
-          { topic: topics[tid], label: label(rows, keys), role: role(tid, keys), commit_ids: commit_ids, keys: keys }
+          { topic: topics[tid], label: label(rows, keys, sibling_set.include?(tid)), role: role(tid, keys), commit_ids: commit_ids, keys: keys }
         end
       end
     end
@@ -40,13 +50,25 @@ module Topics
 
     private
 
-    def label(rows, keys)
+    def sibling_ids
+      @sibling_ids ||= begin
+        group = feature_group
+        group ? FeatureGroupTopic.where(feature_group_id: group.id).where.not(topic_id: @topic.id)
+                                 .joins(:topic).merge(Topic.active).pluck(:topic_id) : []
+      end
+    end
+
+    def label(rows, keys, same_feature = false)
       parts = []
       parts << (keys.size == 1 ? "same commit" : "#{keys.size} shared commits") if keys.any?
       mentions = rows.select { |r| r.kind == "mention" }.map(&:direction).uniq
       parts << "mentions" if mentions.include?("out")
       parts << "mentioned in" if mentions.include?("in")
+      fixes = rows.select { |r| r.kind == "fixes" }.map(&:direction)
+      parts << "follow-up of" if fixes.include?("out")
+      parts << "followed up in" if fixes.include?("in")
       parts << "same CF entry" if rows.any? { |r| r.kind == "commitfest" }
+      parts << "same feature" if same_feature
       parts.join(", ")
     end
 

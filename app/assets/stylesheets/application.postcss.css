@@ -29,6 +29,7 @@
 @import "components/reports.css";
 @import "components/release-stats.css";
 @import "components/help.css";
+@import "components/feature-groups.css";
 @import "components/pagination.css";
 @import "components/ci.css";
 @import "components/ci-stats.css";

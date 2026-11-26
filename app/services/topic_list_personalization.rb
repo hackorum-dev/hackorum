@@ -71,6 +71,7 @@ class TopicListPersonalization
     return if topic_ids.empty?
 
     @note_counts = Note.visible_to(user)
+                       .without_bot
                        .where(topic_id: topic_ids)
                        .active
                        .group(:topic_id)

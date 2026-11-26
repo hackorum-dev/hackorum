@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "size", "enhancement", "not_a_bug", "group", "join_linked", "feature_name", "evidence", "confidence"],
+  "properties": {
+    "kind": { "type": "string", "enum": ["feature", "performance", "bug", "refactor", "docs", "tests-build", "discussion"] },
+    "size": { "type": ["string", "null"], "enum": ["major", "moderate", "minor", null] },
+    "enhancement": { "type": ["boolean", "null"] },
+    "not_a_bug": { "type": "boolean" },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "new_name", "new_summary"],
+      "properties": {
+        "id": { "type": ["integer", "null"] },
+        "new_name": { "type": ["string", "null"] },
+        "new_summary": { "type": ["string", "null"] }
+      }
+    },
+    "join_linked": { "type": "array", "items": { "type": "integer" } },
+    "feature_name": { "type": "string" },
+    "evidence": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "confidence": { "type": "string", "enum": ["low", "medium", "high"] }
+  }
+}

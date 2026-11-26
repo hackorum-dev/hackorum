@@ -1,0 +1,35 @@
+- content_for :title, @group.name
+.feature-group-page
+  p.feature-group-back = link_to "All features", feature_groups_path
+  h1 = @group.name
+  - if @group.summary.present?
+    p.feature-group-summary = @group.summary
+  - if @versions.any?
+    h2 Versions
+    ul.feature-group-versions
+      - @versions.each do |v|
+        li
+          strong = feature_version_line(v)
+          - listed = v.topic_ids.filter_map { |id| @version_topics[id] }
+          - if listed.any?
+            ul.feature-group-version-threads
+              - listed.each do |t|
+                li
+                  = link_to t.title, topic_path(t)
+                  span.feature-group-meta
+                    - [ Classify.kind(@tags[t.id] || []), Classify.size(@tags[t.id] || []) ].compact.each do |tag|
+                      span.feature-group-tag = tag
+  h2 Threads
+  - if @topics.empty?
+    p.sidebar-muted No threads yet.
+  - else
+    ul.feature-group-list
+      - @topics.each do |t|
+        - tags = @tags[t.id] || []
+        li
+          = link_to t.title, topic_path(t)
+          span.feature-group-meta
+            - [ Classify.kind(tags), Classify.size(tags) ].compact.each do |tag|
+              span.feature-group-tag = tag
+            - if t.last_message_at
+              = " last activity #{time_ago_in_words(t.last_message_at)} ago"

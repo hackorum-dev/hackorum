@@ -9,6 +9,8 @@ module Lineage
       STOP_KINDS = %w[usage_limit capacity aborted stale_repo].freeze
       MAX_CONSECUTIVE_FAILURES = 3
       COUNTED_FAILURE_KINDS = %w[processor codex].freeze
+      # as reported back by the server; lineage replies carry no kind
+      SERVER_FAILURE_KINDS = %w[ingest].freeze
       BUNDLE_POLL_SECONDS = 5
       BUNDLE_WAIT_SECONDS = 1800
       # kind: :done (server took the result), :refused (server no longer wanted it, not a stop), :empty, :stopped
@@ -111,9 +113,9 @@ module Lineage
         reply = upload(claim, fields, File.join(job_dir, "result.json"))
         return Outcome.new(kind: :stopped, claim: claim, error: "upload failed") unless reply
         FileUtils.touch(File.join(job_dir, "uploaded"))
-        count_failure(reply, fields)
+        kind = count_failure(reply, fields)
         if @failures >= @max_failures
-          @say.call("#{@failures} #{fields[:failure_kind]} failures in a row, stopping")
+          @say.call("#{@failures} #{kind} failures in a row, stopping")
           @stop.set!
           return Outcome.new(kind: :stopped, claim: claim, status: reply["status"], duration_s: duration, error: reply["error"])
         end
@@ -123,9 +125,13 @@ module Lineage
         Outcome.new(kind: :refused, claim: claim, duration_s: duration, error: e.message)
       end
 
+      # -> the counted kind, or nil
       def count_failure(reply, fields)
-        counted = %w[failed timeout].include?(reply["status"]) && COUNTED_FAILURE_KINDS.include?(fields[:failure_kind])
-        @failures = counted ? @failures + 1 : 0
+        kind = fields[:failure_kind] if COUNTED_FAILURE_KINDS.include?(fields[:failure_kind])
+        kind ||= reply["failure_kind"] if SERVER_FAILURE_KINDS.include?(reply["failure_kind"])
+        kind = nil unless %w[failed timeout].include?(reply["status"])
+        @failures = kind ? @failures + 1 : 0
+        kind
       end
 
       def prepare_and_run(job_dir, tar)

@@ -1,0 +1,99 @@
+- content_for :title, "Admin — #{@group.name}"
+
+.settings-page
+  h1 = @group.name
+
+  p
+    code = @group.slug
+    = " - #{@group.source}"
+  - if @group.merged_into_id
+    p
+      | Merged into 
+      = link_to @group.surviving.name, admin_feature_group_path(@group.surviving)
+  - if @group.summary.present?
+    p = @group.summary
+
+  .saved-searches-actions
+    = link_to "Edit", edit_admin_feature_group_path(@group), class: "button-secondary button-small"
+    - unless @group.merged_into_id
+      = form_with url: merge_admin_feature_group_path(@group), method: :post, local: true do |f|
+        = f.number_field :target_id, placeholder: "Target group id", required: true, class: "form-input"
+        = f.submit "Merge into", class: "button-secondary button-small", data: { turbo_confirm: "Merge this group into the target?" }
+    - if @memberships.any? { |m| !m.human? }
+      = button_to "Dissolve", dissolve_admin_feature_group_path(@group), method: :post, class: "button-danger-secondary button-small", form: { data: { turbo_confirm: "Remove all seed and llm members? Admin-set members stay." } }
+    - if @memberships.empty? && !@group.merged_into_id
+      = button_to "Delete", admin_feature_group_path(@group), method: :delete, class: "button-danger-secondary button-small", form: { data: { turbo_confirm: "Delete this group?" } }
+
+  h2 Versions
+  - if @versions.any?
+    .email-table-wrap
+      table.email-table
+        thead
+          tr
+            th Major
+            th Status
+            th Source
+            th Role
+            th Detail
+            th Commits
+            th Actions
+        tbody
+          - @versions.each do |v|
+            tr
+              td = v.major
+              td = v.status
+              td = v.source
+              td = v.role
+              td
+                = feature_version_line(v)
+                - v.topic_ids.filter_map { |id| @version_topics[id] }.each do |t|
+                  div = link_to t.title, topic_path(t)
+              td
+                - v.commit_ids.filter_map { |id| @version_shas[id] }.each do |sha|
+                  => link_to sha[0, 10], commit_web_url(sha), target: "_blank", rel: "noopener"
+              td
+                = form_with url: override_version_admin_feature_group_path(@group), method: :post, local: true do |f|
+                  = f.hidden_field :major, value: v.major, id: nil
+                  = f.select :status, FeatureGroupVersion::STATUSES, { selected: v.status }, class: "form-input", id: nil
+                  = f.select :role, FeatureGroupVersion::ROLES, { include_blank: "No role", selected: v.role }, class: "form-input", id: nil
+                  = f.submit "Override", class: "button-secondary button-small"
+                - if v.human?
+                  = button_to "Clear", clear_version_admin_feature_group_path(@group), method: :delete, params: { major: v.major }, class: "button-danger-secondary button-small"
+  - else
+    p No versions.
+  .saved-searches-actions
+    = form_with url: override_version_admin_feature_group_path(@group), method: :post, local: true do |f|
+      = f.number_field :major, placeholder: "Major", required: true, min: 1, class: "form-input"
+      = f.select :status, FeatureGroupVersion::STATUSES, {}, class: "form-input"
+      = f.select :role, FeatureGroupVersion::ROLES, { include_blank: "No role" }, class: "form-input"
+      = f.submit "Override", class: "button-secondary button-small"
+    = button_to "Recompute versions", recompute_versions_admin_feature_group_path(@group), method: :post, class: "button-secondary button-small"
+
+  h2 = "Threads (#{@memberships.size})"
+  = form_with url: admin_feature_group_memberships_path, method: :post, local: true do |f|
+    = f.hidden_field :feature_group_id, value: @group.id
+    = f.number_field :topic_id, placeholder: "Thread id", class: "search-input", "aria-label": "Thread id"
+    = f.submit "Add thread", class: "search-button"
+  - if @memberships.any?
+    .email-table-wrap
+      table.email-table
+        thead
+          tr
+            th Thread
+            th Tags
+            th Source
+            th Actions
+        tbody
+          - @memberships.each do |m|
+            tr
+              td = link_to m.topic.title, topic_path(m.topic)
+              td = (@tags[m.topic_id] || []).map { |t| "##{t}" }.join(" ")
+              td = m.source
+              td
+                = form_with url: admin_feature_group_membership_path(m.topic_id), method: :patch, local: true do |f|
+                  = f.text_field :feature_group_id, placeholder: "Group id or slug", class: "search-input", "aria-label": "Target group id or slug"
+                  = f.submit "Move to", class: "button-secondary button-small"
+                = button_to "Remove", admin_feature_group_membership_path(m.topic_id), method: :delete, class: "button-danger-secondary button-small", title: "Admin: no group", form: { data: { turbo_confirm: "Remove this thread from the group? The bot will not assign it again." } }
+                = button_to "Release to bot", release_admin_feature_group_membership_path(m.topic_id), method: :delete, class: "button-secondary button-small", title: "Drop the membership; the bot may assign it again", form: { data: { turbo_confirm: "Release this thread? The bot may assign it to a group again." } }
+  - else
+    p No threads.

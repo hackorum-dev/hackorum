@@ -359,6 +359,7 @@ module Lineage
       stale = update? ? [] : CommitTopic.llm.where(topic_id: @run.topic_id).where.not(commit_id: ids).pluck(:commit_id)
       CommitTopic.llm.where(topic_id: @run.topic_id, commit_id: stale).delete_all
       TopicLinks.sync_commits!(ids | stale)
+      TopicLinks.sync_fixes!(ids | stale)
     end
 
     # Credits come from every thread's current verdict; one row per person

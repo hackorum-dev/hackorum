@@ -20,6 +20,7 @@ class TopicMergeService
       topic_merge = create_audit_record!
       record_message_moves!(topic_merge)
       move_messages!
+      source_bot_note_ids = Classify::TopicMerge.bot_note_ids(source_topic)
       move_notes!
       merge_stars!
       merge_ignores!
@@ -28,6 +29,7 @@ class TopicMergeService
       move_commitfest_links!
       move_drafts!
       move_commit_links!
+      Classify::TopicMerge.call(source: source_topic, target: target_topic, source_bot_note_ids:)
       move_patch_branches!
       move_lineage!
       copy_mailing_lists!
@@ -175,8 +177,14 @@ class TopicMergeService
       link.delete
     end
 
+    fixes_refs = TopicLink.where(kind: "fixes", ref_type: "Commit")
+                          .where(topic_id: source_topic.id).or(TopicLink.where(kind: "fixes", ref_type: "Commit", other_topic_id: source_topic.id))
+                          .distinct.pluck(:ref_id)
+    TopicLinks.repoint!(from: source_topic, to: target_topic)
     TopicLink.where(topic_id: source_topic.id).or(TopicLink.where(other_topic_id: source_topic.id)).delete_all
-    TopicLinks.sync_commits!(CommitTopic.where(topic_id: target_topic.id).pluck(:commit_id))
+    merged_commit_ids = CommitTopic.where(topic_id: target_topic.id).pluck(:commit_id)
+    TopicLinks.sync_commits!(merged_commit_ids)
+    TopicLinks.sync_fixes!(merged_commit_ids | fixes_refs)
     Topic.refresh_commit_aggregates!([ source_topic.id, target_topic.id ])
   end
 

@@ -277,6 +277,8 @@ class CommitfestImporter
         link.last_synced_at = Time.current
       end
     end
+
+    TopicLinks.sync_commitfest!([ patch.id ])
   end
 
   def fetch_html(url)

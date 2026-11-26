@@ -242,6 +242,32 @@ RSpec.describe TopicMergeService do
         expect(TopicLink.where(topic_id: source_topic.id).or(TopicLink.where(other_topic_id: source_topic.id))).to be_empty
         expect(TopicLink.where(topic_id: target_topic.id, other_topic_id: third.id)).to exist
       end
+
+      it "keeps inbound fixes links from third threads, pointing at the target" do
+        third = create(:topic)
+        referenced = create(:commit, sha: "aaaa1111bbbb2222cccc3333dddd4444eeee5555")
+        referrer = create(:commit, body: "Oversight in commit aaaa1111bbbb.")
+        create(:commit_topic, commit: referenced, topic: source_topic)
+        create(:commit_topic, commit: referrer, topic: third)
+        TopicLinks.sync_fixes!([ referrer.id ])
+        expect(TopicLink.where(kind: "fixes", topic_id: third.id, other_topic_id: source_topic.id)).to exist
+
+        service.call
+
+        expect(TopicLink.where(kind: "fixes").pluck(:topic_id, :other_topic_id, :direction))
+          .to contain_exactly([ third.id, target_topic.id, "out" ], [ target_topic.id, third.id, "in" ])
+      end
+
+      it "repoints mention links to the target" do
+        third = create(:topic)
+        msg = create(:message, topic: source_topic)
+        TopicLinks.link!(source_topic, third, kind: "mention", ref: msg, direction: "out")
+
+        service.call
+
+        expect(TopicLink.where(kind: "mention").pluck(:topic_id, :other_topic_id, :direction))
+          .to contain_exactly([ target_topic.id, third.id, "out" ], [ third.id, target_topic.id, "in" ])
+      end
     end
 
     context "with patch branches" do

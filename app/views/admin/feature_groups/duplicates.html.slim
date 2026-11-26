@@ -1,0 +1,38 @@
+- content_for :title, "Admin — Possible duplicates"
+
+.settings-page
+  h1
+    | Possible duplicates
+    span.settings-page-count = "(#{@pairs.size})"
+  p = link_to "Back to groups", admin_feature_groups_path
+
+  - if @pairs.any?
+    .email-table-wrap
+      table.email-table
+        thead
+          tr
+            th Group A
+            th Group B
+            th Similarity
+            th Links
+            th
+        tbody
+          - @pairs.each do |pair|
+            - a = pair[:a]
+            - b = pair[:b]
+            tr
+              td
+                = link_to a.name, admin_feature_group_path(a)
+                = " (#{@member_counts[a.id].to_i})"
+              td
+                = link_to b.name, admin_feature_group_path(b)
+                = " (#{@member_counts[b.id].to_i})"
+              td = format("%.2f", pair[:similarity])
+              td = pair[:links]
+              td
+                .saved-searches-actions
+                  = button_to "Merge A into B", merge_admin_feature_group_path(a), params: { target_id: b.id }, method: :post, class: "button-secondary button-small", form: { data: { turbo_confirm: "Merge #{a.name} into #{b.name}?" } }
+                  = button_to "Merge B into A", merge_admin_feature_group_path(b), params: { target_id: a.id }, method: :post, class: "button-secondary button-small", form: { data: { turbo_confirm: "Merge #{b.name} into #{a.name}?" } }
+                  = button_to "Dismiss", dismiss_pair_admin_feature_groups_path, params: { a_id: a.id, b_id: b.id }, method: :post, class: "button-secondary button-small"
+  - else
+    p No possible duplicates.

@@ -1,0 +1,31 @@
+- content_for :title, "Admin — Feature Groups"
+
+.settings-page
+  h1
+    | Feature Groups
+    span.settings-page-count = "(#{@groups.size})"
+
+  = form_with url: admin_feature_groups_path, method: :get, local: true do |f|
+    = f.text_field :q, value: params[:q], placeholder: "Search by name", class: "form-input"
+    = f.submit "Search", class: "button-secondary"
+    = link_to "Possible duplicates", duplicates_admin_feature_groups_path, class: "button-secondary"
+
+  - if @groups.any?
+    .email-table-wrap
+      table.email-table
+        thead
+          tr
+            th Name
+            th Slug
+            th Source
+            th Threads
+        tbody
+          - @groups.each do |g|
+            tr
+              td = link_to g.name, admin_feature_group_path(g)
+              td
+                code = g.slug
+              td = g.source
+              td = @member_counts[g.id].to_i
+  - else
+    p No feature groups.

@@ -38,6 +38,33 @@ RSpec.describe Lineage::CodexRunner do
     end
   end
 
+  it "feeds stdin_file to codex and keeps it out of argv" do
+    Dir.mktmpdir do |dir|
+      job = File.join(dir, "job")
+      FileUtils.mkdir_p(job)
+      File.write(File.join(job, "prompt.md"), "x" * 200_000)
+      schema = Rails.root.join("config/classify/result.schema.json")
+      copy = File.join(job, "stdin_copy")
+      result = with_env("FAKE_CODEX_STDIN_COPY" => copy) do
+        runner(dir, stdin_file: "prompt.md", sandbox: "read-only", schema_path: schema).call(job)
+      end
+      expect(File.size(copy)).to eq(200_000)
+      expect(result.command).to include("read-only", schema.to_s)
+      expect(result.command.join(" ").size).to be < 10_000
+    end
+  end
+
+  it "keeps lineage defaults" do
+    Dir.mktmpdir do |dir|
+      job = "/j"
+      expect(runner(dir).command(job)).to eq(
+        [ fake, "exec", "--skip-git-repo-check", "-C", job, "-s", "workspace-write",
+          "--output-schema", described_class::SCHEMA_PATH.to_s, "--json", "-o", "/j/result.json",
+          described_class::PROMPT ]
+      )
+    end
+  end
+
   it "times out" do
     Dir.mktmpdir do |dir|
       job = File.join(dir, "job")

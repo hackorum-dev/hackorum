@@ -852,7 +852,7 @@ class TopicsController < ApplicationController
 
   def load_guest_note_counts
     ids = @topics.map(&:id)
-    @guest_note_counts = ids.empty? ? {} : Note.global_visible.where(topic_id: ids).group(:topic_id).count
+    @guest_note_counts = ids.empty? ? {} : Note.global_visible.without_bot.where(topic_id: ids).group(:topic_id).count
   end
 
   def load_saved_searches

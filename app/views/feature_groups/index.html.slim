@@ -1,0 +1,14 @@
+.feature-group-page
+  h1 Features
+  - if @groups.empty?
+    p.sidebar-muted No feature groups yet.
+  - else
+    ul.feature-group-list
+      - @groups.each do |g|
+        - s = @stats[g.id]
+        li
+          = link_to g.name, feature_group_path(g.slug)
+          span.feature-group-meta
+            = pluralize(s[:count], "thread")
+            - if s[:latest]
+              = " · last activity #{time_ago_in_words(s[:latest])} ago"

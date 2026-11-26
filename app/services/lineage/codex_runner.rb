@@ -25,7 +25,9 @@ module Lineage
 
     attr_reader :model, :effort
 
-    def initialize(repo_path:, model: nil, effort: nil, timeout: 1200,
+    def initialize(repo_path: nil, model: nil, effort: nil, timeout: 1200,
+                   config_source: CONFIG_SOURCE, schema_path: SCHEMA_PATH, prompt: PROMPT,
+                   sandbox: "workspace-write", stdin_file: nil,
                    codex_bin: ENV.fetch("CODEX_BIN", "codex"),
                    codex_home: Rails.root.join("tmp/codex_home").to_s,
                    auth_path: File.expand_path("~/.codex/auth.json"))
@@ -33,6 +35,11 @@ module Lineage
       @model = model
       @effort = effort
       @timeout = timeout
+      @config_source = config_source.to_s
+      @schema_path = schema_path.to_s
+      @prompt = prompt
+      @sandbox = sandbox
+      @stdin_file = stdin_file
       @codex_bin = codex_bin
       @codex_home = codex_home.to_s
       @auth_path = auth_path
@@ -45,7 +52,7 @@ module Lineage
       prepare_home!
       pid = Process.spawn({ "CODEX_HOME" => @codex_home }, *cmd,
                           pgroup: true,
-                          in: File::NULL,
+                          in: @stdin_file ? File.join(job_dir, @stdin_file) : File::NULL,
                           out: File.join(job_dir, "events.jsonl"),
                           err: File.join(job_dir, "stderr.txt"))
       status, timed_out = wait(pid)
@@ -76,17 +83,17 @@ module Lineage
 
     def command(job_dir)
       cmd = [ @codex_bin, "exec", "--skip-git-repo-check", "-C", job_dir,
-              "-s", "workspace-write", "--output-schema", SCHEMA_PATH.to_s,
+              "-s", @sandbox, "--output-schema", @schema_path,
               "--json", "-o", File.join(job_dir, "result.json") ]
       cmd += [ "-m", @model ] if @model
       cmd += [ "-c", "model_reasoning_effort=\"#{@effort}\"" ] if @effort
-      cmd << PROMPT
+      cmd << @prompt
     end
 
     def prepare_home!
       FileUtils.mkdir_p(@codex_home)
       config = File.join(@codex_home, "config.toml")
-      FileUtils.cp(CONFIG_SOURCE, config) unless File.exist?(config) && File.read(config) == File.read(CONFIG_SOURCE)
+      FileUtils.cp(@config_source, config) unless File.exist?(config) && File.read(config) == File.read(@config_source)
       auth = File.join(@codex_home, "auth.json")
       return if File.exist?(auth)
       File.delete(auth) if File.symlink?(auth)

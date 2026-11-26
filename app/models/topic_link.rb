@@ -1,5 +1,5 @@
 class TopicLink < ApplicationRecord
-  KINDS = %w[commit mention commitfest].freeze
+  KINDS = %w[commit mention commitfest fixes].freeze
   DIRECTIONS = %w[both out in].freeze
   MIRROR = { "both" => "both", "out" => "in", "in" => "out" }.freeze
 

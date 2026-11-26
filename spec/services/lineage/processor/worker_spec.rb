@@ -244,6 +244,36 @@ RSpec.describe Lineage::Processor::Worker do
       end
     end
 
+    it "stops after three server-side ingest failures in a row" do
+      Dir.mktmpdir do |dir|
+        c = client(dir, submit: { "status" => "failed", "failure_kind" => "ingest", "error" => "boom" })
+        w = worker(dir, client: c, runner: runner(result, result, result))
+        expect(w.run_one.kind).to eq(:done)
+        expect(w.run_one.kind).to eq(:done)
+        out = w.run_one
+        expect(out.kind).to eq(:stopped)
+        expect(lines).to include(a_string_including("3 ingest failures in a row"))
+      end
+    end
+
+    it "does not count other server-side failures" do
+      Dir.mktmpdir do |dir|
+        c = client(dir, submit: { "status" => "failed", "failure_kind" => "schema", "error" => "bad" })
+        w = worker(dir, client: c, runner: runner(result, result, result, result))
+        4.times { expect(w.run_one.kind).to eq(:done) }
+        expect(stop.set?).to be(false)
+      end
+    end
+
+    it "does not count lineage replies, which carry no failure kind" do
+      Dir.mktmpdir do |dir|
+        c = client(dir, submit: { "status" => "failed", "error" => "ingest boom" })
+        w = worker(dir, client: c, runner: runner(result, result, result, result))
+        4.times { expect(w.run_one.kind).to eq(:done) }
+        expect(stop.set?).to be(false)
+      end
+    end
+
     it "honours a custom limit" do
       Dir.mktmpdir do |dir|
         c = failing_client(dir)

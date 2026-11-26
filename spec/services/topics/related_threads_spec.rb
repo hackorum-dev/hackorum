@@ -24,6 +24,13 @@ RSpec.describe Topics::RelatedThreads do
     expect(described_class.new(bug).entries.sole).to include(label: "2 shared commits", role: nil)
   end
 
+  it "labels fixes links" do
+    other = create(:topic)
+    TopicLinks.link!(bug, other, kind: "fixes", ref: create(:commit), direction: "out")
+    expect(described_class.new(bug).entries.find { |e| e[:topic] == other }[:label]).to eq("follow-up of")
+    expect(described_class.new(other).entries.map { |e| e[:label] }).to include("followed up in")
+  end
+
   it "labels directed mentions" do
     other = create(:topic)
     TopicLinks.link!(bug, other, kind: "mention", ref: create(:message, topic: bug), direction: "out")
@@ -49,5 +56,44 @@ RSpec.describe Topics::RelatedThreads do
     expect(rel.entries.sole).to include(label: "same commit", role: "patch thread")
     group = { sha: commit.sha, commit_ids: backports.map(&:id) }
     expect(rel.also_in([ group ])[commit.sha]).to eq([ { topic: patch, verdict: "as_is" } ])
+  end
+
+  describe "feature group" do
+    let(:group) { create(:feature_group) }
+    let(:sibling) { create(:topic) }
+
+    before do
+      create(:feature_group_topic, feature_group: group, topic: bug)
+      create(:feature_group_topic, feature_group: group, topic: sibling)
+    end
+
+    it "exposes the group and lists siblings as same feature" do
+      rel = described_class.new(bug)
+      expect(rel.feature_group).to eq(group)
+      expect(rel.entries.find { |e| e[:topic] == sibling }[:label]).to eq("same feature")
+    end
+
+    it "appends to an existing label" do
+      TopicLinks.link!(bug, sibling, kind: "mention", ref: create(:message, topic: bug), direction: "out")
+      entry = described_class.new(bug).entries.find { |e| e[:topic] == sibling }
+      expect(entry[:label]).to eq("mentions, same feature")
+    end
+
+    it "has no group for ungrouped topics" do
+      expect(described_class.new(create(:topic)).feature_group).to be_nil
+    end
+
+    it "lists linked threads before unlinked siblings" do
+      create(:message, topic: sibling, is_patch_submission: true, created_at: 1.minute.from_now)
+      linked_sibling = create(:topic)
+      create(:feature_group_topic, feature_group: group, topic: linked_sibling)
+      TopicLinks.link!(bug, linked_sibling, kind: "mention", ref: create(:message, topic: bug), direction: "out")
+      expect(described_class.new(bug).entries.map { |e| e[:topic] }).to eq([ patch, linked_sibling, sibling ])
+    end
+
+    it "ignores merged-away siblings" do
+      sibling.update!(merged_into_topic_id: bug.id)
+      expect(described_class.new(bug).entries.map { |e| e[:topic] }).not_to include(sibling)
+    end
   end
 end

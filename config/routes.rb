@@ -1,4 +1,5 @@
 Rails.application.routes.draw do
+  resources :feature_groups, path: "features", param: :slug, only: [ :index, :show ]
   namespace :admin do
     root "dashboard#show"
     resources :patchset_runs, only: [ :index, :show ] do
@@ -45,6 +46,22 @@ Rails.application.routes.draw do
         post :unretire
       end
     end
+    resources :feature_groups, only: [ :index, :show, :edit, :update, :destroy ] do
+      collection do
+        get :duplicates
+        post :dismiss_pair
+      end
+      member do
+        post :merge
+        post :override_version
+        delete :clear_version
+        post :recompute_versions
+        post :dissolve
+      end
+    end
+    resources :feature_group_memberships, only: [ :create, :update, :destroy ], param: :topic_id do
+      delete :release, on: :member
+    end
     resources :saved_searches
     resources :features, only: [ :index, :show ], param: :name do
       resources :enrollments, only: [ :create, :destroy ], param: :user_id, controller: "feature_enrollments"
@@ -58,6 +75,16 @@ Rails.application.routes.draw do
   end
 
   scope path: "api/lineage", module: "lineage_api", as: "api_lineage", defaults: { format: :json } do
+    resources :claims, only: [ :create, :destroy ] do
+      member do
+        get :bundle
+        post :result
+      end
+    end
+    get "queue", to: "queue#show"
+  end
+
+  scope path: "api/classify", module: "classify_api", as: "api_classify", defaults: { format: :json } do
     resources :claims, only: [ :create, :destroy ] do
       member do
         get :bundle

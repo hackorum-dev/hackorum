@@ -15,6 +15,7 @@ class Topic < ApplicationRecord
   has_many :messages
   has_many :attachments, through: :messages
   has_many :notes, dependent: :destroy
+  has_one :feature_group_topic, dependent: :destroy
   has_many :commitfest_patch_topics, dependent: :destroy
   has_many :commitfest_patches, through: :commitfest_patch_topics
   has_many :topic_stars, dependent: :destroy

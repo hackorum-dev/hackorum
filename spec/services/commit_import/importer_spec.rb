@@ -176,6 +176,20 @@ RSpec.describe CommitImport::Importer do
       expect(TopicLink.where(kind: "commit").pluck(:topic_id, :other_topic_id)).to contain_exactly([ t1.id, t2.id ], [ t2.id, t1.id ])
     end
 
+    it "creates a fixes link when a commit cites an earlier commit hash" do
+      t1 = create(:topic)
+      t2 = create(:topic)
+      create(:message, topic: t1, message_id: "one@example.com")
+      create(:message, topic: t2, message_id: "two@example.com")
+      first = fixture_repo.commit(subject: "x", body: "Discussion: https://postgr.es/m/one@example.com\n")
+      fixture_repo.commit(subject: "y", body: "Fixes #{first[0, 12]}.\nDiscussion: https://postgr.es/m/two@example.com\n")
+
+      importer.run!
+
+      expect(TopicLink.where(kind: "fixes").pluck(:topic_id, :other_topic_id, :direction))
+        .to include([ t2.id, t1.id, "out" ], [ t1.id, t2.id, "in" ])
+    end
+
     it "resolves a percent-encoded message id" do
       topic = create(:topic)
       create(:message, topic: topic, message_id: "CAD21AoA=abc@mail.gmail.com")

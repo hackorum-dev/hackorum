@@ -16,9 +16,10 @@ module Lineage
         Net::ProtocolError, JSON::ParserError
       ].freeze
 
-      def initialize(server:, token:, open_timeout: 10, read_timeout: 600)
+      def initialize(server:, token:, prefix: "/api/lineage", open_timeout: 10, read_timeout: 600)
         @uri = URI.parse(server)
         @token = token
+        @prefix = prefix
         @open_timeout = open_timeout
         @read_timeout = read_timeout
       end
@@ -92,7 +93,7 @@ module Lineage
         end
       end
 
-      def path(suffix) = "#{@uri.path.chomp('/')}/api/lineage#{suffix}"
+      def path(suffix) = "#{@uri.path.chomp('/')}#{@prefix}#{suffix}"
 
       def authed(req)
         req["Authorization"] = "Bearer #{@token}"

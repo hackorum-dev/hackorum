@@ -15,6 +15,20 @@ RSpec.describe Lineage::Processor::Client, :webmock do
     expect(client.claim(worker: "w")).to be_nil
   end
 
+  it "raises a plain error on an unexpected claim status" do
+    stub_request(:post, "http://srv:3000/api/classify/claims").to_return(status: 503, body: { error: "run setup" }.to_json)
+    c = described_class.new(server: "http://srv:3000", token: "t", prefix: "/api/classify")
+    expect { c.claim(worker: "w") }.to raise_error(described_class::Error, /503.*run setup/) { |e|
+      expect(e).not_to be_a(described_class::Conflict)
+    }
+  end
+
+  it "uses the given prefix" do
+    stub = stub_request(:post, "http://srv:3000/api/classify/claims").to_return(status: 204)
+    described_class.new(server: "http://srv:3000", token: "t", prefix: "/api/classify").claim(worker: "w")
+    expect(stub).to have_been_requested
+  end
+
   it "downloads a bundle to a file" do
     stub_request(:get, "http://srv:3000/api/lineage/claims/7/bundle").with(headers: auth).to_return(status: 200, body: "GZ")
     Dir.mktmpdir do |dir|

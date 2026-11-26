@@ -45,6 +45,14 @@ RSpec.describe TopicListPersonalization do
       expect(personalization.note_count_for(topic)).to eq(1)
     end
 
+    it "leaves out the classifier bot's notes" do
+      Classify::Setup.call!
+      Classify::BotNote.new(topic).write!(%w[bug])
+      expect(personalization.note_count_for(topic)).to eq(0)
+      create(:note, topic: topic, author: user)
+      expect(personalization.note_count_for(topic)).to eq(1)
+    end
+
     it "returns 0 without notes" do
       expect(personalization.note_count_for(topic)).to eq(0)
     end

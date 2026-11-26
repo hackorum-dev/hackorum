@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Mimics `codex exec --json -o FILE`: emits two turns of events, writes the
 # result file. FAKE_CODEX_SLEEP delays the exit for timeout tests,
+# FAKE_CODEX_STDIN_COPY saves stdin to that path,
 # FAKE_CODEX_ERROR replaces the result with error events and exit 1.
 out=""
 while [ $# -gt 0 ]; do
@@ -9,6 +10,7 @@ while [ $# -gt 0 ]; do
     *) shift ;;
   esac
 done
+[ -n "$FAKE_CODEX_STDIN_COPY" ] && cat > "$FAKE_CODEX_STDIN_COPY"
 echo '{"type":"thread.started","thread_id":"t1"}'
 if [ -n "$FAKE_CODEX_ERROR" ]; then
   echo "{\"type\":\"error\",\"message\":\"$FAKE_CODEX_ERROR\"}"
