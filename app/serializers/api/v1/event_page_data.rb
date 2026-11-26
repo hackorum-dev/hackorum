@@ -2,8 +2,6 @@ module Api
   module V1
     # What the events of one page show, loaded once per event type.
     class EventPageData
-      BRANCH_COLUMNS = BranchSerializer::REF_COLUMNS
-
       def initialize(events, context)
         @events = events
         @context = context
@@ -90,8 +88,8 @@ module Api
 
       def load_ci_runs(ids)
         runs = PatchCiRun.where(id: ids).select(*PatchCiRun.list_columns).to_a
-        branches = PatchBranch.where(id: runs.map(&:patch_branch_id).uniq)
-                              .select(*BRANCH_COLUMNS).index_by(&:id)
+        branches = BranchSerializer.load_refs(PatchBranch.where(id: runs.map(&:patch_branch_id).uniq))
+                                   .index_by(&:id)
         runs.each_with_object({}) do |run, found|
           branch = branches[run.patch_branch_id]
           next unless branch

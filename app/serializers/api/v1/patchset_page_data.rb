@@ -63,9 +63,9 @@ module Api
       end
 
       def branches
-        @branches ||= @ids.empty? ? {} : PatchBranch
-          .where(message_id: @ids, lineage_only: false)
-          .select(:message_id, *BranchSerializer::REF_COLUMNS).index_by(&:message_id)
+        @branches ||= @ids.empty? ? {} : BranchSerializer
+          .load_refs(PatchBranch.where(message_id: @ids, lineage_only: false))
+          .select(PatchBranch.arel_table[:message_id]).index_by(&:message_id)
       end
     end
   end

@@ -3173,7 +3173,7 @@ components:
         The record of hackorum trying to apply this patchset. `status` says
         whether it applied. A git branch to fetch exists only when
         `pushed_at` is set.
-      required: [id, branch_name, status, ci_status, pushed_at, url]
+      required: [id, branch_name, status, ci_status, pushed_at, rfc_message_id, url]
       properties:
         id:
           type: integer
@@ -3193,6 +3193,9 @@ components:
             - $ref: "#/components/schemas/CiStatus"
             - type: "null"
           description: CI verdict for the commit that is pushed now, null when CI never ran for this branch
+        rfc_message_id:
+          type: [string, "null"]
+          description: Message-ID header of the patch message, usually without angle brackets
         url:
           type: string
     TopicRef:
@@ -3560,7 +3563,7 @@ components:
         The record of hackorum trying to apply a patchset, and where it
         stands on CI. A git branch exists only when `pushed_at` is set.
       required:
-        [id, url, html_url, branch_name, topic, message_id, status, failure_stage,
+        [id, url, html_url, branch_name, topic, message_id, rfc_message_id, status, failure_stage,
         failure_reason, conflict_files, state, state_reason, superseded, base_sha, base_source,
         base_committed_at,
         on_master, pg_major, behind, attempted_at, pushed_at, pushed_head_sha, github_url, git_url,
@@ -3586,6 +3589,9 @@ components:
         message_id:
           type: integer
           description: Numeric id of the patch message; use `/messages/{message_id}`
+        rfc_message_id:
+          type: [string, "null"]
+          description: Message-ID header of the patch message, usually without angle brackets
         status:
           type: string
           enum: [applied, failed]
@@ -3725,12 +3731,15 @@ components:
       additionalProperties: false
       description: A message that carries patches
       required:
-        [message_id, number, url, html_url, created_at, subject, sender, topic, files,
+        [message_id, rfc_message_id, number, url, html_url, created_at, subject, sender, topic, files,
         changed_paths, branch, download_url]
       properties:
         message_id:
           type: integer
           description: Numeric id of the message; use `/messages/{message_id}`
+        rfc_message_id:
+          type: [string, "null"]
+          description: Message-ID header of the patch message, usually without angle brackets
         number:
           type: integer
           description: |
