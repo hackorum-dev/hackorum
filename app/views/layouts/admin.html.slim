@@ -51,5 +51,8 @@
       = link_to admin_patchset_runs_path, class: admin_nav_link_class(:patchset_runs) do
         i.fas.fa-project-diagram
         span Patchset Runs
+      = link_to admin_classification_runs_path, class: admin_nav_link_class(:classification_runs) do
+        i.fas.fa-tags
+        span Classification Runs
 
 = render template: 'layouts/application'

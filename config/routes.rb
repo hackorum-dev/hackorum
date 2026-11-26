@@ -5,6 +5,9 @@ Rails.application.routes.draw do
     resources :patchset_runs, only: [ :index, :show ] do
       post :requeue, on: :member
     end
+    resources :classification_runs, only: [ :index, :show ] do
+      post :requeue, on: :member
+    end
     resources :users, only: [ :index ] do
       member do
         post :toggle_admin

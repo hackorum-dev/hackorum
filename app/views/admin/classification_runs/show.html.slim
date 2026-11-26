@@ -1,0 +1,85 @@
+- content_for :title, "Admin - Classification run #{@run.id}"
+- result = @run.result || {}
+- answer = result["group"] || {}
+
+.settings-page
+  h1 = "Run #{@run.id}: #{@run.topic.title}"
+  p
+    = link_to "open thread", topic_path(@run.topic)
+    |  /
+    = link_to "all runs", admin_classification_runs_path
+  table.email-table
+    tr
+      th Status
+      td = @run.failure_kind.present? ? "#{@run.status} (#{@run.failure_kind})" : @run.status
+    tr
+      th Phase / worker
+      td = "#{@run.phase} / #{@run.worker}"
+    tr
+      th Model / effort / prompt
+      td = "#{@run.model} / #{@run.effort} / #{@run.prompt_version}"
+    tr
+      th Claimed / finished
+      td = [ @run.claimed_at, @run.finished_at ].map { |t| t ? absolute_time_display(t) : "-" }.join(" / ")
+    tr
+      th Messages seen
+      td = @run.message_count
+    tr
+      th Duration
+      td = @run.duration_s ? "#{@run.duration_s.round}s" : ""
+    tr
+      th Tokens in/cached/out
+      td = "#{@run.input_tokens}/#{@run.cached_input_tokens}/#{@run.output_tokens}"
+    - if @run.error.present?
+      tr
+        th Error
+        td
+          pre = @run.error
+  - if Admin::ClassificationRunsController::REQUEUEABLE.include?(@run.status)
+    = button_to "Requeue", requeue_admin_classification_run_path(@run), method: :post, class: "button-secondary button-small", form: { data: { turbo_confirm: "Delete this run so the thread is picked up again?" } }
+
+  - if result.any?
+    h2 Answer
+    table.email-table
+      tr
+        th Kind / size
+        td = [ result["kind"], result["size"] ].compact.join(" / ")
+      tr
+        th Enhancement / not a bug
+        td = "#{result['enhancement'].inspect} / #{result['not_a_bug'].inspect}"
+      tr
+        th Feature name
+        td = result["feature_name"]
+      tr
+        th Group
+        td
+          - if @run.feature_group
+            = link_to @run.feature_group.name, admin_feature_group_path(@run.feature_group)
+          - elsif answer["new_name"].present?
+            = "proposed: #{answer['new_name']}"
+          - else
+            | none
+      - if answer["new_summary"].present?
+        tr
+          th Proposed summary
+          td = answer["new_summary"]
+      tr
+        th Joined linked threads
+        td
+          - ids = Array(result["join_linked"])
+          - if ids.empty?
+            | none
+          - else
+            - ids.each do |id|
+              div
+                - if (t = @linked[id])
+                  = link_to t.title, topic_path(t)
+                - else
+                  = "topic #{id}"
+      tr
+        th Confidence
+        td = result["confidence"]
+    h2 Evidence
+    ul
+      - Array(result["evidence"]).each do |line|
+        li = line

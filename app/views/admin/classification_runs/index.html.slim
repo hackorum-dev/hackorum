@@ -1,0 +1,69 @@
+- content_for :title, "Admin - Classification runs"
+- filters = { status: @status, phase: @phase, kind: @kind, sort: @sort }.compact
+
+.settings-page
+  h1 Classification runs
+  p
+    - @queue_counts.each do |phase, c|
+      span.commit-sidebar-meta = "#{phase}: #{c[:remaining]} remaining, #{c[:claimed]} claimed, #{c[:done]} done  "
+  p
+    - @status_counts.sort.each do |status, n|
+      span.commit-sidebar-meta = "#{status}: #{n}  "
+  p
+    - @kind_counts.sort_by { |k, n| [ -n, k.to_s ] }.each do |kind, n|
+      span.commit-sidebar-meta = "#{kind || '-'}: #{n}  "
+  - if @totals&.first
+    p.commit-sidebar-meta
+      = "Tokens in/cached/out: #{@totals[0]}/#{@totals[1]}/#{@totals[2]}, average #{@totals[3].to_f.round(1)}s per run"
+  p
+    = link_to "newest", admin_classification_runs_path(filters.except(:sort))
+    |  /
+    = link_to "slowest", admin_classification_runs_path(filters.merge(sort: "duration"))
+    |  /
+    = link_to "most tokens", admin_classification_runs_path(filters.merge(sort: "tokens"))
+  p
+    | Status:
+    - ClassificationRun::STATUSES.each do |s|
+      = " "
+      = link_to s, admin_classification_runs_path(filters.merge(status: s))
+    |  / Phase:
+    - ClassificationRun::PHASES.each do |ph|
+      = " "
+      = link_to ph, admin_classification_runs_path(filters.merge(phase: ph))
+    |  / Kind:
+    - Classify::KIND_TAGS.each do |k|
+      = " "
+      = link_to k, admin_classification_runs_path(filters.merge(kind: k))
+    - if filters.except(:sort).any?
+      |  /
+      = link_to "clear", admin_classification_runs_path(filters.slice(:sort))
+
+  table.email-table
+    thead
+      tr
+        th Run
+        th Thread
+        th Phase
+        th Status
+        th Result
+        th Group
+        th Model
+        th Worker
+        th Duration
+        th Tokens in/cached/out
+    tbody
+      - @runs.each do |run|
+        tr
+          td = link_to run.id, admin_classification_run_path(run)
+          td = link_to run.topic.title, topic_path(run.topic)
+          td = run.phase
+          td = run.failure_kind.present? ? "#{run.status} (#{run.failure_kind})" : run.status
+          td = [ run.kind, run.size, ("enhancement" if run.enhancement), ("not-a-bug" if run.not_a_bug) ].compact.join(" ")
+          td
+            - if run.feature_group
+              = link_to run.feature_group.name, admin_feature_group_path(run.feature_group)
+          td = [ run.model, run.effort ].compact.join(" / ")
+          td = run.worker
+          td = run.duration_s ? "#{run.duration_s.round}s" : ""
+          td = "#{run.input_tokens}/#{run.cached_input_tokens}/#{run.output_tokens}"
+  = paginate @runs
