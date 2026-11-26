@@ -17,7 +17,7 @@
         = 'message'.pluralize(total)
     .summary-boxes
       - if started_query
-        a class=["summary-box", ("zero" if started.zero?)] href=search_topics_path(q: started_query)
+        a class=["summary-box", ("zero" if started.zero?)] href=search_topics_path(q: started_query) data-turbo-frame="_top"
           span.summary-box-value = number_with_delimiter(started)
           span.summary-box-label Started
       - else
