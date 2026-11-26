@@ -30,13 +30,24 @@ module Lineage
     end
 
     def self.counts
-      PHASES.to_h do |phase|
-        all = phase_scope(phase, gate: false).unscope(:order).count
-        open = phase_scope(phase).unscope(:order).count
-        [ phase, { remaining: open, held: all - open,
-                   claimed: PatchsetRun.claimed.where(mode: phase).count,
-                   done: PatchsetRun.done.where(mode: phase).count } ]
+      runs = PatchsetRun.where(status: %w[claimed done]).group(:mode, :status).count
+      Topic.transaction do
+        # planner overestimates these, jit costs more than it saves
+        Topic.connection.execute("SET LOCAL jit = off")
+        PHASES.to_h do |phase|
+          all, open = phase_counts(phase)
+          [ phase, { remaining: open, held: all - open,
+                     claimed: runs.fetch([ phase, "claimed" ], 0),
+                     done: runs.fetch([ phase, "done" ], 0) } ]
+        end
       end
+    end
+
+    # -> [all, not held]
+    def self.phase_counts(phase)
+      scope = phase_scope(phase, gate: false).unscope(:order)
+      return [ scope.count ] * 2 unless GATED.include?(phase)
+      scope.pick(Arel.sql("count(*)"), Arel.sql("count(*) FILTER (WHERE NOT #{held_sql('topics.id')})"))
     end
 
     # a higher-ranked thread sharing a trailer commit has not judged it yet
@@ -92,6 +103,6 @@ module Lineage
     def self.last_at(messages)
       messages.group(:topic_id).select("topic_id, max(created_at) AS last_at")
     end
-    private_class_method :held_sql, :base, :discussion, :update, :last_at
+    private_class_method :held_sql, :base, :discussion, :update, :last_at, :phase_counts
   end
 end
