@@ -178,7 +178,9 @@ class QuotedEmailFormatter
 
   def inline_reference_html(num, ref_text)
     tooltip = auto_link_html(ref_text)
-    %(<span class="inline-reference">[#{num}]<span class="reference-hover">#{tooltip}</span></span>)
+    %(<span class="inline-reference" data-controller="hover-popover" ) +
+      %(data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide">[#{num}]) +
+      %(<span class="reference-hover" data-hover-popover-target="popover">#{tooltip}</span></span>)
   end
 
   URL_RE = %r{https?://[^\s<>"]+}

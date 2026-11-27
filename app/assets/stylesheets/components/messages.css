@@ -266,7 +266,6 @@
   }
 
   & .inline-reference {
-    position: relative;
     display: inline-block;
     margin-left: 2px;
     color: var(--color-text-muted);
@@ -274,29 +273,28 @@
     cursor: pointer;
   }
 
-  & .reference-hover {
-    display: none;
-    position: absolute;
-    left: 0;
-    top: 120%;
-    z-index: 5;
-    background: var(--color-bg-card);
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--border-radius-sm);
-    padding: var(--spacing-2) var(--spacing-3);
-    color: var(--color-text-secondary);
-    min-width: 200px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-    white-space: normal;
-  }
-
-  & .inline-reference:hover .reference-hover {
-    display: block;
-  }
-
   & .reference-definition {
     color: var(--color-text-secondary);
   }
+}
+
+/* moved to <body> while open by hover-popover, so not nested */
+.reference-hover {
+  display: none;
+  z-index: 50;
+  background: var(--color-bg-card);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-2) var(--spacing-3);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+  min-width: 200px;
+  max-width: min(36rem, calc(100vw - 16px));
+  overflow-wrap: anywhere;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  white-space: normal;
 }
 
 .message-attachments {

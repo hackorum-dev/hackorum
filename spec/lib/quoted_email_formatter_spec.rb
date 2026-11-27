@@ -73,8 +73,21 @@ RSpec.describe QuotedEmailFormatter do
 
       html = described_class.new(body).to_html
 
-      expect(html).to include(%q(inline-reference">[1]))
-      expect(html).not_to include(%q(inline-reference">[2]))
+      refs = Nokogiri::HTML.fragment(html).css(".inline-reference").map { |r| r.children.first.text }
+      expect(refs).to eq([ "[1]" ])
+    end
+
+    it "wires inline references to the hover-popover controller" do
+      body = <<~BODY
+        See [1]
+
+        [1]: https://example.com/ref1
+      BODY
+      ref = Nokogiri::HTML.fragment(described_class.new(body).to_html).at_css(".inline-reference")
+
+      expect(ref["data-controller"]).to eq("hover-popover")
+      expect(ref["data-action"]).to eq("mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide")
+      expect(ref.at_css(".reference-hover")["data-hover-popover-target"]).to eq("popover")
     end
 
     it "rewrites known message-id links to local resolver" do

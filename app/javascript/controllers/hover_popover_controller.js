@@ -72,19 +72,31 @@ export default class extends Controller {
     window.addEventListener("resize", this.onScroll)
   }
 
+  // Closes on scroll, so it has to fit the viewport: shift left, flip above.
   _positionPopover() {
+    const gap = 6
+    const edge = 8
     const alignRight = this.element.closest(".topic-participants") !== null
     const rect = this.element.getBoundingClientRect()
 
     this.popover.style.position = "fixed"
-    this.popover.style.top = `${rect.bottom + 6}px`
+    this.popover.style.top = `${rect.bottom + gap}px`
 
     if (alignRight) {
       this.popover.style.left = "auto"
       this.popover.style.right = `${window.innerWidth - rect.right}px`
     } else {
-      this.popover.style.left = `${rect.left}px`
+      this.popover.style.left = "0px"
       this.popover.style.right = "auto"
+      const maxLeft = window.innerWidth - edge - this.popover.offsetWidth
+      this.popover.style.left = `${Math.max(edge, Math.min(rect.left, maxLeft))}px`
+    }
+
+    const height = this.popover.offsetHeight
+    const fitsBelow = rect.bottom + gap + height <= window.innerHeight - edge
+    const fitsAbove = rect.top - gap - height >= edge
+    if (!fitsBelow && fitsAbove) {
+      this.popover.style.top = `${rect.top - gap - height}px`
     }
   }
 
