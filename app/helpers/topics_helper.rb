@@ -18,8 +18,12 @@ module TopicsHelper
   end
 
   # Replaces app/views/topics/_participant_row.html.slim
+  def participant_alias(participant)
+    participant[:alias] || participant[:person]&.aliases&.order(sender_count: :desc, id: :asc)&.first
+  end
+
   def participant_row_html(participant:, avatar_size: 40, tooltip: nil)
-    alias_record = participant[:alias]
+    alias_record = participant_alias(participant)
     return nil unless alias_record
 
     person = participant[:person] || alias_record.person
@@ -74,7 +78,7 @@ module TopicsHelper
   def avatar_list_html(participants:, total_participants:)
     avatars = tag.div(class: "participants-avatars") do
       avatar_tags = participants.filter_map do |participant|
-        alias_record = participant[:alias] || participant
+        alias_record = participant_alias(participant)
         next unless alias_record
 
         person = participant[:person] || alias_record.person

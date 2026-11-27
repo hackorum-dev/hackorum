@@ -12,6 +12,8 @@ set -euo pipefail
 # aliases is split by row: the public dump only gets addresses seen in the
 # archive, with the account link (user_id, verified_at) cleared. The private
 # dump adds the remaining rows and restores the account links.
+# people.default_alias_id pointing to a private-only alias is moved to the
+# best archive alias (or NULL) in the public dump, the private dump restores it.
 #
 # Dumps older than RETENTION_DAYS (default 365) are deleted.
 
@@ -63,6 +65,20 @@ public_aliases() {
     FROM aliases a WHERE ${IN_ARCHIVE} ORDER BY id) TO STDOUT"
   echo '\.'
   echo "${SETVAL}"
+  echo "UPDATE public.people p SET default_alias_id = (
+    SELECT a.id FROM public.aliases a WHERE a.person_id = p.id
+    ORDER BY a.name = 'Noname', a.sender_count DESC, a.created_at, a.id LIMIT 1)
+  WHERE p.default_alias_id IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM public.aliases a WHERE a.id = p.default_alias_id);"
+}
+
+private_default_aliases() {
+  echo "CREATE TEMP TABLE people_private AS SELECT id, default_alias_id FROM public.people WITH NO DATA;"
+  echo "COPY people_private (id, default_alias_id) FROM stdin;"
+  "${PSQL[@]}" -c "COPY (SELECT p.id, p.default_alias_id FROM people p JOIN aliases a ON a.id = p.default_alias_id
+    WHERE NOT (${IN_ARCHIVE}) ORDER BY p.id) TO STDOUT"
+  echo '\.'
+  echo "UPDATE public.people p SET default_alias_id = pp.default_alias_id FROM people_private pp WHERE p.id = pp.id;"
 }
 
 private_aliases() {
@@ -81,7 +97,7 @@ mkdir -p /dumps/public /dumps/private
 "${DUMP[@]}" --schema-only | gzip -9 > "/dumps/public/schema-${STAMP}.sql.gz"
 { "${DUMP[@]}" --data-only "${EXCLUDE_ARGS[@]}"; public_aliases; } \
   | gzip -9 > "/dumps/public/public-data-${STAMP}.sql.gz"
-{ "${DUMP[@]}" --data-only "${INCLUDE_ARGS[@]}"; private_aliases; } \
+{ "${DUMP[@]}" --data-only "${INCLUDE_ARGS[@]}"; private_aliases; private_default_aliases; } \
   | gzip -9 > "/dumps/private/private-data-${STAMP}.sql.gz"
 
 find /dumps/public /dumps/private -name '*.sql.gz' -mtime "+${RETENTION_DAYS}" -print -delete

@@ -11,4 +11,37 @@ RSpec.describe TopicsHelper, type: :helper do
     expect(helper.short_name_list(%w[Korotkov Koval Wang Guo])).to eq("Korotkov, Koval +2")
     expect(helper.short_name_list(%w[Korotkov])).to eq("Korotkov")
   end
+
+  describe "participant without an alias" do
+    let(:person) { create(:person) }
+    let(:participant) { { alias: nil, person: person, message_count: 3 } }
+
+    context "when the person has other aliases" do
+      before do
+        create(:alias, person: person, name: "Rare Name", sender_count: 1)
+        create(:alias, person: person, name: "Main Name", sender_count: 9)
+      end
+
+      it "avatar list uses the busiest alias" do
+        html = helper.avatar_list_html(participants: [ participant ], total_participants: 1)
+        expect(html).to include('alt="Main Name"')
+      end
+
+      it "participant row uses the busiest alias" do
+        html = helper.participant_row_html(participant: participant)
+        expect(html).to include("Main Name")
+      end
+    end
+
+    context "when the person has no aliases" do
+      it "avatar list skips the participant" do
+        html = helper.avatar_list_html(participants: [ participant ], total_participants: 1)
+        expect(html).not_to include("participant-avatar-link")
+      end
+
+      it "participant row renders nothing" do
+        expect(helper.participant_row_html(participant: participant)).to be_nil
+      end
+    end
+  end
 end
