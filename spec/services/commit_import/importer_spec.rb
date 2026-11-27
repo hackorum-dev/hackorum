@@ -408,14 +408,16 @@ RSpec.describe CommitImport::Importer do
   end
 
   describe "#refresh_commit_aggregates" do
-    it "counts trailer links only" do
+    it "counts trailer and llm links" do
       topic = create(:topic)
-      create(:commit_topic, topic: topic, commit: create(:commit))
-      create(:commit_topic, topic: topic, commit: create(:commit), source: "llm", confidence: 0.9)
+      create(:commit_topic, topic: topic, commit: create(:commit, committed_at: 3.days.ago))
+      later = create(:commit, committed_at: 1.day.ago)
+      create(:commit_topic, topic: topic, commit: later, source: "llm", confidence: 0.9)
 
       importer.send(:refresh_commit_aggregates, [ topic.id ])
 
-      expect(topic.reload.commit_count).to eq(1)
+      expect(topic.reload.commit_count).to eq(2)
+      expect(topic.last_commit_at).to be_within(1.second).of(later.committed_at)
     end
   end
 

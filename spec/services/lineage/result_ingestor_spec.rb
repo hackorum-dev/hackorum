@@ -27,6 +27,20 @@ RSpec.describe Lineage::ResultIngestor do
     end
   end
 
+  it "refreshes the topic commit aggregates when it links" do
+    ingest(answer)
+    expect(topic.reload.commit_count).to eq(1)
+    expect(topic.last_commit_at).to be_within(1.second).of(commit.committed_at)
+  end
+
+  it "refreshes the topic commit aggregates when it unlinks" do
+    create(:commit_topic, commit: commit, topic: topic, source: "llm", confidence: 0.9)
+    Topic.refresh_commit_aggregates!([ topic.id ])
+    ingest(answer(confidence: 0.5))
+    expect(topic.reload.commit_count).to eq(0)
+    expect(topic.last_commit_at).to be_nil
+  end
+
   it "writes rows, story, links above threshold" do
     ingest(answer)
     expect(run.reload.status).to eq("done")

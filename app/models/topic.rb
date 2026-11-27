@@ -68,10 +68,10 @@ class Topic < ApplicationRecord
       FROM (
         SELECT t.id,
                (SELECT COUNT(*) FROM commit_topics ct
-                 WHERE ct.topic_id = t.id AND ct.source = 'trailer') AS n,
+                 WHERE ct.topic_id = t.id) AS n,
                (SELECT MAX(c.committed_at) FROM commit_topics ct
                   JOIN commits c ON c.id = ct.commit_id
-                 WHERE ct.topic_id = t.id AND ct.source = 'trailer') AS last_at
+                 WHERE ct.topic_id = t.id) AS last_at
         FROM topics t WHERE t.id IN (?)
       ) sub
       WHERE topics.id = sub.id
@@ -384,7 +384,7 @@ class Topic < ApplicationRecord
 
     rows = Commit
       .joins(:commit_topics)
-      .where(commit_topics: { topic_id: ids, source: "trailer" })
+      .where(commit_topics: { topic_id: ids })
       .select(<<~COLUMNS.squish)
         commits.id, commits.sha, commits.subject, commits.branches,
         commits.released_in, commits.released_at, commits.committed_at,

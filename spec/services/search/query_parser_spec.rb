@@ -243,6 +243,44 @@ RSpec.describe Search::QueryParser, type: :service do
     end
 
     context 'with dependent conditions (bracket notation)' do
+      it 'parses commit: selector with conditions' do
+        result = parser.parse('commit:[reviewer:me, released:17]')
+        expect(result).to include(type: :selector, key: :commit, value: '')
+        expect(result[:conditions]).to eq([
+          { key: :reviewer, value: 'me', quoted: false },
+          { key: :released, value: '17', quoted: false }
+        ])
+      end
+
+      it 'parses commit: conditions with quoted value and date' do
+        result = parser.parse('commit:[reporter:"Alexander Lakhin", committed_after:1m]')
+        expect(result[:conditions][0]).to include(key: :reporter, value: 'Alexander Lakhin', quoted: true)
+        expect(result[:conditions][1][:key]).to eq(:committed_after)
+      end
+
+      it 'parses commit: sha' do
+        result = parser.parse('commit:abc1234')
+        expect(result).to include(key: :commit, value: 'abc1234')
+      end
+
+      it 'parses ci:, apply: and group: selectors' do
+        expect(parser.parse('ci:failing')).to include(key: :ci, value: 'failing')
+        expect(parser.parse('apply:needs_rebase')).to include(key: :apply, value: 'needs_rebase')
+        expect(parser.parse('group:"incremental backup"')).to include(key: :group, value: 'incremental backup')
+      end
+
+      it 'parses has:later_fix' do
+        result = parser.parse('has:later_fix')
+        expect(result).to include(key: :has, value: 'later_fix')
+      end
+
+      it 'keeps commitfest selectors and plain words intact' do
+        expect(parser.parse('commitfest:PG19-Final')[:key]).to eq(:commitfest)
+        expect(parser.parse('commitfest:[status:committed]')[:key]).to eq(:commitfest)
+        expect(parser.parse('commits')).to include(type: :text, value: 'commits')
+        expect(parser.parse('circle:x')).to include(type: :text)
+      end
+
       it 'parses from: selector with single condition' do
         result = parser.parse('from:bruce[messages:>=10]')
         expect(result[:type]).to eq(:selector)
@@ -330,6 +368,13 @@ RSpec.describe Search::QueryParser, type: :service do
         expect(result[:key]).to eq(:has)
         expect(result[:value]).to eq('patch')
         expect(result[:conditions].size).to eq(2)
+      end
+
+      it 'parses has:patch with after and waiting conditions' do
+        result = parser.parse('has:patch[after:me]')
+        expect(result[:conditions].map { |c| c.slice(:key, :value) }).to eq([ { key: :after, value: 'me' } ])
+        result = parser.parse('has:patch[from:alice, waiting:2w]')
+        expect(result[:conditions].map { |c| c[:key] }).to eq(%i[from waiting])
       end
 
       it 'parses tag with added_before condition' do

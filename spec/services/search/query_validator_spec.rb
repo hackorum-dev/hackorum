@@ -28,6 +28,37 @@ RSpec.describe Search::QueryValidator, type: :service do
       end
     end
 
+    context 'with has:patch progress conditions' do
+      def validate(q)
+        described_class.new(parser.parse(q)).validate
+      end
+
+      it 'keeps valid waiting values' do
+        %w[any 2w 2026-01-01].each do |v|
+          result = validate("has:patch[waiting:#{v}]")
+          expect(result.warnings).to be_empty
+          expect(result.ast[:conditions].first[:value]).to eq(v)
+        end
+      end
+
+      it 'normalizes empty waiting to any' do
+        result = validate('has:patch[waiting:]')
+        expect(result.warnings).to be_empty
+        expect(result.ast[:conditions]).to eq([ { key: :waiting, value: 'any', quoted: false } ])
+      end
+
+      it 'drops invalid waiting values' do
+        result = validate('has:patch[waiting:soon]')
+        expect(result.warnings).to include(/invalid date/i)
+        expect(result.ast[:conditions]).to be_nil
+      end
+
+      it 'drops after: for attachment' do
+        result = validate('has:attachment[after:me]')
+        expect(result.warnings).to include(/not valid for/i)
+      end
+    end
+
     context 'with empty values' do
       it 'warns and removes selector with empty value' do
         ast = parser.parse('from:')
@@ -145,6 +176,92 @@ RSpec.describe Search::QueryValidator, type: :service do
       end
     end
 
+    context 'with ci:, apply: and group: selectors' do
+      def validate(query)
+        described_class.new(parser.parse(query)).validate
+      end
+
+      it 'accepts ci values case-insensitively' do
+        %w[passing failing pending none FAILING].each do |v|
+          result = validate("ci:#{v}")
+          expect(result.warnings).to be_empty
+          expect(result.ast[:key]).to eq(:ci)
+        end
+      end
+
+      it 'drops invalid ci values' do
+        result = validate('ci:bogus')
+        expect(result.ast).to be_nil
+        expect(result.warnings.join).to include('bogus')
+      end
+
+      it 'accepts apply buckets and drops others' do
+        PatchCi::BranchHealth::BUCKETS.each { |b| expect(validate("apply:#{b}").ast[:key]).to eq(:apply) }
+        result = validate('apply:bogus')
+        expect(result.ast).to be_nil
+        expect(result.warnings.join).to include('bogus')
+      end
+
+      it 'accepts group values and has:group' do
+        expect(validate('group:"incremental backup"').ast[:key]).to eq(:group)
+        expect(validate('has:group').warnings).to be_empty
+      end
+    end
+
+    context 'with commit: selector' do
+      def validate(query)
+        described_class.new(parser.parse(query)).validate
+      end
+
+      it 'keeps valid conditions' do
+        result = validate('commit:[reviewer:me]')
+        expect(result.warnings).to be_empty
+        expect(result.ast[:key]).to eq(:commit)
+      end
+
+      it 'drops invalid released values' do
+        %w[17beta abc].each do |v|
+          result = validate("commit:[reviewer:me, released:#{v}]")
+          expect(result.ast[:conditions].map { |c| c[:key] }).to eq([ :reviewer ])
+          expect(result.warnings.join).to include("Invalid release '#{v}'")
+        end
+      end
+
+      it 'keeps none and dotted released values' do
+        %w[none 8.4].each do |v|
+          result = validate("commit:[released:#{v}]")
+          expect(result.warnings).to be_empty
+          expect(result.ast[:conditions].size).to eq(1)
+        end
+      end
+
+      it 'drops non-hex and short shas' do
+        %w[xyz abc12].each do |v|
+          result = validate("commit:#{v}")
+          expect(result.ast).to be_nil
+          expect(result.warnings.join).to include("must be 7-40 hex characters")
+        end
+      end
+
+      it 'accepts a hex sha' do
+        expect(validate('commit:abc1234').warnings).to be_empty
+      end
+
+      it 'rejects count: condition' do
+        result = validate('commit:[reviewer:me, count:3]')
+        expect(result.ast[:conditions].size).to eq(1)
+        expect(result.warnings.join).to include('not valid for')
+      end
+
+      it 'accepts new has: values' do
+        %w[commit later_fix fixes].each do |v|
+          result = validate("has:#{v}")
+          expect(result.warnings).to be_empty
+          expect(result.ast[:value]).to eq(v)
+        end
+      end
+    end
+
     context 'with valid commitfest: selector' do
       it 'passes valid commitfest name' do
         ast = parser.parse('commitfest:PG19-Final')
@@ -178,6 +295,30 @@ RSpec.describe Search::QueryValidator, type: :service do
         ast = parser.parse('commitfest:[messages:>=10]')
         result = described_class.new(ast).validate
         expect(result.warnings).to include(/not valid for 'commitfest:'/i)
+      end
+    end
+
+    context 'with bracket-only keys and short selectors as plain text' do
+      def warnings_for(query)
+        described_class.new(parser.parse(query)).validate.warnings
+      end
+
+      it 'warns that reviewer: only works inside commit:[...]' do
+        expect(warnings_for('reviewer:me').join).to include("'reviewer:' works inside commit:[...]")
+      end
+
+      it 'names the parent for after: and does not suggest first_after:' do
+        warnings = warnings_for('after:me')
+        expect(warnings.join).to include("'after:' works inside has:patch[...]")
+        expect(warnings.join).not_to include('first_after')
+      end
+
+      it 'does not suggest ci: for circle:x' do
+        expect(warnings_for('circle:x').join).not_to include("'ci:'")
+      end
+
+      it 'still suggests ci: for a near typo' do
+        expect(warnings_for('cl:x').join).to include("'ci:'")
       end
     end
 

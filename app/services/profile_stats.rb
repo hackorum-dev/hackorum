@@ -56,7 +56,7 @@ class ProfileStats
       if patch_threads_since_era.zero?
         0
       else
-        CommitTopic.trailer.where(topic_id: patch_message_scope.select(:topic_id))
+        CommitTopic.where(topic_id: patch_message_scope.select(:topic_id))
                    .joins(:topic)
                    .joins(commit: :commit_people)
                    .where(commit_people: { person_id: @person_ids, role: LANDED_ROLES, source: @sources })

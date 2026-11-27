@@ -169,8 +169,16 @@ module Search
                  apply_last_date_selector(:<, value, relation, negated: negated)
       when :commitfest
                  apply_commitfest_selector(value, relation, negated: negated, conditions: conditions)
+      when :commit
+                 apply_commit_selector(value, relation, negated: negated, conditions: conditions)
       when :list
                  apply_list_selector(value, relation, negated: negated)
+      when :ci
+                 restrict_topics(relation, PatchStateQuery.ci(value.downcase), negated: negated)
+      when :apply
+                 restrict_topics(relation, PatchStateQuery.apply(value.downcase), negated: negated)
+      when :group
+                 apply_group_selector(value, relation, negated: negated)
       else
                  @warnings << "Unknown selector: #{key}"
                  relation
@@ -699,6 +707,10 @@ module Search
       normalized = value.to_s.downcase
 
       # Handle conditions for attachment and patch
+      if conditions.present? && normalized == "patch" && conditions.any? { |c| %i[after waiting].include?(c[:key]) }
+        return apply_patch_progress(relation, conditions, negated: negated)
+      end
+
       if conditions.present? && %w[attachment patch].include?(normalized)
         topic_ids = build_has_condition_query(normalized, conditions)
         return restrict_topics(relation, topic_ids, negated: negated)
@@ -726,6 +738,14 @@ module Search
         core_person_ids = ContributorMembership.where(contributor_type: "core_team").select(:person_id)
         topic_ids_subquery = TopicParticipant.where(person_id: core_person_ids).select(:topic_id).distinct
         restrict_topics(relation, topic_ids_subquery, negated: negated)
+      when "group"
+        restrict_topics(relation, FeatureGroupTopic.where.not(feature_group_id: nil).select(:topic_id), negated: negated)
+      when "commit"
+        relation.where(negated ? "topics.commit_count = 0" : "topics.commit_count > 0")
+      when "later_fix"
+        restrict_topics(relation, TopicLink.where(kind: "fixes", direction: "in").select(:topic_id), negated: negated)
+      when "fixes"
+        restrict_topics(relation, TopicLink.where(kind: "fixes", direction: "out").select(:topic_id), negated: negated)
       when "commitfest"
         topic_ids_subquery = CommitfestPatchTopic.select(:topic_id).distinct
         restrict_topics(relation, topic_ids_subquery, negated: negated)
@@ -733,6 +753,40 @@ module Search
         @warnings << "Unknown has: value '#{value}'"
         relation
       end
+    end
+
+    def apply_patch_progress(relation, conditions, negated:)
+      from_cond = conditions.find { |c| c[:key] == :from }
+      after_cond = conditions.find { |c| c[:key] == :after }
+      waiting_cond = conditions.find { |c| c[:key] == :waiting }
+
+      from_ids = nil
+      after_ids = nil
+      [ [ from_cond, :from ], [ after_cond, :after ] ].each do |cond, which|
+        next unless cond
+
+        result = @value_resolver.resolve_author(cond[:value], quoted: cond[:quoted])
+        @warnings.concat(result.warnings)
+        return unresolved(relation, negated) if result.person_ids.empty?
+
+        which == :from ? from_ids = result.person_ids : after_ids = result.person_ids
+      end
+
+      waiting_before = nil
+      if waiting_cond && !waiting_cond[:value].to_s.casecmp?("any")
+        waiting_before = DateParser.new(waiting_cond[:value]).parse
+      end
+
+      progress = PatchProgressQuery.new(from_ids: from_ids, after_ids: after_ids,
+                                        waiting: waiting_cond.present?, waiting_before: waiting_before).relation
+
+      count_cond = conditions.find { |c| c[:key] == :count }
+      if count_cond
+        count_conditions = conditions.select { |c| %i[from count].include?(c[:key]) }
+        progress = Topic.where(id: progress).where(id: build_has_condition_query("patch", count_conditions)).select(:id)
+      end
+
+      restrict_topics(relation, progress, negated: negated)
     end
 
     def build_has_condition_query(has_type, conditions)
@@ -886,6 +940,25 @@ module Search
       end
 
       topic_ids = links.select(:topic_id)
+      restrict_topics(relation, topic_ids, negated: negated)
+    end
+
+    def apply_group_selector(value, relation, negated:)
+      group = FeatureGroup.find_by("lower(slug) = ?", value.downcase)&.surviving ||
+              FeatureGroup.find_by_normalized_name(value)
+      if group.nil?
+        @warnings << "Unknown group '#{value}'"
+        return unresolved(relation, negated)
+      end
+
+      restrict_topics(relation, FeatureGroupTopic.where(feature_group_id: group.id).select(:topic_id), negated: negated)
+    end
+
+    def apply_commit_selector(value, relation, negated:, conditions:)
+      query = CommitQuery.new(resolver: @value_resolver, warnings: @warnings)
+      topic_ids = query.topic_ids(sha: value.presence, conditions: conditions || [])
+      return unresolved(relation, negated) if query.unresolved?
+
       restrict_topics(relation, topic_ids, negated: negated)
     end
 

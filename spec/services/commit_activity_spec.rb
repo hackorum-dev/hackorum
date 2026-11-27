@@ -81,6 +81,15 @@ RSpec.describe CommitActivity do
     expect(activity.detail_rows_in(year_range).first[:topics]).to eq([ topic ])
   end
 
+  it "carries topics linked to the commit only by lineage" do
+    commit = create(:commit, branches: [ "master" ], committed_at: Time.zone.local(year, 8, 4, 9))
+    create(:commit_person, commit: commit, person: person, role: "author")
+    topic = create(:topic)
+    create(:commit_topic, commit: commit, topic: topic, source: "llm", confidence: 0.9)
+
+    expect(activity.detail_rows_in(year_range).first[:topics]).to eq([ topic ])
+  end
+
   describe "roles" do
     let!(:commit) do
       create(:commit, branches: [ "master" ], committed_at: Time.zone.local(year, 4, 2, 8))

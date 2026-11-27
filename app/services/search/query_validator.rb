@@ -24,13 +24,20 @@ module Search
 
     COMMITFEST_SELECTORS = %i[commitfest]
 
+    COMMIT_SELECTORS = %i[commit].freeze
+
     LIST_SELECTORS = %i[list].freeze
+
+    PATCH_STATE_SELECTORS = %i[ci apply].freeze
+
+    GROUP_SELECTORS = %i[group].freeze
 
     ALL_SELECTORS = (DATE_SELECTORS + COUNT_SELECTORS + AUTHOR_SELECTORS +
                      STATE_SELECTORS + CONTENT_SELECTORS + TAG_SELECTORS +
-                     COMMITFEST_SELECTORS + LIST_SELECTORS + [ :has, :hidden ]).freeze
+                     COMMITFEST_SELECTORS + COMMIT_SELECTORS + LIST_SELECTORS +
+                     PATCH_STATE_SELECTORS + GROUP_SELECTORS + [ :has, :hidden ]).freeze
 
-    HAS_VALUES = %w[attachment patch contributor committer core_team commitfest].freeze
+    HAS_VALUES = %w[attachment patch contributor committer core_team commitfest commit later_fix fixes group].freeze
 
     HIDDEN_VALUES = %w[true false].freeze
 
@@ -39,14 +46,19 @@ module Search
       from: %i[messages last_before last_after first_before first_after body],
       has: {
         attachment: %i[from count name],
-        patch: %i[from count]
+        patch: %i[from count after waiting]
       },
       tag: %i[from added_before added_after],
-      commitfest: %i[name status tag]
+      commitfest: %i[name status tag],
+      commit: %i[reviewer reporter tester author committer released committed_after committed_before]
     }.freeze
 
     # Sub-condition keywords that require date values
-    DATE_SUB_CONDITIONS = %i[last_before last_after first_before first_after added_before added_after].freeze
+    DATE_SUB_CONDITIONS = %i[last_before last_after first_before first_after added_before added_after
+                            committed_after committed_before].freeze
+
+    RELEASE_PATTERN = /\A(none|\d+(\.\d+)*)\z/i
+    SHA_PATTERN = /\A[0-9a-f]{7,40}\z/i
 
     # Sub-condition keywords that require count values
     COUNT_SUB_CONDITIONS = %i[messages count].freeze
@@ -117,8 +129,14 @@ module Search
                     validate_tag_selector(node)
       when *COMMITFEST_SELECTORS
                     validate_commitfest_selector(node)
+      when *COMMIT_SELECTORS
+                    validate_commit_selector(node)
       when *LIST_SELECTORS
                     validate_list_selector(node)
+      when *PATCH_STATE_SELECTORS
+                    validate_patch_state_selector(node)
+      when *GROUP_SELECTORS
+                    node
       when :has
                     validate_has_selector(node)
       when :hidden
@@ -141,7 +159,7 @@ module Search
 
     def supports_empty_value_with_conditions?(key, conditions)
       # tag: and commitfest: can have empty value with conditions (e.g., tag:[from:me], commitfest:[tag:bugfix])
-      key.in?([ :tag, :commitfest ]) && conditions.present?
+      key.in?([ :tag, :commitfest, :commit ]) && conditions.present?
     end
 
     def validate_conditions(parent_key, parent_value, conditions)
@@ -166,6 +184,8 @@ module Search
         return nil
       end
 
+      return cond.merge(value: "any") if cond_key == :waiting && cond_value.blank?
+
       # Validate the condition value
       if cond_value.blank?
         @warnings << "Empty value for condition '#{cond_key}:' was ignored"
@@ -177,6 +197,16 @@ module Search
         parser = DateParser.new(cond_value)
         unless parser.valid?
           @warnings << "Invalid date '#{cond_value}' for condition '#{cond_key}:' was ignored"
+          return nil
+        end
+      elsif cond_key == :waiting
+        unless cond_value.casecmp?("any") || DateParser.new(cond_value).valid?
+          @warnings << "Invalid date '#{cond_value}' for condition 'waiting:' was ignored"
+          return nil
+        end
+      elsif cond_key == :released
+        unless cond_value.match?(RELEASE_PATTERN)
+          @warnings << "Invalid release '#{cond_value}' for condition 'released:' was ignored"
           return nil
         end
       elsif COUNT_SUB_CONDITIONS.include?(cond_key)
@@ -201,6 +231,8 @@ module Search
         VALID_SUB_CONDITIONS[:tag] || []
       when :commitfest
         VALID_SUB_CONDITIONS[:commitfest] || []
+      when :commit
+        VALID_SUB_CONDITIONS[:commit]
       else
         []
       end
@@ -275,6 +307,29 @@ module Search
       node
     end
 
+    def validate_commit_selector(node)
+      value = node[:value].to_s
+      if value.present? && !value.match?(SHA_PATTERN)
+        @warnings << "Commit sha '#{value}' must be 7-40 hex characters - ignored"
+        return nil
+      end
+
+      node
+    end
+
+    def validate_patch_state_selector(node)
+      key = node[:key]
+      value = node[:value].to_s.downcase
+      valid = key == :ci ? PatchStateQuery::CI_STATUSES.keys : PatchCi::BranchHealth::BUCKETS
+
+      unless valid.include?(value)
+        @warnings << "Unknown #{key}: value '#{value}' - valid values are: #{valid.join(', ')}"
+        return nil
+      end
+
+      node
+    end
+
     def validate_list_selector(node)
       node
     end
@@ -310,10 +365,25 @@ module Search
       # Check if text looks like a selector (word:something)
       if value.match?(/\A[a-z_]+:[^\s]*\z/i)
         potential_key = value.split(":").first.downcase
-        check_for_selector_typo(potential_key, value)
+        parents = sub_condition_parents(potential_key.to_sym)
+        if parents.any? && !ALL_SELECTORS.include?(potential_key.to_sym)
+          @warnings << "'#{potential_key}:' works inside #{parents.join(' or ')}, it was searched as plain text"
+        else
+          check_for_selector_typo(potential_key, value)
+        end
       end
 
       node
+    end
+
+    def sub_condition_parents(key)
+      VALID_SUB_CONDITIONS.flat_map do |parent, conditions|
+        if conditions.is_a?(Hash)
+          conditions.select { |_, keys| keys.include?(key) }.keys.map { |v| "#{parent}:#{v}[...]" }
+        else
+          conditions.include?(key) ? [ "#{parent}:[...]" ] : []
+        end
+      end
     end
 
     def check_for_selector_typo(potential_key, full_value)
@@ -339,8 +409,8 @@ module Search
         selector_str = selector.to_s
         # Check for close match using simple edit distance heuristics
         levenshtein_distance(potential_key, selector_str) <= 2 ||
-          potential_key.include?(selector_str) ||
-          selector_str.include?(potential_key)
+          (selector_str.length >= 3 &&
+            (potential_key.include?(selector_str) || selector_str.include?(potential_key)))
       end.map(&:to_s)
     end
 

@@ -447,6 +447,15 @@ RSpec.describe PatchCi::CorpusStats do
       expect(row[:count]).to eq(1)
     end
 
+    it "counts an llm-linked topic as committed" do
+      committed = create(:topic)
+      create(:patch_branch, topic: committed)
+      create(:commit_topic, topic: committed, source: "llm", confidence: 0.9)
+
+      rows = stats.patchsets_per_topic
+      expect(rows.find { |row| row[:series] == "committed" }[:count]).to eq(1)
+    end
+
     it "splits by whether the topic was committed" do
       committed = create(:topic)
       create(:patch_branch, topic: committed)

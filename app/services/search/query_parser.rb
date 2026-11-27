@@ -44,7 +44,8 @@ module Search
           str("contributors") | str("participants") | str("messages") |
           str("unread") | str("reading") | str("read") | str("new") |
           str("starred") | str("ignored") | str("notes") | str("tag") |
-          str("has") | str("hidden") | str("commitfest") | str("list")
+          str("has") | str("hidden") | str("commitfest") | str("commit") | str("list") |
+          str("ci") | str("apply") | str("group")
         ).as(:selector_key)
       end
 
@@ -59,6 +60,9 @@ module Search
           str("last_after") | str("last_before") |
           str("first_after") | str("first_before") |
           str("added_after") | str("added_before") |
+          str("committed_after") | str("committed_before") | str("committer") |
+          str("reviewer") | str("reporter") | str("tester") | str("author") | str("released") |
+          str("after") | str("waiting") |
           str("messages") | str("count") | str("from") |
           str("body") | str("name") | str("status") | str("tag")
         ).as(:condition_key)

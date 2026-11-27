@@ -358,6 +358,7 @@ module Lineage
       ids = judged.map { |v| known[v["sha"]].id } + backports.values.flatten
       stale = update? ? [] : CommitTopic.llm.where(topic_id: @run.topic_id).where.not(commit_id: ids).pluck(:commit_id)
       CommitTopic.llm.where(topic_id: @run.topic_id, commit_id: stale).delete_all
+      Topic.refresh_commit_aggregates!([ @run.topic_id ])
       TopicLinks.sync_commits!(ids | stale)
       TopicLinks.sync_fixes!(ids | stale)
     end

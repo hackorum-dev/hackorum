@@ -187,6 +187,17 @@ RSpec.describe ProfileStats do
       expect(stats.landed_patch_rate).to eq(100)
     end
 
+    it "counts a thread landed through an llm commit link" do
+      topic = create(:topic, creator_alias: person_alias)
+      create(:message, topic: topic, sender: person_alias, is_patch_submission: true)
+
+      commit = create(:commit)
+      create(:commit_topic, commit: commit, topic: topic, source: "llm", confidence: 0.9)
+      CommitPerson.create!(commit: commit, role: "author", person_id: person.id)
+
+      expect(described_class.new(person.id).landed_patch_threads).to eq(1)
+    end
+
     it "ignores llm-sourced author rows" do
       topic = create(:topic, creator_alias: person_alias)
       create(:message, topic: topic, sender: person_alias, is_patch_submission: true)
